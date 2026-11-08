@@ -2,6 +2,8 @@
 mod extensions;
 mod history;
 mod multipart;
+mod permissions;
+mod queue;
 mod remote;
 use async_trait::async_trait;
 use futures_util::{StreamExt, stream};
@@ -61,6 +63,7 @@ impl DshConnector {
 struct Correlation {
     client: String,
     event: String,
+    kind: &'static str,
 }
 pub struct DshSessionEndpoint {
     identity: String,
@@ -145,6 +148,7 @@ struct FollowState {
 }
 impl FollowState {
     async fn normalize(&mut self, value: Value) -> Result<()> {
+        queue::reject_reserved_anywhere(&value)?;
         let generation = &self.generation;
         match &self.target {
             StreamTarget::WorkspaceInventory => {
@@ -191,6 +195,12 @@ impl FollowState {
                         require(!self.began, "duplicate DSH journal snapshot")?;
                         self.began = true;
                         let entries = decode_records(array(&value, "records")?)?;
+                        let projections = value
+                            .get("projections")
+                            .filter(|v| !v.is_null())
+                            .map(queue::normalize_projection)
+                            .transpose()?
+                            .flatten();
                         let snapshot = JournalSnapshot {
                             session_id: id.clone(),
                             generation: generation.clone(),
@@ -198,11 +208,7 @@ impl FollowState {
                             window_limit: *max_messages,
                             entries,
                             has_more_before: boolean(&value, "hasMore")?,
-                            projections: value
-                                .get("projections")
-                                .filter(|v| !v.is_null())
-                                .map(|v| serde_json::from_value(v.clone()))
-                                .transpose()?,
+                            projections: projections.map(serde_json::from_value).transpose()?,
                             history_revision: None,
                         };
                         snapshot.validate()?;
@@ -222,7 +228,11 @@ impl FollowState {
                     }
                     "projection" => {
                         require(self.began, "DSH projection before snapshot")?;
-                        self.pending.push_back(json!({"type":"projection","generation":generation,"frame":{"sessionId":id,"key":value["key"],"value":value["value"],"seq":value["seq"]}}));
+                        let seq = integer(&value, "seq")?;
+                        let key = string(&value, "key")?;
+                        let projections =
+                            queue::normalize_projection_delta(key, &value["value"], seq)?;
+                        self.pending.push_back(json!({"type":"projection-block","generation":generation,"sessionId":id,"projections":projections}));
                     }
                     "assistant-stream" => {
                         require(self.began, "assistant stream before snapshot")?;
@@ -250,7 +260,22 @@ impl FollowState {
                             .map(|(id, value)| json!({"sessionId":id,field:value}))
                             .collect())
                     };
-                    self.pending.push_back(json!({"type":"baseline","generation":generation,"snapshot":{"queues":states("queues","items")?,"jobs":states("jobs","jobs")?,"projections":states("projections","projections")?}}));
+                    let projection_states = || -> Result<Vec<Value>> {
+                        let Some(values) = baseline.get("projections") else {
+                            return Ok(Vec::new());
+                        };
+                        let map = values.as_object().ok_or_else(|| {
+                            Error::Protocol("invalid DSH control projection map".into())
+                        })?;
+                        let mut states = Vec::new();
+                        for (id, value) in map {
+                            if let Some(projections) = queue::normalize_projection(value)? {
+                                states.push(json!({"sessionId":id,"projections":projections}));
+                            }
+                        }
+                        Ok(states)
+                    };
+                    self.pending.push_back(json!({"type":"baseline","generation":generation,"snapshot":{"queues":states("queues","items")?,"jobs":states("jobs","jobs")?,"projections":projection_states()?}}));
                 }
                 "queue" | "jobs" => {
                     require(self.began, "control delta before baseline")?;
@@ -260,7 +285,12 @@ impl FollowState {
                 }
                 "projection" => {
                     require(self.began, "projection before baseline")?;
-                    self.pending.push_back(json!({"type":"projection","generation":generation,"state":{"sessionId":value["sessionId"],"projections":{"asOfSeq":value["seq"],"values":{string(&value,"key")?:value["value"]}}}}));
+                    let projections = queue::normalize_projection_delta(
+                        string(&value, "key")?,
+                        &value["value"],
+                        integer(&value, "seq")?,
+                    )?;
+                    self.pending.push_back(json!({"type":"projection","generation":generation,"state":{"sessionId":value["sessionId"],"projections":projections}}));
                 }
                 _ => return Err(Error::Protocol("unknown DSH control frame".into())),
             },
@@ -275,6 +305,7 @@ impl FollowState {
                                 .remote
                                 .call("session/list", json!({"_request":{}}), &rpc())
                                 .await?;
+                            queue::reject_reserved_anywhere(&snapshot)?;
                             let mut cursor = snapshot
                                 .get("nextCursor")
                                 .and_then(Value::as_str)
@@ -290,6 +321,7 @@ impl FollowState {
                                         &rpc(),
                                     )
                                     .await?;
+                                queue::reject_reserved_anywhere(&page)?;
                                 snapshot["items"]
                                     .as_array_mut()
                                     .ok_or_else(|| Error::Protocol("invalid inventory".into()))?
@@ -299,6 +331,7 @@ impl FollowState {
                                     .and_then(Value::as_str)
                                     .map(String::from);
                             }
+                            queue::normalize_inventory_snapshot(&mut snapshot)?;
                             self.pending.push_back(json!({"type":"baseline","generation":generation,"snapshot":snapshot}));
                         } else {
                             self.pending
@@ -311,9 +344,13 @@ impl FollowState {
                             let args = array(&value, "args")?;
                             let event = string(&value, "event")?;
                             let frame = match (event, args.as_slice()) {
-                                ("api-session/added", [session]) => Some(
-                                    json!({"type":"upsert","generation":generation,"session":session}),
-                                ),
+                                ("api-session/added", [session]) => {
+                                    let mut session = session.clone();
+                                    queue::normalize_inventory_row(&mut session)?;
+                                    Some(
+                                        json!({"type":"upsert","generation":generation,"session":session}),
+                                    )
+                                }
                                 ("api-session/removed", [id]) => Some(
                                     json!({"type":"remove","generation":generation,"sessionId":id}),
                                 ),
@@ -348,10 +385,19 @@ impl FollowState {
                                     Correlation {
                                         client: client.clone(),
                                         event: event_id.into(),
+                                        kind: if event == "approval/request" {
+                                            "approval"
+                                        } else {
+                                            "question"
+                                        },
                                     },
                                 );
-                                let mut payload = value["request"].clone();
-                                payload["sessionId"] = json!(agent);
+                                let payload = shared_actionable_payload(
+                                    value["request"].clone(),
+                                    event,
+                                    event_id,
+                                    agent,
+                                )?;
                                 self.pending.push_back(json!({"type":"upsert","generation":generation,"actionable":{"id":event_id,"sessionId":agent,"revision":0,"kind":if event=="approval/request"{"approval"}else{"question"},"payload":payload}}));
                             }
                         } else {
@@ -420,6 +466,9 @@ impl SessionEndpoint for DshSessionEndpoint {
     fn supports_events(&self) -> bool {
         true
     }
+    fn sequenced_queue_projection_key(&self) -> Option<&'static str> {
+        Some(SEQUENCED_QUEUE_PROJECTION_KEY)
+    }
     async fn events(&self) -> Result<FrameStream> {
         let raw = self.remote.open("$events", json!({})).await?;
         let generation = self.generation.clone();
@@ -428,6 +477,7 @@ impl SessionEndpoint for DshSessionEndpoint {
             (raw, None::<String>, generation, remote),
             |(mut raw, mut client, generation, remote)| async move {
                 let value = raw.next().await.ok_or(Error::Disconnected)??;
+                queue::reject_reserved_anywhere(&value)?;
                 let frame = if client.is_none() {
                     require(value["type"] == "ready", "endpoint events need readiness")?;
                     client = Some(string(&value, "clientId")?.into());
@@ -505,6 +555,7 @@ impl SessionEndpoint for DshSessionEndpoint {
             .remote
             .call("session/page", json!({"request":query}), &rpc())
             .await?;
+        queue::reject_reserved_anywhere(&result)?;
         let page = HistoryPage {
             session_id: request.session_id.clone(),
             through_sequence: request.through_sequence,
@@ -523,6 +574,7 @@ impl SessionEndpoint for DshSessionEndpoint {
             .get(id)
             .cloned()
             .ok_or_else(|| unsupported("actionable is no longer pending"))?;
+        let outcome = remote_actionable_outcome(outcome, correlation.kind);
         self.remote.call("$events/result",json!({"clientId":correlation.client,"eventId":correlation.event,"outcome":{"kind":"result","value":outcome}}),&rpc()).await?;
         self.actionables.lock().await.remove(id);
         let _ = self
@@ -535,6 +587,7 @@ impl SessionEndpoint for DshSessionEndpoint {
         let mut seen = BTreeSet::new();
         let row = loop {
             let result=self.remote.call("session/list",json!({"_request":cursor.as_ref().map(|c|json!({"cursor":c})).unwrap_or(json!({}))}),&rpc()).await?;
+            queue::reject_reserved_anywhere(&result)?;
             if let Some(row) = array(&result, "items")?
                 .iter()
                 .find(|row| row["sessionId"] == id)
@@ -555,6 +608,7 @@ impl SessionEndpoint for DshSessionEndpoint {
                 &rpc(),
             )
             .await?;
+        queue::reject_remote_projection(&projections)?;
         let working_directory = sequenced_working_directory(&projections)?;
         Ok(SessionLocator {
             address: SessionAddress {
@@ -630,6 +684,12 @@ impl SessionEndpoint for DshSessionEndpoint {
         Ok(serde_json::from_value(self.remote.call("workspaceFiles/read",json!({"workspaceFileScopeId":id,"path":path,"range":{"offset":offset,"limit":limit}}),&rpc()).await?)?)
     }
     async fn call(&self, method: &str, mut payload: Value, rpc_id: &str) -> Result<Value> {
+        if matches!(
+            method,
+            "approvals.policy" | "approvals.mode" | "approvals.select"
+        ) {
+            return self.permission_call(method, &payload, rpc_id).await;
+        }
         if method == "subagents.list" || method == "subagents/list" {
             return self
                 .child_catalog(string(&payload, "parentSessionId")?, rpc_id)
@@ -671,7 +731,8 @@ impl SessionEndpoint for DshSessionEndpoint {
             return Ok(json!({"accepted":true,"rpcId":rpc_id,"messageId":receipt["messageId"]}));
         }
         if let Some((endpoint, args)) = extensions::route(method, &payload)? {
-            return self.remote.call(&endpoint, args, rpc_id).await;
+            let result = self.remote.call(&endpoint, args, rpc_id).await?;
+            return extensions::normalize_feedback_reply(method, result);
         }
         let endpoint = match method {
             "session.uploadFile" => {
@@ -703,6 +764,7 @@ impl SessionEndpoint for DshSessionEndpoint {
                             rpc_id,
                         )
                         .await?;
+                    queue::reject_remote_projection(&value)?;
                     let limits = &value["values"]["imageLimits"];
                     if value["kind"] != "migration-required" && limits.is_object() {
                         policy = json!({"inlineMediaTypes":limits["mediaTypes"],"maxAttachmentBytes":limits["maxImageBytes"],"maxAttachmentsPerMessage":limits["maxImagesPerMessage"],"maxMessageAttachmentBytes":limits["maxMessageImageBytes"],"maxImagePixels":limits["maxImagePixels"],"maxImageDimension":limits["maxImageDimension"]});
@@ -761,6 +823,7 @@ impl SessionEndpoint for DshSessionEndpoint {
                             rpc_id,
                         )
                         .await?;
+                    queue::reject_remote_projection(&projections)?;
                     let next = &projections["values"]["modelSelection"]["next"];
                     if projections["kind"] != "migration-required" && next.is_object() {
                         current = next.clone();
@@ -854,6 +917,7 @@ impl DshSessionEndpoint {
         let mut seen = BTreeSet::new();
         loop {
             let page = self.remote.call("session/list", json!({"_request":cursor.as_ref().map(|c|json!({"cursor":c})).unwrap_or(json!({}))}), &rpc()).await?;
+            queue::reject_reserved_anywhere(&page)?;
             if let Some(row) = array(&page, "items")?.iter().find(|r| r["sessionId"] == id) {
                 if let Some(parent) = row["parentSessionId"]
                     .as_str()
@@ -887,6 +951,7 @@ impl DshSessionEndpoint {
                 rpc_id,
             )
             .await?;
+        queue::reject_remote_projection(&projection)?;
         require(
             projection["kind"] == "sequenced"
                 || (self.host.product.version == "0.2.0-rc.2"
@@ -913,6 +978,7 @@ impl DshSessionEndpoint {
         let mut seen = BTreeSet::new();
         let available = loop {
             let page = self.remote.call("session/list", json!({"_request":cursor.as_ref().map(|c|json!({"cursor":c})).unwrap_or(json!({}))}), rpc_id).await?;
+            queue::reject_reserved_anywhere(&page)?;
             if let Some(row) = array(&page, "items")?
                 .iter()
                 .find(|r| r["sessionId"] == parent)
@@ -928,6 +994,42 @@ impl DshSessionEndpoint {
         Ok(json!({"entries":normalized,"parentAvailable":available}))
     }
 }
+/// Add the shared consumer identity while retaining the original tool-call facts.
+fn shared_actionable_payload(
+    mut payload: Value,
+    event: &str,
+    event_id: &str,
+    session: &str,
+) -> Result<Value> {
+    require(payload.is_object(), "invalid DSH actionable request")?;
+    payload["sessionId"] = json!(session);
+    if event == "approval/request" {
+        // A pending approval is identified by the Remote event, not the tool call.
+        // Shared consumers use this field to construct the response envelope.
+        payload["approvalId"] = json!(event_id);
+    }
+    Ok(payload)
+}
+
+/// Shared Kernel-style envelopes are addressed by session; DSH waterfall
+/// handlers consume the answer body or approval word, as ClientKit does.
+/// Native DSH shapes and unknown kinds remain lossless.
+fn remote_actionable_outcome(mut outcome: Value, kind: &str) -> Value {
+    let Some(object) = outcome.as_object_mut() else {
+        return outcome;
+    };
+    if kind == "question" && object.contains_key("answer") && !object.contains_key("answers") {
+        return object.remove("answer").expect("present answer");
+    }
+    if kind == "approval"
+        && object.contains_key("approvalId")
+        && object.get("outcome").is_some_and(Value::is_string)
+    {
+        return object.remove("outcome").expect("present outcome");
+    }
+    outcome
+}
+
 fn pending_inbox_ids(projections: &Value) -> Result<Vec<String>> {
     let mut ids = Vec::new();
     let mut seen = BTreeSet::new();
@@ -974,6 +1076,306 @@ fn sequenced_working_directory(projections: &Value) -> Result<Option<String>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use futures_util::{SinkExt, StreamExt};
+    use tokio::{
+        io::{AsyncReadExt, AsyncWriteExt},
+        net::{TcpListener, TcpStream},
+    };
+    use tokio_tungstenite::{accept_async, tungstenite::Message};
+
+    async fn read_http_request(stream: &mut TcpStream) -> (String, Vec<u8>) {
+        let mut bytes = Vec::new();
+        while !bytes.ends_with(b"\r\n\r\n") {
+            let mut byte = [0];
+            stream.read_exact(&mut byte).await.unwrap();
+            bytes.push(byte[0]);
+        }
+        let header_end = bytes.len();
+        let headers = String::from_utf8(bytes.clone()).unwrap();
+        let content_length = headers
+            .lines()
+            .find_map(|line| {
+                let (name, value) = line.split_once(':')?;
+                name.eq_ignore_ascii_case("content-length")
+                    .then(|| value.trim().parse::<usize>().unwrap())
+            })
+            .unwrap_or_default();
+        bytes.resize(header_end + content_length, 0);
+        stream.read_exact(&mut bytes[header_end..]).await.unwrap();
+        let request_line = headers.lines().next().unwrap().to_owned();
+        (request_line, bytes[header_end..].to_vec())
+    }
+
+    async fn serve_http(mut stream: TcpStream, baseline: Value) {
+        let (request_line, body) = read_http_request(&mut stream).await;
+        let (status, value) = if request_line.starts_with("GET /api/agentkit/harness-version ") {
+            (
+                "200 OK",
+                json!({"product":"@deepseek-ai/dsh","source":"@deepseek-ai/dsh-app-boot#getDshRuntimeVersion","version":"0.2.1-rc.2"}),
+            )
+        } else if request_line.starts_with("POST /api/session/list ") {
+            let request: Value = serde_json::from_slice(&body).unwrap();
+            (
+                "200 OK",
+                json!({"type":"server-response","rpcId":request["rpcId"],"result":{"ok":true,"value":baseline}}),
+            )
+        } else {
+            ("404 Not Found", json!({"error":"unexpected request"}))
+        };
+        let body = value.to_string();
+        let response = format!(
+            "HTTP/1.1 {status}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+            body.len()
+        );
+        stream.write_all(response.as_bytes()).await.unwrap();
+    }
+
+    async fn serve_events(stream: TcpStream, added: Value) {
+        let Ok(mut socket) = accept_async(stream).await else {
+            return;
+        };
+        while let Some(Ok(Message::Text(text))) = socket.next().await {
+            let Ok(frame) = serde_json::from_str::<Value>(&text) else {
+                return;
+            };
+            if frame["type"] == "open" && frame["endpoint"] == "$events" {
+                let stream_id = frame["streamId"].as_str().unwrap();
+                for value in [
+                    json!({"type":"ready","clientId":"mock-client"}),
+                    json!({"type":"emit","event":"api-session/added","args":[added]}),
+                ] {
+                    let outgoing = json!({"type":"item","streamId":stream_id,"value":value});
+                    if socket
+                        .send(Message::Text(outgoing.to_string().into()))
+                        .await
+                        .is_err()
+                    {
+                        return;
+                    }
+                }
+            } else if frame["type"] == "cancel" {
+                return;
+            }
+        }
+    }
+
+    async fn serve_mock(baseline: Value, added: Value) -> (String, tokio::task::JoinHandle<()>) {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let task = tokio::spawn(async move {
+            loop {
+                let Ok((stream, _)) = listener.accept().await else {
+                    return;
+                };
+                let mut prefix = [0; 128];
+                let request = tokio::time::timeout(Duration::from_secs(2), async {
+                    loop {
+                        let count = stream.peek(&mut prefix).await.unwrap_or_default();
+                        let request = String::from_utf8_lossy(&prefix[..count]);
+                        if request.contains("\r\n") {
+                            break request.into_owned();
+                        }
+                        tokio::task::yield_now().await;
+                    }
+                })
+                .await
+                .expect("mock request line arrives");
+                let baseline = baseline.clone();
+                let added = added.clone();
+                if request.starts_with("GET /api/remote.mux ") {
+                    tokio::spawn(serve_events(stream, added));
+                } else {
+                    tokio::spawn(serve_http(stream, baseline));
+                }
+            }
+        });
+        (format!("http://{address}/"), task)
+    }
+
+    #[tokio::test]
+    async fn pinned_dsh_session_summaries_survive_rpc_baseline_and_added_event() {
+        let child = json!({
+            "sessionId":"child",
+            "updatedAt":1700000000100_i64,
+            "agentAvailable":false,
+            "formatStatus":"current",
+            "running":false,
+            "blank":false,
+            "parentSessionId":"parent",
+            "origin":"subagent",
+            "cwd":"/work/child",
+            "projections":{"kind":"sequenced","asOfSeq":12,"values":{"sessionListMetadata":{"blank":false,"lastPromptAt":1700000000100_i64}}}
+        });
+        let parent_only_fork = json!({
+            "sessionId":"fork-without-origin",
+            "updatedAt":1700000000200_i64,
+            "agentAvailable":false,
+            "running":false,
+            "blank":false,
+            "parentSessionId":"parent",
+            "cwd":"/work/fork"
+        });
+        let no_origin = json!({
+            "sessionId":"ordinary",
+            "updatedAt":1700000000300_i64,
+            "agentAvailable":true,
+            "running":true,
+            "blank":false,
+            "cwd":"/work"
+        });
+        // The supported 0.2.0-rc.2 public summary has no formatStatus field.
+        // Exercise that actual shape, rather than merely relabeling a mock runtime version.
+        let legacy_child = json!({
+            "sessionId":"legacy-child", "updatedAt":1700000000050_i64,
+            "agentAvailable":false, "running":false, "blank":false,
+            "parentSessionId":"parent", "origin":"subagent", "cwd":"/work/legacy-child"
+        });
+        let baseline = json!({"items":[child.clone(),legacy_child.clone(),parent_only_fork.clone(),no_origin.clone()]});
+        let added = json!({
+            "sessionId":"live-child",
+            "updatedAt":1700000000400_i64,
+            "agentAvailable":true,
+            "formatStatus":"current",
+            "running":true,
+            "blank":false,
+            "parentSessionId":"parent",
+            "origin":"subagent",
+            "cwd":"/work/live-child",
+            "projections":{"kind":"sequenced","asOfSeq":19,"values":{"sessionListMetadata":{"blank":false,"lastPromptAt":1700000000400_i64}}}
+        });
+        let (url, server) = serve_mock(baseline, added.clone()).await;
+        let mut config = DshConfiguration::new("dsh-test", &url).unwrap();
+        config.timeout = Duration::from_secs(2);
+        let remote = Arc::new(Remote::connect(config).await.unwrap());
+        let (resolved, _) = broadcast::channel(8);
+        let endpoint = DshSessionEndpoint {
+            identity: "dsh-test".into(),
+            host: HostDescription {
+                protocol_version: 3,
+                product: Product {
+                    name: "DeepSeek Harness".into(),
+                    version: "0.2.1-rc.2".into(),
+                },
+                capabilities: BTreeSet::new(),
+                cwd: "/work".into(),
+                home: "/work".into(),
+                provider: None,
+                model: None,
+                attached_sessions: 0,
+                can_open_path: false,
+            },
+            remote,
+            generation: "wire-test-generation".into(),
+            actionables: Arc::new(Mutex::new(BTreeMap::new())),
+            resolved,
+            child_addresses: Mutex::new(BTreeMap::new()),
+        };
+        let mut frames = endpoint
+            .follow(StreamTarget::SessionInventory)
+            .await
+            .unwrap();
+        let first = tokio::time::timeout(Duration::from_secs(2), frames.next())
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap();
+        assert_eq!(first["type"], "baseline");
+        assert_eq!(
+            first["snapshot"]["items"],
+            json!([child, legacy_child, parent_only_fork, no_origin])
+        );
+        let second = tokio::time::timeout(Duration::from_secs(2), frames.next())
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap();
+        assert_eq!(second["type"], "upsert");
+        assert_eq!(second["session"], added);
+        assert!(second["session"].get("ephemeral").is_none());
+        assert!(first["snapshot"]["items"][1].get("formatStatus").is_none());
+        assert!(first["snapshot"]["items"][3].get("origin").is_none());
+        assert!(first["snapshot"]["items"][2].get("origin").is_none());
+        assert!(
+            first["snapshot"]["items"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .all(|item| item.get("ephemeral").is_none())
+        );
+        drop(frames);
+        drop(endpoint);
+        server.abort();
+    }
+
+    #[test]
+    fn dsh_approval_payload_supports_the_web_consumer_response_shape() {
+        let payload = shared_actionable_payload(
+            json!({"toolName":"write","callId":"tool-1","reason":"outside workspace"}),
+            "approval/request",
+            "event-2",
+            "session-3",
+        )
+        .unwrap();
+        assert_eq!(payload["callId"], "tool-1");
+        assert_eq!(payload["approvalId"], "event-2");
+        for decision in ["allowed-once", "rejected", "cancelled"] {
+            let web_response = json!({"sessionId":payload["sessionId"], "approvalId":payload["approvalId"], "outcome":decision});
+            assert_eq!(
+                remote_actionable_outcome(web_response, "approval"),
+                json!(decision)
+            );
+        }
+        let question =
+            shared_actionable_payload(json!({"questions":[]}), "user-questions/request", "q", "s")
+                .unwrap();
+        assert!(question.get("approvalId").is_none());
+        assert!(shared_actionable_payload(Value::Null, "approval/request", "e", "s").is_err());
+    }
+    #[test]
+    fn actionable_responses_unwrap_shared_envelopes_by_registered_kind() {
+        let answer = json!({"answers":[{"id":"q","selected":["继续"],"custom":""}]});
+        let envelope = json!({"sessionId":"s","answer":answer});
+        assert_eq!(
+            remote_actionable_outcome(envelope.clone(), "question"),
+            answer
+        );
+        assert_eq!(
+            remote_actionable_outcome(answer.clone(), "question"),
+            answer
+        );
+        for word in ["allowed-once", "rejected"] {
+            assert_eq!(
+                remote_actionable_outcome(
+                    json!({"sessionId":"s","approvalId":"p","outcome":word}),
+                    "approval"
+                ),
+                json!(word)
+            );
+            assert_eq!(
+                remote_actionable_outcome(json!(word), "approval"),
+                json!(word)
+            );
+        }
+        assert_eq!(
+            remote_actionable_outcome(envelope.clone(), "unknown"),
+            envelope
+        );
+        let native = json!({"answers":[],"answer":"not-an-envelope"});
+        assert_eq!(
+            remote_actionable_outcome(native.clone(), "question"),
+            native
+        );
+        let unrelated = json!({"outcome":"rejected"});
+        assert_eq!(
+            remote_actionable_outcome(unrelated.clone(), "approval"),
+            unrelated
+        );
+        let wrong_kind = json!({"approvalId":"p","outcome":"allowed-once"});
+        assert_eq!(
+            remote_actionable_outcome(wrong_kind.clone(), "question"),
+            wrong_kind
+        );
+    }
     #[test]
     fn inherited_inbox_keeps_order_and_rejects_bad_ids() {
         assert_eq!(pending_inbox_ids(&json!({"values":{"inbox":{"next-turn":[{"id":"first"}],"next-step":[{"id":"second"}]}}})).unwrap(),["first","second"]);
@@ -1002,6 +1404,12 @@ mod tests {
             )
             .unwrap(),
             None
+        );
+        assert!(
+            sequenced_working_directory(
+                &json!({"kind":"cached","asOfSeq":9000,"values":{"workingDirectory":"/stale"}})
+            )
+            .is_err()
         );
         assert!(sequenced_working_directory(&json!({"kind":"unknown","asOfSeq":0})).is_err());
         assert!(sequenced_working_directory(&json!({"kind":"sequenced","values":{}})).is_err());

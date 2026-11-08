@@ -11,12 +11,29 @@ export interface TranscriptAnnotationSource {
   end: number;
   fingerprint: string;
 }
+export interface Utf16SelectionRange {
+  location: number;
+  length: number;
+}
+export interface ArtifactSelectionReference {
+  documentId: string;
+  artifactId: string;
+  artifactType: string;
+  fieldPath: string[];
+  revision: string;
+  digest: string;
+  range: Utf16SelectionRange;
+  quote: string;
+  contextBefore: string;
+  contextAfter: string;
+}
 export interface ComposerAnnotation {
   id: string;
   source: string;
   excerpt: string;
   comment: string;
   sourceLocator?: TranscriptAnnotationSource;
+  artifactReference?: ArtifactSelectionReference;
 }
 export interface AnnotationInput {
   text: string;
@@ -74,3 +91,56 @@ export interface TranscriptReportedUsage {
   outputTokens: number;
   isComplete: boolean;
 }
+export interface PermissionOption {
+  value: string;
+  title?: string | null;
+  description?: string | null;
+}
+export interface PermissionState {
+  options: PermissionOption[];
+  currentValue: string | null;
+}
+export interface PermissionPolicy {
+  threadLevel: PermissionOption[];
+  serverLevel: PermissionState;
+}
+export interface PermissionModeState {
+  mode: string | null;
+}
+/** Optional shared question cancellation; submit verbatim through respond. */
+export interface QuestionCancellationOutcome {
+  sessionId: string;
+  cancelQuestion: true;
+}
+export interface RunScope {
+  endpointId: string;
+  threadId: string;
+  sessionId: string;
+}
+export interface ConnectionPresentation {
+  phase: 'connecting' | 'connected' | 'reconnecting' | 'degraded' | 'failed' | 'stopped';
+  canSubmit: boolean;
+  historyIsStale: boolean;
+  message?: string | null;
+}
+/** Shared AgentKit Run read model; all permission fields are server-derived. */
+export interface RunPresentation {
+  scope: RunScope;
+  connectionEpoch: number;
+  phase: 'loading' | 'idle' | 'running' | 'waitingForInput' | 'interrupted' | 'archived' | 'unavailable';
+  connection: ConnectionPresentation;
+  canSubmit: boolean;
+  canCancel: boolean;
+  canUpdateQueue: boolean;
+  actionables: unknown[];
+  queue: unknown[];
+  jobs: unknown[];
+  error?: string | null;
+}
+/** Remove one currently queued input using the observed connection epoch. */
+export interface AgentQueueRemoveRequest {
+  sessionId: string;
+  itemId: string;
+  connectionEpoch: number;
+}
+export type AgentQueueRemoveMethod = 'agent.queue.remove';

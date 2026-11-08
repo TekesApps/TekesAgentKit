@@ -1,5 +1,11 @@
 //! ClientKit-aligned headless SessionEndpoint contract. Extension payloads stay lossless JSON.
 mod annotations;
+mod permissions;
+pub use permissions::*;
+mod artifact_selection;
+pub use artifact_selection::*;
+mod feedback;
+pub use feedback::*;
 mod commands;
 pub use annotations::*;
 mod thread_actions;
@@ -8,7 +14,10 @@ pub use thread_actions::*;
 mod capabilities;
 mod registry;
 pub use capabilities::*;
+mod search;
+pub use search::*;
 mod session;
+mod web;
 use async_trait::async_trait;
 use futures_util::stream::BoxStream;
 pub use registry::{HARNESS_EXTENSION_EVENTS, REQUIRED_EVENTS, SURFACE_EVENTS};
@@ -16,6 +25,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 pub use session::*;
 use std::collections::{BTreeMap, BTreeSet};
+pub use web::*;
 
 pub type Result<T> = std::result::Result<T, Error>;
 pub type FrameStream = BoxStream<'static, Result<Value>>;
@@ -216,6 +226,7 @@ pub struct SessionEvent {
     pub kind: String,
     #[serde(deserialize_with = "decode_i64")]
     pub seq: i64,
+    /// Unix milliseconds, matching the public SEP event wire contract.
     pub time: f64,
     pub data: Value,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -427,12 +438,19 @@ impl GenerationValidator {
     }
 }
 
+/// Adapter-owned versioned queue value; remote projections may not impersonate it.
+pub const SEQUENCED_QUEUE_PROJECTION_KEY: &str = "agentkit.queue.v1";
+
 #[async_trait]
 pub trait SessionEndpoint: Send + Sync {
     fn identity(&self) -> &str;
     fn host(&self) -> &HostDescription;
     fn capabilities(&self) -> EndpointCapabilities {
         EndpointCapabilities::default()
+    }
+    /// Explicit local adapter authority, never inferred from an opaque remote key.
+    fn sequenced_queue_projection_key(&self) -> Option<&'static str> {
+        None
     }
     fn content_kind(&self) -> SessionContentKind {
         SessionContentKind::Journal

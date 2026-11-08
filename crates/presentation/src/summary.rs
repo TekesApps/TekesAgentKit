@@ -1,9 +1,10 @@
 use crate::{AgentTask, RunScope, TranscriptSnapshot};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::borrow::Cow;
 use std::collections::BTreeSet;
 use tekes_agent_contract::{Result, require};
-use tekes_agent_session::SessionProjection;
+use tekes_agent_session::{MemoryProjectionStore, SessionProjection};
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +18,25 @@ pub struct SummarySubagent {
     pub id: String,
     pub title: String,
     pub session_id: Option<String>,
+    /// Child session execution status, never the parent tool-call phase. Empty
+    /// means no observed status; retained facts do not imply a live connection.
     pub status: String,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SummarySubagentIndicator {
+    Running,
+    Failed,
+}
+impl SummarySubagent {
+    /// ClientKit SummaryProviders uses only these child-execution statuses.
+    /// Complete/idle/unknown deliberately have no success or inferred dot.
+    pub fn indicator(&self) -> Option<SummarySubagentIndicator> {
+        match self.status.as_str() {
+            "running" | "in_progress" | "working" => Some(SummarySubagentIndicator::Running),
+            "failed" | "interrupted" => Some(SummarySubagentIndicator::Failed),
+            _ => None,
+        }
+    }
 }
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -63,6 +82,41 @@ pub struct SummaryFacts {
     pub usage: Option<SummaryUsage>,
 }
 impl SummaryFacts {
+    /// Read retained facts from one endpoint authority. No child hydration or
+    /// status inference from control mode, parent execution or tool results.
+    /// Connection freshness remains in the existing Run connection snapshot.
+    pub fn read_with_store(
+        scope: &RunScope,
+        store: &MemoryProjectionStore,
+        transcript: &TranscriptSnapshot,
+    ) -> Result<Self> {
+        scope.validate()?;
+        require(
+            scope.endpoint_id == store.endpoint_id,
+            "Summary endpoint mismatch",
+        )?;
+        let session = store.sessions.get(&scope.session_id).ok_or_else(|| {
+            tekes_agent_contract::Error::Protocol("Summary parent unavailable".into())
+        })?;
+        let mut facts = Self::read(scope, session, transcript)?;
+        for child in &mut facts.subagents {
+            let candidate = transcript
+                .tools
+                .iter()
+                .find(|tool| tool.id == child.id)
+                .and_then(|tool| tool.result.as_ref())
+                .and_then(subagent_result_candidate);
+            child.session_id = candidate
+                .as_deref()
+                .and_then(|id| known_child_session_id(store, scope, id));
+            child.status = child
+                .session_id
+                .as_deref()
+                .map(|id| child_session_status(store, id))
+                .unwrap_or_default();
+        }
+        Ok(facts)
+    }
     pub fn read(
         scope: &RunScope,
         session: &SessionProjection,
@@ -131,8 +185,13 @@ impl SummaryFacts {
             usage.is_cost_complete = usage.total_tokens() == 0;
         }
         for tool in &transcript.tools {
+            if !matches!(tool.name.as_str(), "task" | "subagent" | "subagents") {
+                continue;
+            }
+            let arguments = summary_arguments(&tool.arguments);
             if tool.name == "task"
-                && let Some(name) = tool.arguments["task_name"]
+                && let Some(arguments) = arguments.as_deref()
+                && let Some(name) = arguments["task_name"]
                     .as_str()
                     .filter(|s| !s.trim().is_empty())
             {
@@ -141,7 +200,14 @@ impl SummaryFacts {
                     id: tool.id.clone(),
                     scope: scope.clone(),
                     name: name.into(),
-                    status: tool.phase.clone(),
+                    // Tool calls use `doing`; formal Task wire states do not.
+                    // Adapt only this passive-tool source, preserving the
+                    // original Transcript phase and formal unknown-state rules.
+                    status: if tool.phase == "doing" {
+                        "in_progress".into()
+                    } else {
+                        tool.phase.clone()
+                    },
                     kind: "task".into(),
                 });
             }
@@ -149,17 +215,22 @@ impl SummaryFacts {
                 let title = ["brief", "description"]
                     .into_iter()
                     .find_map(|key| {
-                        tool.arguments[key]
-                            .as_str()
+                        arguments
+                            .as_deref()
+                            .and_then(|arguments| arguments[key].as_str())
                             .map(str::trim)
                             .filter(|s| !s.is_empty())
+                            .map(str::to_owned)
                     })
-                    .unwrap_or("Subagent");
+                    .unwrap_or_else(|| tool.presentation_title());
                 facts.subagents.push(SummarySubagent {
                     id: tool.id.clone(),
-                    title: title.into(),
-                    session_id: tool.result.as_ref().and_then(subagent_result_id),
-                    status: tool.phase.clone(),
+                    title,
+                    // A UUID-shaped value in result text is only a candidate. Without a store
+                    // inventory this projection cannot authorize navigation; read_with_store
+                    // validates candidates against the same endpoint's known sessions.
+                    session_id: None,
+                    status: String::new(),
                 });
             }
         }
@@ -174,16 +245,22 @@ impl SummaryFacts {
             .tasks
             .iter()
             .filter(|t| {
-                t.scope.endpoint_id == current.endpoint_id && t.scope.thread_id == current.thread_id
+                !t.id.trim().is_empty()
+                    && t.scope.validate().is_ok()
+                    && t.scope.endpoint_id == current.endpoint_id
+                    && t.scope.thread_id == current.thread_id
             })
             .map(|task| SummaryRow {
                 id: task.id.clone(),
                 title: task.name.clone(),
                 value: Value::String(task.canonical_status().into()),
-                action: task.independent_run().map(|scope| SummaryAction::OpenTask {
-                    task_id: task.id.clone(),
-                    scope,
-                }),
+                action: task
+                    .independent_run()
+                    .filter(|scope| scope.validate().is_ok())
+                    .map(|scope| SummaryAction::OpenTask {
+                        task_id: task.id.clone(),
+                        scope,
+                    }),
             })
             .collect();
         sections.push(SummarySection {
@@ -195,13 +272,23 @@ impl SummaryFacts {
             rows: self
                 .subagents
                 .iter()
+                .filter(|s| !s.id.trim().is_empty())
                 .map(|s| SummaryRow {
                     id: s.id.clone(),
                     title: s.title.clone(),
-                    value: Value::String(s.status.clone()),
+                    value: if s.status.is_empty() {
+                        Value::Null
+                    } else {
+                        Value::String(s.status.clone())
+                    },
                     action: s
                         .session_id
                         .as_ref()
+                        .filter(|child| {
+                            !child.trim().is_empty()
+                                && *child != &current.session_id
+                                && !current.session_id.ends_with(&format!(":{child}"))
+                        })
                         .map(|child| SummaryAction::OpenSubagent {
                             parent: current.clone(),
                             child_id: child.clone(),
@@ -234,7 +321,7 @@ impl SummaryFacts {
             rows: self
                 .artifacts
                 .iter()
-                .filter(|a| seen.insert(&a.id))
+                .filter(|a| !a.id.trim().is_empty() && seen.insert(&a.id))
                 .map(|a| SummaryRow {
                     id: a.id.clone(),
                     title: a.id.rsplit('/').next().unwrap_or(&a.id).into(),
@@ -246,8 +333,8 @@ impl SummaryFacts {
                 })
                 .collect(),
         });
-        if let Some(usage) = &self.usage {
-            let rows = [
+        let rows = if let Some(usage) = &self.usage {
+            [
                 ("total", serde_json::json!(usage.total_tokens())),
                 ("input", serde_json::json!(usage.input_tokens)),
                 ("output", serde_json::json!(usage.output_tokens)),
@@ -262,12 +349,24 @@ impl SummaryFacts {
                 value,
                 action: None,
             })
-            .collect();
-            sections.push(SummarySection {
-                id: "usage".into(),
-                rows,
-            });
-        }
+            .collect()
+        } else {
+            // ClientKit keeps the usage section visible for a loaded Summary and
+            // renders Unavailable for all six fields when the mirror has no row.
+            ["total", "input", "output", "cache", "hit-rate", "cost"]
+                .into_iter()
+                .map(|id| SummaryRow {
+                    id: id.into(),
+                    title: id.into(),
+                    value: Value::String("unavailable".into()),
+                    action: None,
+                })
+                .collect()
+        };
+        sections.push(SummarySection {
+            id: "usage".into(),
+            rows,
+        });
         sections.retain(|s| !s.rows.is_empty());
         sections
     }
@@ -275,10 +374,22 @@ impl SummaryFacts {
         self.scope.validate()?;
         require(
             self.tasks.iter().all(|t| {
-                t.scope.endpoint_id == self.scope.endpoint_id
+                !t.id.trim().is_empty()
+                    && t.scope.validate().is_ok()
+                    && t.scope.endpoint_id == self.scope.endpoint_id
                     && t.scope.thread_id == self.scope.thread_id
             }),
-            "foreign task scope",
+            "invalid or foreign summary task",
+        )?;
+        require(
+            self.subagents.iter().all(|s| !s.id.trim().is_empty()),
+            "invalid summary subagent identity",
+        )?;
+        require(
+            self.artifacts
+                .iter()
+                .all(|artifact| !artifact.id.trim().is_empty()),
+            "invalid summary artifact identity",
         )
     }
 }
@@ -305,6 +416,18 @@ pub struct SummarySection {
     pub id: String,
     pub rows: Vec<SummaryRow>,
 }
+/// Summary reads one decoded object while leaving the transcript's original arguments intact.
+/// Some harnesses publish tool-call arguments as a single JSON-encoded object string.
+fn summary_arguments(arguments: &Value) -> Option<Cow<'_, Value>> {
+    match arguments {
+        Value::Object(_) => Some(Cow::Borrowed(arguments)),
+        Value::String(encoded) => serde_json::from_str::<Value>(encoded)
+            .ok()
+            .filter(Value::is_object)
+            .map(Cow::Owned),
+        _ => None,
+    }
+}
 /// Host sections (for example Git) are explicit additions in caller order, with empty sections omitted.
 pub fn append_summary_sections(
     sections: &mut Vec<SummarySection>,
@@ -313,9 +436,49 @@ pub fn append_summary_sections(
     sections.extend(host.into_iter().filter(|s| !s.rows.is_empty()));
 }
 
-// ClientKit resolves the first native startup UUID in the tool result. Keep it raw here: endpoint
-// identity is a separate scope, never a synthetic storage prefix.
-fn subagent_result_id(value: &Value) -> Option<String> {
+fn child_session_status(store: &MemoryProjectionStore, id: &str) -> String {
+    let Some(summary) = store
+        .sessions
+        .get(id)
+        .and_then(|session| session.summary.as_ref())
+    else {
+        return String::new();
+    };
+    let raw = summary["status"].as_str().unwrap_or("");
+    if !matches!(raw, "" | "active" | "archived") {
+        return raw.into();
+    }
+    // `active` / `archived` are lifecycle states. The existing child-only
+    // execution projection handles public running flags and retained history.
+    let status = crate::thread_activity(store, id).status;
+    if status == "unknown" {
+        String::new()
+    } else {
+        status
+    }
+}
+// ClientKit resolves the first native startup UUID in the tool result. This is only a raw
+// candidate; authorization may return a matching inventory key, never a synthesized prefix.
+fn known_child_session_id(
+    store: &MemoryProjectionStore,
+    scope: &RunScope,
+    candidate: &str,
+) -> Option<String> {
+    let suffix = format!(":{candidate}");
+    if scope.session_id == candidate || scope.session_id.ends_with(&suffix) {
+        return None;
+    }
+    if store.sessions.contains_key(candidate) {
+        return Some(candidate.to_owned());
+    }
+    let mut matches = store
+        .sessions
+        .keys()
+        .filter(|id| id.ends_with(&suffix) && *id != &scope.session_id);
+    let only = matches.next()?.clone();
+    matches.next().is_none().then_some(only)
+}
+fn subagent_result_candidate(value: &Value) -> Option<String> {
     fn texts(value: &Value, out: &mut String) {
         match value {
             Value::Array(values) => {

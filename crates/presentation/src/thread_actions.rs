@@ -31,6 +31,22 @@ fn action(
         copy_text: None,
     }
 }
+pub(crate) fn fork_action(
+    capabilities: &EndpointCapabilities,
+    ready: bool,
+    running: bool,
+) -> ThreadActionDefinition {
+    let reason = if !ready {
+        Some("Agent 尚未连接")
+    } else if !capabilities.supports("session.fork") {
+        Some("当前 Harness 不支持此操作")
+    } else if running {
+        Some("会话仍有运行或排队中的任务")
+    } else {
+        None
+    };
+    action("fork", "分叉会话", "fork", "execute", reason)
+}
 pub fn thread_actions(context: &ThreadActionContext<'_>) -> ThreadActionsPresentation {
     let c = context;
     let unavailable = if !c.ready {
@@ -60,13 +76,7 @@ pub fn thread_actions(context: &ThreadActionContext<'_>) -> ThreadActionsPresent
     if c.capabilities.supports("session.rename") {
         items.push(action("rename", "重命名", "rename", "rename", unavailable));
     }
-    items.push(action(
-        "fork",
-        "分叉会话",
-        "fork",
-        "execute",
-        idle_capability("session.fork"),
-    ));
+    items.push(fork_action(c.capabilities, c.ready, c.running));
     let mut copy = action("copySessionId", "复制会话 ID", "copy", "copy", None);
     let raw = if c.kind == "dsh" {
         c.session_id

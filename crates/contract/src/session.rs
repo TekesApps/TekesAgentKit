@@ -176,3 +176,37 @@ mod tests {
         assert!(page.validate(0, 3).is_err());
     }
 }
+
+/// Explicit live-message to native entry association, supplied by the endpoint.
+/// It is scoped to its owning conversation/generation and is not CAS authority.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct NativeMessageReadingIdentity {
+    pub stream_id: String,
+    pub entry_id: String,
+}
+pub fn validate_native_reading_identities(
+    snapshot: &NativeConversationSnapshot,
+    identities: &[NativeMessageReadingIdentity],
+) -> Result<()> {
+    let mut streams = std::collections::BTreeSet::new();
+    let mut entries = std::collections::BTreeSet::new();
+    for identity in identities {
+        require(
+            !identity.stream_id.is_empty()
+                && !identity.entry_id.is_empty()
+                && streams.insert(&identity.stream_id)
+                && entries.insert(&identity.entry_id),
+            "ambiguous native reading identity",
+        )?;
+        require(
+            snapshot.entries.iter().any(|entry| {
+                entry["id"] == identity.entry_id
+                    && entry["type"] == "message"
+                    && entry["message"]["role"] == "assistant"
+            }),
+            "native reading identity has no loaded assistant entry",
+        )?;
+    }
+    Ok(())
+}

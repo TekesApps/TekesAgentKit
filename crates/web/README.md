@@ -12,7 +12,7 @@ line on stdin followed by multiplexed requests. It emits `{id,value}`, `{id,erro
 There is no listener, credential store or Kernel UI in this crate.
 
 Operations: `endpoints`, `describe`, `snapshot`, `call` (requires caller-supplied `rpcId`),
-`history`, `respond`, `earlier`, `follow`, `cancelObservation`. A `follow` targets `state`
+`history`, `respond`, `earlier`, `follow`, `cancelObservation`, `reconnect`. A `follow` targets `state`
 (inventory/health), `view` (session/run/transcript), or a normalized `StreamTarget` object.
 A host can refresh DSH authorization with the private `configureDSH` operation; its HTTP
 wrapper must restrict this to its native-host authorization, never browser credentials.
@@ -21,6 +21,22 @@ Each view has its own history lease. Dropping an observation, changing selection
 closing a browser releases only that observation. Runtime/Harness ownership stays in
 the host until an explicit host stop. Requests are never automatically replayed after
 uncertain mutations. Slow observers are disconnected and must request fresh baselines.
+
+`{op:"reconnect", endpoint:"…"}` explicitly restarts that endpoint's existing
+Runtime connection/recovery and returns its current description after readiness.
+Descriptions project `canReconnect` when the connection is failed, including
+after finite automatic attempts are exhausted. Consumers show the explicit action
+from that flag and retain the original connection/error text. This operation
+does not resend prompts, queued mutations, approvals or question replies; it does
+not change credentials or bypass authentication/protocol failures.
+
+`earlier` fetches a page in a Runtime-owned read task, leaving live events and
+controls on the session actor responsive. There is at most one pending page per
+session reader; a duplicate returns an explicit error. The actor alone merges
+results after checking the connection epoch, reader identity/readiness, session,
+and the original frozen `throughSequence`/`beforeSequence` contract. Closing and
+reopening a reader invalidates its old results; reconnect cancels old read tasks.
+An unavailable history reader cannot be repaired by applying a delayed page.
 
 The browser application is the independent MIT TypeScript project
 [TekesWebUI](https://github.com/TekesApps/TekesWebUI). No HTML, CSS, browser code or
@@ -94,3 +110,18 @@ use the settled run marker's entry ID. Missing boundaries, stale journals, activ
 work and unavailable capabilities prevent execution. Current authority is rechecked
 at click time. The existing outcome preserves navigation even if optional rename
 or queue cleanup reports a warning; mutations are never automatically retried.
+
+## Task and child presentation
+
+The service exposes shared SummaryFacts and parent-owned child controls through
+`agent.familySnapshot` and the `familyView` observation. Child content opens with
+an opaque, per-observer handle; `childView` holds an independent history lease.
+Read the [family contract](../../docs/web-family-contract.md) before consuming
+these methods. Child IDs never become ordinary session fallbacks; one-shot,
+parent-unavailable and bounded read-only sources retain their exact capabilities.
+
+The public TypeScript contract also exports permission DTOs from Rust. The host
+and browser render each Harness's actual catalog and confirmed effective mode;
+values are not browser-enforced sandbox policies. A release must replace local
+development package overrides with an immutable public commit and verify the
+installed declaration bytes against that pin.

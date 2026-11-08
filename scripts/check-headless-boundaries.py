@@ -1,20 +1,27 @@
 #!/usr/bin/env python3
 """Keep headless production dependencies independent of UI, server internals and SQLite."""
+import argparse
 import json
 from pathlib import Path
 import subprocess
-root=Path(__file__).resolve().parent.parent
-tracked=subprocess.check_output(['git','ls-files','--cached','--others','--exclude-standard','-z'],cwd=root).decode().split('\0')
-swift_sources=[name for name in tracked if name.endswith('.swift') and (root/name).is_file()]
-assert not swift_sources, f'Swift sources are not allowed in AgentKit: {swift_sources}'
-metadata=json.loads(subprocess.check_output(['cargo','metadata','--locked','--no-deps','--format-version','1'],cwd=root))
-for package in metadata['packages']:
-    if package['name'] not in {'tekes-agent-contract','tekes-agent-session','tekes-agent-endpoint-kernel','tekes-agent-endpoint-pi','tekes-agent-endpoint-dsh','tekes-agent-headless','tekes-agent-presentation'}: continue
-    for dependency in package['dependencies']:
-        if dependency['kind']=='dev': continue
-        name=dependency['name']
-        assert not any(part in name for part in ('tekes-ui','rusqlite','sqlite','sqlx')), (package['name'],name)
-        assert name not in {'schema','endpoint','engine','store','tekes-agent-components'}, (package['name'],name)
-        if package['name'] not in {'tekes-agent-headless','tekes-agent-presentation'}: assert name != 'tekes-agent-presentation', 'presentation must stay above session/adapter authority'
-        assert not dependency.get('path') or Path(dependency['path']).resolve().is_relative_to(root), 'implicit sibling path dependency'
-print('HEADLESS_DEPENDENCY_BOUNDARIES_OK')
+from acceptance_tools import headless_dependencies, require, source_files
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--root', type=Path, default=Path(__file__).resolve().parent.parent)
+    parser.add_argument('--metadata', type=Path, help='Resolved cargo metadata for this exact root')
+    args = parser.parse_args()
+    root = args.root.resolve(strict=True)
+    tracked, inventory = source_files(root)
+    swift = [name for name in tracked if name.endswith('.swift') and (root / name).is_file()]
+    require(not swift, f'Swift sources are not allowed in AgentKit: {swift}')
+    metadata = json.loads(args.metadata.read_text() if args.metadata else subprocess.check_output(
+        ['cargo', 'metadata', '--locked', '--no-deps', '--format-version', '1'], cwd=root))
+    require(Path(metadata['workspace_root']).resolve() == root, 'metadata workspace root mismatch')
+    headless_dependencies(metadata, root)
+    print(f'HEADLESS_DEPENDENCY_BOUNDARIES_OK inventory={inventory}')
+
+
+if __name__ == '__main__':
+    main()

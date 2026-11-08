@@ -389,6 +389,7 @@ impl SessionEndpoint for NativeSessionEndpoint {
         caps.supports_ephemeral_fork = true;
         caps.can_fork_completed_turn = true;
         caps.supports_file_observation = true;
+        caps.supports_question_cancellation = true;
         caps
     }
     fn supports_recovery(&self) -> bool {

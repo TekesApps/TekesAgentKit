@@ -331,6 +331,7 @@ fn ambiguous_submission_locks_its_owner_and_new_typing_wins_failure_recovery() {
         id: "file".into(),
         name: "proof".into(),
         content: json!({"type":"file","receiptId":"file"}),
+        facts: None,
     };
     store
         .edit(
@@ -397,6 +398,51 @@ fn echo_retires_only_by_rpc_identity_and_late_failure_does_not_restore_acknowled
     assert!(store.draft(&a).text.is_empty());
 }
 #[test]
+fn native_queued_user_source_retires_only_its_scoped_submission_echo() {
+    let mut store = PresentationStore::default();
+    let mut authority = authority();
+    let a = destination("a");
+    store.select(a.clone()).unwrap();
+    store.edit(&a, text("queued native input")).unwrap();
+    let ticket = store.prepare(&a, PromptMode::Queue, &authority).unwrap();
+    store.mark_dispatched(&ticket).unwrap();
+    let queued = json!({"id":"input:42","placement":"queued","message":{
+        "id":"input-42","role":"user","content":[{"type":"text","text":"queued native input"}],
+        "source":{"kind":"user","rpcId":ticket.id()}}});
+    // Another session carrying the same request text/identity cannot settle this owner.
+    authority.sessions.get_mut("b").unwrap().queue = vec![queued.clone()];
+    assert!(!store.refresh(&authority).unwrap().submissions[0].reconciled);
+    for (role, kind) in [("assistant", "user"), ("user", "tool")] {
+        let mut foreign = queued.clone();
+        foreign["message"]["role"] = json!(role);
+        foreign["message"]["source"]["kind"] = json!(kind);
+        authority.sessions.get_mut("a").unwrap().queue = vec![foreign];
+        assert!(!store.refresh(&authority).unwrap().submissions[0].reconciled);
+    }
+    let mut other_request = queued.clone();
+    other_request["message"]["source"]["rpcId"] = json!("another-request");
+    authority.sessions.get_mut("a").unwrap().queue = vec![other_request];
+    assert!(!store.refresh(&authority).unwrap().submissions[0].reconciled);
+    authority.sessions.get_mut("a").unwrap().queue = vec![queued];
+    let accepted = store.refresh(&authority).unwrap();
+    assert!(accepted.submissions[0].reconciled);
+    assert!(
+        !accepted
+            .transcript
+            .items
+            .iter()
+            .any(|item| item.is_provisional
+                && item.reconciliation_id.as_deref() == Some(ticket.id()))
+    );
+    // A late failed ACK must not resurrect input already admitted by the public queue.
+    store
+        .finish(ticket.id(), Err("late transport failure".into()))
+        .unwrap();
+    assert!(store.draft(&a).text.is_empty());
+    store.edit(&a, text("next explicit input")).unwrap();
+    store.prepare(&a, PromptMode::Queue, &authority).unwrap();
+}
+#[test]
 fn new_thread_materialization_moves_draft_and_echo_without_touching_selected_other_run() {
     let mut store = PresentationStore::default();
     let authority = authority();
@@ -445,6 +491,156 @@ fn connection_and_thread_status_never_invent_running_or_cross_session_authority(
     authority.connection = ConnectionState::Ready;
     authority.archived_session_ids.push("b".into());
     assert!(!RunPresentation::read(&authority, &scope("b"), true).can_submit);
+}
+
+#[test]
+fn failed_or_loading_history_does_not_disable_authoritative_running_cancel() {
+    for (ready, error) in [
+        (false, None),
+        (false, Some("history failed")),
+        (true, Some("history failed")),
+    ] {
+        let mut state = authority();
+        let session = state.sessions.get_mut("a").unwrap();
+        session.journal_ready = ready;
+        session.journal_error = error.map(String::from);
+        session.summary = Some(json!({"running":true,"status":"active"}));
+        // A retained journal flag is not the independent inventory authority.
+        session.run_open = false;
+        let run = RunPresentation::read(&state, &scope("a"), true);
+        assert!(!run.can_submit);
+        assert!(run.connection.history_is_stale);
+        assert_eq!(run.error.as_deref(), error);
+        assert!(run.can_cancel, "history ready={ready}, error={error:?}");
+    }
+}
+
+#[test]
+fn failed_history_keeps_fresh_actionables_and_their_revisions() {
+    let mut state = authority();
+    state.sessions.get_mut("a").unwrap().journal_ready = false;
+    state.sessions.get_mut("a").unwrap().journal_error = Some("history failed".into());
+    for (id, kind, revision) in [("approval", "approval", 4), ("question", "question", 7)] {
+        state.actionables.insert(id.into(), json!({"id":id,"sessionId":"a","kind":kind,"revision":revision,"payload":{"title":"Confirm"}}));
+    }
+    let mut presentation = PresentationStore::default();
+    presentation.select(destination("a")).unwrap();
+    let snapshot = presentation.refresh(&state).unwrap();
+    let run = snapshot.run.unwrap();
+    assert_eq!(run.phase, RunPhase::WaitingForInput);
+    assert_eq!(run.actionables.len(), 2);
+    assert_eq!(run.actionables[0]["revision"], 4);
+    assert_eq!(run.actionables[1]["revision"], 7);
+    assert!(!run.can_submit);
+}
+
+#[test]
+fn history_failure_never_bypasses_control_readiness_or_explicit_read_only_access() {
+    let mut state = authority();
+    let session = state.sessions.get_mut("a").unwrap();
+    session.journal_error = Some("history failed".into());
+    session.summary = Some(json!({"running":true,"status":"active"}));
+    state.actionables.insert("approval".into(), json!({"id":"approval","sessionId":"a","kind":"approval","revision":4,"responseAvailable":true}));
+    for boundary in ["disconnected", "inventory", "control", "readonly"] {
+        let mut blocked = state.clone();
+        match boundary {
+            "disconnected" => blocked.connection = ConnectionState::Connecting,
+            "inventory" => blocked.inventory_ready = false,
+            "control" => blocked.control_ready = false,
+            "readonly" => {
+                blocked.sessions.get_mut("a").unwrap().projections.insert(
+                    "historyAccess".into(),
+                    VersionedValue {
+                        sequence: 1,
+                        value: json!({"mode":"read-only"}),
+                    },
+                );
+            }
+            _ => unreachable!(),
+        }
+        let run = RunPresentation::read(&blocked, &scope("a"), true);
+        assert!(!run.can_cancel, "{boundary}");
+        assert!(!run.can_respond("approval", 4), "{boundary}");
+    }
+    state.actionables_ready = false;
+    let run = RunPresentation::read(&state, &scope("a"), true);
+    assert!(
+        run.can_cancel,
+        "cancel does not depend on actionable readiness"
+    );
+    assert!(!run.can_respond("approval", 4));
+}
+
+#[test]
+fn legacy_history_is_readable_but_shared_presentation_blocks_writes() {
+    let mut authority = authority();
+    let session = authority.sessions.get_mut("a").unwrap();
+    session.journal_ready = true;
+    session.run_open = true;
+    session.queue.push(json!({"id":"queued"}));
+    session.jobs.push(json!({"id":"job"}));
+    authority
+        .actionables
+        .insert("approval".into(), json!({"id":"approval","sessionId":"a"}));
+    authority.sessions.get_mut("a").unwrap().projections.insert(
+        "historyAccess".into(),
+        VersionedValue {
+            sequence: 12,
+            value: json!({
+                "mode":"read-only",
+                "reason":"legacy-tool-catalog-unavailable",
+                "sourceDigest":format!("sha256-{}", "a".repeat(64))
+            }),
+        },
+    );
+
+    let run = RunPresentation::read(&authority, &scope("a"), true);
+    assert_eq!(run.connection.phase, ConnectionPhase::Connected);
+    assert!(!run.connection.history_is_stale);
+    assert!(
+        run.connection
+            .message
+            .as_deref()
+            .unwrap()
+            .contains("历史只读")
+    );
+    assert_eq!(run.phase, RunPhase::Unavailable);
+    assert!(!run.can_submit);
+    assert!(!run.can_cancel);
+    assert!(run.actionables.is_empty());
+    assert!(run.queue.is_empty());
+    assert!(run.jobs.is_empty());
+    assert!(run.error.as_deref().unwrap().contains("历史只读"));
+
+    let transcript =
+        TranscriptSnapshot::read(&scope("a"), authority.sessions.get("a").unwrap()).unwrap();
+    assert!(!transcript.is_stale);
+}
+
+#[test]
+fn malformed_historical_access_marker_fails_closed_without_marking_history_stale() {
+    let mut authority = authority();
+    let session = authority.sessions.get_mut("a").unwrap();
+    session.journal_ready = true;
+    session.projections.insert(
+        "historyAccess".into(),
+        VersionedValue {
+            sequence: 1,
+            value: json!({"mode":"future-mode"}),
+        },
+    );
+
+    let run = RunPresentation::read(&authority, &scope("a"), false);
+    assert_eq!(run.connection.phase, ConnectionPhase::Connected);
+    assert!(!run.connection.history_is_stale);
+    assert!(!run.can_submit);
+    assert!(
+        run.connection
+            .message
+            .as_deref()
+            .unwrap()
+            .contains("标记无效")
+    );
 }
 
 #[test]
@@ -498,7 +694,35 @@ fn pi_only_child_creation_is_a_summary_subagent() {
     assert_eq!(transcript.tools[1].name, "tekes_subagent");
     let facts = SummaryFacts::read(&scope("a"), &projection, &transcript).unwrap();
     assert_eq!(facts.subagents.len(), 1);
+    assert_eq!(facts.subagents[0].session_id, None);
+    assert!(
+        facts
+            .sections(&scope("a"))
+            .into_iter()
+            .find(|section| section.id == "subagents")
+            .unwrap()
+            .rows[0]
+            .action
+            .is_none()
+    );
+
+    let mut store = MemoryProjectionStore::new("e");
+    store.sessions.insert("a".into(), projection);
+    store
+        .sessions
+        .insert(child.into(), SessionProjection::default());
+    let facts = SummaryFacts::read_with_store(&scope("a"), &store, &transcript).unwrap();
     assert_eq!(facts.subagents[0].session_id.as_deref(), Some(child));
+    assert!(
+        facts
+            .sections(&scope("a"))
+            .into_iter()
+            .find(|section| section.id == "subagents")
+            .unwrap()
+            .rows[0]
+            .action
+            .is_some()
+    );
 }
 
 #[test]
@@ -820,4 +1044,270 @@ fn worker_launch_notice_recovers_only_after_later_durable_turn_start() {
     let serialized = serde_json::to_value(&state).unwrap();
     let replay = serde_json::from_value(serialized).unwrap();
     assert_eq!(out, TranscriptSnapshot::read(&scope("a"), &replay).unwrap());
+}
+
+#[test]
+fn attachment_facts_are_backward_compatible_and_never_enter_prompt() {
+    let value = json!({"kind":"attachment","id":"a","name":"中文.txt","content":{"type":"file","receiptId":"receipt"}});
+    let mut artifact: ComposerArtifact = serde_json::from_value(value.clone()).unwrap();
+    assert_eq!(serde_json::to_value(&artifact).unwrap(), value);
+    if let ComposerArtifact::Attachment { facts, .. } = &mut artifact {
+        *facts = Some(AttachmentFacts {
+            attachment_id: Some("read-id-distinct-from-receipt".into()),
+            byte_count: 12,
+            media_type: Some("text/plain".into()),
+        });
+    }
+    let serialized = serde_json::to_value(&artifact).unwrap();
+    assert_eq!(serialized["facts"]["byteCount"], 12);
+    assert_eq!(
+        serialized["facts"]["attachmentId"],
+        "read-id-distinct-from-receipt"
+    );
+    assert_eq!(
+        serde_json::from_value::<ComposerArtifact>(serialized).unwrap(),
+        artifact
+    );
+    let draft = ComposerDraft {
+        artifacts: vec![artifact],
+        ..Default::default()
+    };
+    let SubmissionPlan::Prompt { content, .. } = draft.compile(false).unwrap() else {
+        panic!()
+    };
+    assert_eq!(content, vec![json!({"type":"file","receiptId":"receipt"})]);
+}
+
+#[test]
+fn run_publication_retains_its_own_authority_epoch_across_reconnect_and_legacy_decode() {
+    let mut authority = authority();
+    authority.connection_epoch = 7;
+    let mut store = PresentationStore::default();
+    store.select(destination("a")).unwrap();
+    let old = store.refresh(&authority).unwrap();
+    authority.connection_epoch = 8;
+    authority.connection = ConnectionState::Connecting;
+    let next = store.refresh(&authority).unwrap();
+    assert!(next.revision > old.revision);
+    assert_eq!(old.connection_epoch, 7);
+    assert_eq!(next.connection_epoch, 8);
+    assert_eq!(next.connection.phase, ConnectionPhase::Reconnecting);
+    let mut legacy = serde_json::to_value(old).unwrap();
+    legacy.as_object_mut().unwrap().remove("connectionEpoch");
+    assert_eq!(
+        serde_json::from_value::<RunSnapshot>(legacy)
+            .unwrap()
+            .connection_epoch,
+        0
+    );
+}
+
+#[test]
+fn a_new_native_stream_cannot_replace_a_committed_message_with_the_same_timestamp() {
+    let entries = vec![
+        json!({"id":"u","type":"message","message":{"role":"user","timestamp":1,"content":"input"}}),
+        json!({"id":"old","type":"message","message":{"role":"assistant","timestamp":2,"content":"retained answer","stopReason":"toolUse"}}),
+    ];
+    let preview = json!({"type":"message_update","message":{"role":"assistant","timestamp":2,"content":"new stream"}});
+    let projected =
+        TranscriptSnapshot::read(&scope("a"), &native(entries.clone(), vec![preview], true))
+            .unwrap();
+    let retained = projected
+        .items
+        .iter()
+        .find(|row| row.record_id.as_deref() == Some("old"))
+        .expect("committed row must survive");
+    assert_eq!(retained.text, "retained answer");
+    assert!(!retained.is_provisional);
+    let live = projected
+        .items
+        .iter()
+        .find(|row| row.is_provisional)
+        .unwrap();
+    assert_eq!(live.text, "new stream");
+    assert_ne!(retained.id, live.id);
+    let live_id = live.id.clone();
+    let mut completed = entries;
+    completed.push(json!({"id":"new","type":"message","message":{"role":"assistant","timestamp":2,"content":"new stream","stopReason":"stop"}}));
+    let completed =
+        TranscriptSnapshot::read(&scope("a"), &native(completed, vec![], false)).unwrap();
+    assert_eq!(
+        completed
+            .items
+            .iter()
+            .find(|row| row.record_id.as_deref() == Some("new"))
+            .unwrap()
+            .id,
+        live_id
+    );
+}
+
+#[test]
+fn an_assistant_end_boundary_retires_its_preview_while_the_agent_is_still_running() {
+    let message =
+        json!({"role":"assistant","timestamp":2,"content":"tool step","stopReason":"toolUse"});
+    let source = native(
+        vec![
+            json!({"id":"u","type":"message","message":{"role":"user","timestamp":1,"content":"input"}}),
+            json!({"id":"answer","type":"message","message":message}),
+        ],
+        vec![
+            json!({"type":"message_update","message":message}),
+            json!({"type":"message_end","message":message}),
+        ],
+        true,
+    );
+    let snapshot = TranscriptSnapshot::read(&scope("a"), &source).unwrap();
+    assert_eq!(
+        snapshot
+            .items
+            .iter()
+            .filter(|row| row.kind == TranscriptItemKind::Assistant)
+            .count(),
+        1
+    );
+    assert!(!snapshot.items.iter().any(|row| row.is_provisional));
+    assert_eq!(
+        snapshot.items.last().unwrap().record_id.as_deref(),
+        Some("answer")
+    );
+    assert!(snapshot.items.last().unwrap().reasoning_ended);
+    assert_eq!(snapshot.turns.last().unwrap().status, "running");
+}
+
+#[test]
+fn a_tool_result_end_does_not_retire_an_active_assistant_preview() {
+    let source = native(
+        vec![
+            json!({"id":"u","type":"message","message":{"role":"user","timestamp":1,"content":"input"}}),
+        ],
+        vec![
+            json!({"type":"message_update","message":{"role":"assistant","timestamp":2,"content":"still streaming"}}),
+            json!({"type":"message_end","message":{"role":"toolResult","toolCallId":"call","content":"done"}}),
+        ],
+        true,
+    );
+    let snapshot = TranscriptSnapshot::read(&scope("a"), &source).unwrap();
+    assert_eq!(
+        snapshot
+            .items
+            .iter()
+            .filter(|row| row.is_provisional && row.text == "still streaming")
+            .count(),
+        1
+    );
+}
+
+#[test]
+fn pi_provider_error_retains_its_public_message_and_is_not_a_final_answer() {
+    let result=TranscriptSnapshot::read(&scope("a"),&native(vec![
+        json!({"id":"u","type":"message","message":{"role":"user","content":"input","timestamp":1}}),
+        json!({"id":"failure","type":"message","message":{"role":"assistant","content":[],"timestamp":2,"stopReason":"error","errorMessage":"controlled provider error"}}),
+    ],vec![],false)).unwrap();
+    assert_eq!(result.turns[0].status, "error");
+    assert_eq!(
+        result.items.last().unwrap().metadata["errorMessage"],
+        "controlled provider error"
+    );
+    assert!(!result.items.iter().any(|item| item.is_final));
+    assert_eq!(
+        result.latest_failure().unwrap().message,
+        Some("controlled provider error")
+    );
+    for status in ["running", "completed", "aborted"] {
+        let mut newer = result.clone();
+        let mut turn = newer.turns[0].clone();
+        turn.id = "newer".into();
+        turn.status = status.into();
+        newer.turns.push(turn);
+        assert!(newer.latest_failure().is_none());
+        assert_eq!(
+            newer.items.last().unwrap().failure_message(),
+            Some("controlled provider error")
+        );
+    }
+    let mut unknown = result.clone();
+    unknown.items.last_mut().unwrap().metadata["errorMessage"] = Value::Null;
+    assert_eq!(unknown.latest_failure().unwrap().message, None);
+    let mut cancelled = result.clone();
+    cancelled.turns[0].status = "aborted".into();
+    cancelled.items.last_mut().unwrap().metadata["stopReason"] = "aborted".into();
+    assert!(cancelled.latest_failure().is_none());
+    assert!(cancelled.items.last().unwrap().failure_message().is_none());
+}
+
+#[test]
+fn question_cancellation_uses_adapter_authority_and_exact_session_scope() {
+    let mut authority = authority();
+    let question = json!({
+        "id":"question", "revision":7, "sessionId":"a", "kind":"question",
+        "payload":{"questions":[{"id":"call","question":"Choose","options":[{"label":"A"}]}]},
+        "cancelOutcome":{"sessionId":"b","cancelled":true}
+    });
+    authority
+        .actionables
+        .insert("question".into(), question.clone());
+    authority.actionables.insert(
+        "other-session".into(),
+        json!({
+            "id":"other-session", "revision":8, "sessionId":"b", "kind":"question", "payload":{}
+        }),
+    );
+    let unsupported = RunPresentation::read(&authority, &scope("a"), false);
+    assert_eq!(unsupported.actionables.len(), 1);
+    assert!(unsupported.actionables[0].get("cancelOutcome").is_none());
+    assert_eq!(authority.actionables["question"], question);
+
+    authority
+        .endpoint_capabilities
+        .supports_question_cancellation = true;
+    let supported = RunPresentation::read(&authority, &scope("a"), false);
+    let response = &supported.actionables[0];
+    assert_eq!(response["id"], "question");
+    assert_eq!(response["revision"], 7);
+    assert_eq!(response["payload"], question["payload"]);
+    assert_eq!(
+        response["cancelOutcome"],
+        json!({"sessionId":"a","cancelQuestion":true})
+    );
+    assert!(
+        !response["cancelOutcome"]
+            .as_object()
+            .unwrap()
+            .contains_key("cancelled")
+    );
+
+    authority.actionables.get_mut("question").unwrap()["kind"] = json!("approval");
+    assert!(
+        RunPresentation::read(&authority, &scope("a"), false).actionables[0]
+            .get("cancelOutcome")
+            .is_none()
+    );
+    authority.actionables.get_mut("question").unwrap()["kind"] = json!("question");
+    authority.archived_session_ids.push("a".into());
+    assert!(
+        RunPresentation::read(&authority, &scope("a"), false).actionables[0]
+            .get("cancelOutcome")
+            .is_none()
+    );
+    authority.archived_session_ids.clear();
+    authority.connection = ConnectionState::Connecting;
+    assert!(
+        RunPresentation::read(&authority, &scope("a"), true)
+            .actionables
+            .is_empty()
+    );
+    authority.connection = ConnectionState::Ready;
+    authority.sessions.get_mut("a").unwrap().projections.insert(
+        "historyAccess".into(),
+        VersionedValue {
+            sequence: 1,
+            value: json!({"mode":"read-only"}),
+        },
+    );
+    assert!(
+        RunPresentation::read(&authority, &scope("a"), false)
+            .actionables
+            .is_empty()
+    );
 }

@@ -10,10 +10,23 @@ impl SessionRuntime {
     }
     /// Checks the concrete endpoint/host method authority before invoking an optional extension.
     pub async fn call_optional(&self, method: &str, payload: Value, rpc_id: &str) -> Result<Value> {
+        self.call_optional_with_validation(method, payload, rpc_id, || Ok(()))
+            .await
+    }
+    /// Validate the captured host owner after capability lookup and channel
+    /// backpressure, immediately before local RPC admission. Never retries.
+    pub async fn call_optional_with_validation(
+        &self,
+        method: &str,
+        payload: Value,
+        rpc_id: &str,
+        validate: impl FnOnce() -> Result<()> + Send,
+    ) -> Result<Value> {
         if !self.capabilities().await?.supports(method) {
             return Err(unsupported(method));
         }
-        self.call(method, payload, rpc_id).await
+        self.call_with_validation(method, payload, rpc_id, validate)
+            .await
     }
     pub async fn create(
         &self,
@@ -26,8 +39,22 @@ impl SessionRuntime {
         )?)
     }
     pub async fn submit(&self, request: PromptRequest, rpc_id: &str) -> Result<Value> {
-        self.call_optional("session.prompt", serde_json::to_value(request)?, rpc_id)
+        self.submit_with_validation(request, rpc_id, || Ok(()))
             .await
+    }
+    pub async fn submit_with_validation(
+        &self,
+        request: PromptRequest,
+        rpc_id: &str,
+        validate: impl FnOnce() -> Result<()> + Send,
+    ) -> Result<Value> {
+        self.call_optional_with_validation(
+            "session.prompt",
+            serde_json::to_value(request)?,
+            rpc_id,
+            validate,
+        )
+        .await
     }
     pub async fn fork(&self, request: ForkRequest, rpc_id: &str) -> Result<SessionCreated> {
         request.validate()?;
@@ -81,7 +108,7 @@ impl SessionRuntime {
     ) -> Result<UploadReceipt> {
         use base64::Engine;
         require(
-            !data.is_empty() && data.len() <= 8 * 1024 * 1024,
+            !data.is_empty() && data.len() <= MAX_UPLOAD_BYTES,
             "upload limit",
         )?;
         let value=self.call_optional("session.uploadFile",json!({"sessionId":id,"name":name,"mediaType":media_type,"data":base64::engine::general_purpose::STANDARD.encode(data)}),rpc_id).await?;
@@ -133,6 +160,19 @@ impl SessionRuntime {
         content: Vec<Value>,
         rpc_id: &str,
     ) -> Result<Value> {
+        self.prompt_child_with_validation(parent, child, mode, content, rpc_id, || Ok(()))
+            .await
+    }
+    pub async fn prompt_child_with_validation(
+        &self,
+        parent: &str,
+        child: &str,
+        mode: PromptMode,
+        content: Vec<Value>,
+        rpc_id: &str,
+        validate: impl FnOnce() -> Result<()> + Send,
+    ) -> Result<Value> {
+        let expected_epoch = self.inspect(|state| state.connection_epoch);
         require(
             parent != child && !child.is_empty(),
             "invalid child identity",
@@ -144,10 +184,15 @@ impl SessionRuntime {
         self.subagent_catalog(parent)
             .await?
             .require_continuable(child)?;
-        self.call_optional(
+        if !self.capabilities().await?.supports("subagents.prompt") {
+            return Err(unsupported("subagents.prompt"));
+        }
+        self.call_at_epoch_with_validation(
+            expected_epoch,
             "subagents.prompt",
             json!({"parentSessionId":parent,"childSessionId":child,"mode":mode,"content":content}),
             rpc_id,
+            validate,
         )
         .await
     }

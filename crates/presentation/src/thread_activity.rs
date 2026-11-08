@@ -26,25 +26,29 @@ pub fn thread_activity(store: &MemoryProjectionStore, id: &str) -> ThreadActivit
         _ => None,
     };
     // Inspect already retained terminal evidence; never hydrate every thread just to group a list.
-    let journal_terminal = session
-        .entries
-        .values()
-        .rev()
-        .find(|e| matches!(e.event.kind.as_str(), "turn/start" | "turn/end"))
-        .filter(|e| e.event.kind == "turn/end")
-        .and_then(|e| {
-            e.event.data["reason"]
-                .as_str()
-                .or_else(|| e.event.data["reason"]["kind"].as_str())
-        })
-        .and_then(terminal);
+    let history_terminal = if session.native_conversation.is_some() {
+        native_failure_terminal(session, id)
+    } else {
+        session
+            .entries
+            .values()
+            .rev()
+            .find(|e| matches!(e.event.kind.as_str(), "turn/start" | "turn/end"))
+            .filter(|e| e.event.kind == "turn/end")
+            .and_then(|e| {
+                e.event.data["reason"]
+                    .as_str()
+                    .or_else(|| e.event.data["reason"]["kind"].as_str())
+            })
+            .and_then(terminal)
+    };
     let status = if waiting {
         "waitingForInput"
     } else if running {
         "running"
     } else if !session.queue.is_empty() {
         "queued"
-    } else if let Some(terminal) = terminal(raw).or(journal_terminal) {
+    } else if let Some(terminal) = terminal(raw).or(history_terminal) {
         terminal
     } else if summary.is_some_and(|s| s["blank"] == true) || matches!(raw, "new" | "notStarted") {
         "notStarted"
@@ -60,6 +64,80 @@ pub fn thread_activity(store: &MemoryProjectionStore, id: &str) -> ThreadActivit
             || !store.control_ready
             || !store.actionables_ready
             || session.journal_error.is_some(),
+    }
+}
+
+// Read bounded, already retained Native facts; do not hydrate a conversation or
+// promote a generic stop to completion. Explicit run failure/cancellation follows
+// ClientKit's run-local accumulation, with cancellation taking precedence.
+fn native_failure_terminal(
+    session: &tekes_agent_session::SessionProjection,
+    session_id: &str,
+) -> Option<&'static str> {
+    let native = session.native_conversation.as_ref()?;
+    if !session.journal_ready
+        || session.journal_error.is_some()
+        || session.run_open
+        || native.is_streaming
+        || native.session_id != session_id
+        || native.generation.is_empty()
+    {
+        return None;
+    }
+    let entries = &native.entries;
+    let run_marker = |entry: &serde_json::Value| {
+        entry["type"] == "custom"
+            && matches!(
+                entry["customType"].as_str(),
+                Some("agentkit.run.v1" | "tekes.run.v1")
+            )
+    };
+    let authored_message = |entry: &serde_json::Value| {
+        entry["type"] == "message"
+            && matches!(
+                entry["message"]["role"].as_str(),
+                Some("user" | "assistant")
+            )
+    };
+    let current = if let Some(end) = entries.iter().rposition(run_marker) {
+        let settled = &entries[end]["data"];
+        if settled["phase"] != "settled" {
+            return None;
+        }
+        let run_id = settled["id"].as_str().filter(|id| !id.is_empty())?;
+        let start = entries[..end].iter().rposition(run_marker)?;
+        let started = &entries[start]["data"];
+        if started["phase"] != "started"
+            || started["id"].as_str() != Some(run_id)
+            || entries[end + 1..].iter().any(authored_message)
+        {
+            return None;
+        }
+        if settled["aborted"] == true {
+            return Some("cancelled");
+        }
+        &entries[start + 1..end]
+    } else {
+        // Legacy conversations have no explicit run marker. The newest authored
+        // user bounds the evidence; a clipped error alone cannot identify a turn.
+        let start = entries
+            .iter()
+            .rposition(|entry| entry["type"] == "message" && entry["message"]["role"] == "user")?;
+        &entries[start + 1..]
+    };
+    let has_stop = |reason: &str| {
+        current.iter().any(|entry| {
+            entry["type"] == "message"
+                && entry["message"]["role"] == "assistant"
+                && entry["message"]["stopReason"] == reason
+        })
+    };
+    if has_stop("aborted") {
+        Some("cancelled")
+    } else if has_stop("error") {
+        Some("failed")
+    } else {
+        None
     }
 }
 

@@ -35,24 +35,16 @@ impl PiSessionEndpoint {
             }.await),
             "goals.get"|"goals.create"|"goals.edit"|"goals.clear"|"goals.pause"|"goals.resume"=>Some(self.goal_call(method,payload).await),
             "feedback.list"|"feedback.put"|"feedback.delete"=>Some(self.feedback_call(method,payload).await),
-            "references.sessions"|"session.search"=>Some(async {
+            "session.search"=>Some(self.search_sessions_value(payload).await),
+            "references.sessions"=>Some(async {
                 let query=string(payload,"query")?.to_lowercase();
                 require(query.len()<=4096,"search query limit")?;
                 let rows:Vec<_>=self.context.manifest.lock().await.sessions.values().filter(|row|!row.archived && !row.ephemeral).cloned().collect();
-                let mut items=Vec::new();
-                for row in rows {
+                let items:Vec<_>=rows.into_iter().filter_map(|row|{
                     let title=row.title.clone().unwrap_or_else(||row.id.clone());
-                    let mut text=title.clone();
-                    if method=="session.search" {
-                        let rpc=self.context.process(&row.id).await?;
-                        let entries=rpc.request("get_entries",json!({})).await?;
-                        let (branch,_)=active_branch(&entries,usize::MAX)?;
-                        text.push_str(&serde_json::to_string(&branch)?);
-                    }
-                    if text.to_lowercase().contains(&query) {items.push(json!({"sessionId":row.id,"title":title,"label":title,"cwd":row.cwd,"snippet":text.chars().take(240).collect::<String>()}));}
-                    if items.len()>=20 {break;}
-                }
-                Ok(if method=="session.search" {json!({"items":items})} else {json!(items)})
+                    title.to_lowercase().contains(&query).then(||json!({"sessionId":row.id,"title":title,"label":title,"cwd":row.cwd,"snippet":title.chars().take(240).collect::<String>()}))
+                }).take(20).collect();
+                Ok(json!(items))
             }.await),
             "sessions.recover"=>Some(async {
                 let ids=array(payload,"sessionIds")?;
@@ -211,11 +203,13 @@ impl PiSessionEndpoint {
         let mut manifest = self.context.manifest.lock().await;
         let row = manifest.sessions.get_mut(id).expect("owned row");
         let current = row.feedback.get(message);
-        require(
-            current.map(|value| &value["version"])
-                == payload.get("ifVersion").filter(|value| !value.is_null()),
-            "feedback version conflict",
-        )?;
+        if current.map(|value| &value["version"])
+            != payload.get("ifVersion").filter(|value| !value.is_null())
+        {
+            return Err(Error::Remote(
+                json!({"code":"version-conflict","current":current}),
+            ));
+        }
         let result = if method == "feedback.delete" {
             row.feedback.remove(message);
             Value::Null
@@ -225,7 +219,11 @@ impl PiSessionEndpoint {
                 ["positive", "negative", "up", "down"].contains(&rating),
                 "invalid feedback rating",
             )?;
-            let value = json!({"messageId":message,"rating":rating,"note":payload["note"],"version":uuid::Uuid::new_v4().to_string()});
+            let updated_at = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map_err(|_| Error::Protocol("feedback host clock unavailable".into()))?
+                .as_millis();
+            let value = json!({"messageId":message,"rating":rating,"note":payload["note"],"version":uuid::Uuid::new_v4().to_string(),"updatedAtMilliseconds":updated_at});
             row.feedback.insert(message.into(), value.clone());
             value
         };
@@ -281,4 +279,33 @@ pub(crate) fn recover_metadata(
         }
     }
     Ok((revision, goal, feedback))
+}
+
+// One additional matching row proves truncation; exactly `limit` does not.
+pub(crate) fn bounded_search_results(mut items: Vec<Value>, limit: usize) -> Value {
+    let has_more = items.len() > limit;
+    items.truncate(limit);
+    json!({"items":items,"hasMore":has_more})
+}
+#[cfg(test)]
+mod search_tests {
+    use super::*;
+    #[test]
+    fn bounded_search_distinguishes_exact_limit_from_a_proven_additional_match() {
+        for count in [0, 99, 100, 101] {
+            let raw = bounded_search_results(
+                (0..count)
+                    .map(|i| json!({"sessionId":i.to_string(),"snippet":"中文"}))
+                    .collect(),
+                100,
+            );
+            let value = SessionSearchResults::read(raw).unwrap();
+            assert_eq!(value.items.len(), count.min(100));
+            assert_eq!(value.has_more, count > 100);
+            assert_eq!(
+                value.items.last().map(|item| item.session_id.clone()),
+                count.min(100).checked_sub(1).map(|i| i.to_string())
+            );
+        }
+    }
 }

@@ -13,6 +13,46 @@ The shared annotation DTOs and TypeScript bindings are exported by the public
 inside AgentKit; `follow(view)` projects `inputPresentation` for history rendering.
 See [the service contract](../crates/web/README.md#annotation-interface).
 
+## Observer detach during an active run
+
+### History failures and live controls
+
+`follow(view)` publishes current shared state while its history lease loads. A
+session-scoped history error remains visible in `run.connection` and prevents new
+input/queue edits; it does not end the view or disable independent live controls.
+`run.canCancel` uses current inventory/control readiness and running authority.
+Each visible actionable carries `responseAvailable`, computed by AgentKit from
+current control/actionable readiness and session access. Web consumers render
+that marker and submit the original actionable ID/revision; AgentKit rechecks
+the current revision before dispatch. Consumers must not infer control admission
+from transcript readiness or connection display text.
+
+Disconnects, archived/read-only sessions and stale actionable revisions remain
+non-controllable. Bounded child history can display actionable content but sets
+`responseAvailable: false`; displaying retained content never grants a writable
+child authority. Strict `SessionRuntime::acquire_history` still fails on history
+errors. `acquire_history_view` retains a view lease only for a projected scoped
+history error in the same healthy control epoch; global failures still propagate.
+
+No prompt, cancellation or response is automatically retried by view loading.
+
+### Active observer lifetime
+
+A browser closing releases its history observer; it does not cancel execution.
+When the last observer leaves a ready journal whose shared projection reports an
+active run, SessionRuntime retains that journal and continues folding live events.
+A new observer reuses it, including text already streamed before the browser closed.
+The journal's authoritative terminal state releases this temporary retention when
+there are no observers; an attached observer keeps its normal lease. This lifetime
+is serialized with frame processing and observer Open/Close in AgentKit, without
+WebUI transcript caches or a second business state machine.
+
+This is in-memory continuity within the same service and live Harness connection,
+not durable storage of transient deltas. After service restart or a genuine source
+reconnect, recovery uses the Harness's public history and running/outcome facts.
+Uncommitted content absent from that history cannot be reconstructed or silently
+resent. Existing history, provider configuration and user data are not rewritten.
+
 ## Durable pin relationships and thread activity (v0.3.4)
 
 The embedding host supplies `threadPreferences: {path, scope}` in the private

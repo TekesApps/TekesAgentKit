@@ -5,8 +5,11 @@ use std::{
     sync::{Arc, Mutex},
     time::Duration,
 };
-use tekes_agent_contract::{Error, ForkRequest, Result, require, unsupported};
-use tekes_agent_session::SessionRuntime;
+use tekes_agent_contract::{
+    EndpointCapabilities, Error, ForkRequest, Result, require, unsupported,
+};
+use tekes_agent_session::{ConnectionState, SessionRuntime};
+use tokio::sync::watch;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -24,21 +27,77 @@ pub struct SideChat {
     pub phase: SideChatPhase,
     pub error: Option<String>,
 }
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct SideChatSnapshot {
     pub creating: BTreeSet<String>,
     pub unknown_creations: BTreeMap<String, String>,
     pub chats: BTreeMap<String, SideChat>,
 }
+impl SideChatSnapshot {
+    /// UI consumers do not construct or parse the controller's serialized parent keys.
+    pub fn is_creating_for(&self, parent: &RunScope) -> bool {
+        self.creating
+            .contains(&serde_json::to_string(parent).expect("string-only RunScope"))
+    }
+    pub fn unknown_creation_for(&self, parent: &RunScope) -> Option<&str> {
+        self.unknown_creations
+            .get(&serde_json::to_string(parent).expect("string-only RunScope"))
+            .map(String::as_str)
+    }
+}
 /// Owns ephemeral pointers, not windows/tabs. Results retain the originating parent even after
 /// navigation changes. Callers decide whether to show a tab by comparing that parent.
 pub struct SideChatController {
     runtime: Arc<SessionRuntime>,
-    state: Arc<Mutex<SideChatSnapshot>>,
+    state: Arc<SideChatState>,
+}
+struct SideChatState {
+    value: Mutex<SideChatSnapshot>,
+    changes: watch::Sender<SideChatSnapshot>,
+}
+impl SideChatState {
+    fn new() -> Self {
+        Self {
+            value: Mutex::new(SideChatSnapshot::default()),
+            changes: watch::channel(SideChatSnapshot::default()).0,
+        }
+    }
+    fn lock(&self) -> std::result::Result<SideChatStateGuard<'_>, ()> {
+        let value = self.value.lock().map_err(|_| ())?;
+        let before = value.clone();
+        Ok(SideChatStateGuard {
+            value,
+            before,
+            changes: &self.changes,
+        })
+    }
+}
+struct SideChatStateGuard<'a> {
+    value: std::sync::MutexGuard<'a, SideChatSnapshot>,
+    before: SideChatSnapshot,
+    changes: &'a watch::Sender<SideChatSnapshot>,
+}
+impl std::ops::Deref for SideChatStateGuard<'_> {
+    type Target = SideChatSnapshot;
+    fn deref(&self) -> &Self::Target {
+        &self.value
+    }
+}
+impl std::ops::DerefMut for SideChatStateGuard<'_> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.value
+    }
+}
+impl Drop for SideChatStateGuard<'_> {
+    fn drop(&mut self) {
+        if *self.value != self.before {
+            self.changes.send_replace(self.value.clone());
+        }
+    }
 }
 struct MutationGuard {
-    state: Arc<Mutex<SideChatSnapshot>>,
+    state: Arc<SideChatState>,
     key: String,
     creating: bool,
     armed: bool,
@@ -65,18 +124,39 @@ impl SideChatController {
     pub fn new(runtime: Arc<SessionRuntime>) -> Self {
         Self {
             runtime,
-            state: Arc::new(Mutex::new(SideChatSnapshot::default())),
+            state: Arc::new(SideChatState::new()),
         }
     }
     pub fn snapshot(&self) -> SideChatSnapshot {
         self.state.lock().expect("side chat lock").clone()
     }
+    /// A UI mount must observe and control the same authority that owns its pointer.
+    /// Matching endpoint names alone does not prove runtime identity.
+    pub fn uses_runtime(&self, runtime: &Arc<SessionRuntime>) -> bool {
+        Arc::ptr_eq(&self.runtime, runtime)
+    }
+    /// Canonical local pointer/mutation publications, including cancellation-to-Unknown.
+    /// Snapshot reads and failed no-op reconciliations do not wake observers.
+    pub fn subscribe(&self) -> watch::Receiver<SideChatSnapshot> {
+        self.state.changes.subscribe()
+    }
     pub async fn supports(&self) -> Result<bool> {
         let caps = self.runtime.capabilities().await?;
-        Ok(caps.supports_ephemeral_fork
+        Ok(Self::supports_capabilities(&caps))
+    }
+    fn supports_capabilities(caps: &EndpointCapabilities) -> bool {
+        caps.supports_ephemeral_fork
             && caps.supports("session.fork")
             && caps.supports("session.discard")
-            && caps.supports("session.cancel"))
+            && caps.supports("session.cancel")
+    }
+    /// Read-only UI input. Unknown during connection changes; no actor request,
+    /// polling timer or duplicate capability policy is needed to render controls.
+    pub fn support_snapshot(&self) -> Option<bool> {
+        self.runtime.inspect(|state| {
+            (state.connection == ConnectionState::Ready)
+                .then(|| Self::supports_capabilities(&state.endpoint_capabilities))
+        })
     }
     pub async fn create(
         &self,
@@ -170,12 +250,30 @@ impl SideChatController {
     }
     /// Settles a running child before discard. A timeout/error retains the pointer and draft.
     pub async fn close(&self, id: &str, rpc_id: &str) -> Result<()> {
+        self.close_guarded(id, None, rpc_id).await
+    }
+    /// Captured pane callbacks cannot close a pointer that now belongs to another
+    /// parent or mutation state. Validate in the same lock that admits Closing.
+    pub async fn close_owned(&self, expected: &SideChat, rpc_id: &str) -> Result<()> {
+        self.close_guarded(&expected.scope.session_id, Some(expected), rpc_id)
+            .await
+    }
+    async fn close_guarded(
+        &self,
+        id: &str,
+        expected: Option<&SideChat>,
+        rpc_id: &str,
+    ) -> Result<()> {
         {
             let mut state = self.state.lock().expect("side chat lock");
             let chat = state
                 .chats
                 .get_mut(id)
                 .ok_or_else(|| unsupported("unknown SideChat"))?;
+            require(
+                expected.is_none_or(|expected| expected == chat),
+                "SideChat pointer or parent changed",
+            )?;
             require(
                 chat.phase == SideChatPhase::Ready,
                 "SideChat close pending or unknown",
