@@ -69,6 +69,9 @@ impl SharedAgent {
             ),
             "filesList" => {
                 let path = optional_path(&payload["request"], true)?;
+                // DSH requires a nonempty input path; its root listing still
+                // returns the empty workspace-relative path used by our DTO.
+                let path = if path.is_empty() { "." } else { path };
                 let limit = optional_bound(&payload["request"], "limit", 10000)?;
                 match shared
                     .runtime
@@ -403,6 +406,14 @@ mod tests {
             })
         }
         async fn call(&self, method: &str, payload: Value, _: &str) -> Result<Value> {
+            // The real DSH public service rejects an empty request path even
+            // though its successful root listing returns an empty relative path.
+            if method == "workspaceFiles/list" && payload["path"] == "" {
+                return Err(Error::Remote(
+                    json!({"code":"gateway/bad-request","message":"path is required"}),
+                ));
+            }
+            let root = payload["path"] == ".";
             self.connector
                 .calls
                 .lock()
@@ -421,7 +432,7 @@ mod tests {
                 ));
             }
             Ok(
-                json!({"path":"remote","entries":[{"name":"proof.bin","type":"file","size":4},{"name":"folder","type":"directory"}],"truncated":false}),
+                json!({"path":if root { "" } else { "remote" },"entries":[{"name":"proof.bin","type":"file","size":4},{"name":"folder","type":"directory"}],"truncated":false}),
             )
         }
         async fn close(&self) {}
@@ -457,6 +468,31 @@ mod tests {
     }
     fn request(epoch: u64, method: &str, body: Value) -> Value {
         json!({"op":"call","endpoint":"dsh-files","method":"agent.workspace.read","rpcId":"read","payload":{"sessionId":"session","connectionEpoch":epoch,"method":method,"request":body}})
+    }
+
+    #[tokio::test]
+    async fn root_listing_uses_dsh_dot_path_and_returns_workspace_relative_entries() {
+        let (agent, shared, connector) = fixture(false, false).await;
+        let epoch = shared.runtime.snapshot().connection_epoch;
+        for payload in [json!({}), json!({"path":""})] {
+            let listed = agent
+                .request(&request(epoch, "filesList", payload))
+                .await
+                .unwrap();
+            assert!(listed.get("error").is_none(), "{listed}");
+            assert_eq!(listed["result"]["path"], "");
+            assert_eq!(listed["result"]["entries"][0]["path"], "proof.bin");
+            assert_eq!(listed["result"]["entries"][0]["hidden"], false);
+        }
+        let calls = connector.calls.lock().unwrap().clone();
+        assert_eq!(calls.len(), 2);
+        assert!(
+            calls
+                .iter()
+                .all(|(method, payload)| method == "workspaceFiles/list"
+                    && payload == &json!({"workspaceFileScopeId":"session","path":"."}))
+        );
+        shared.runtime.stop().await.unwrap();
     }
 
     #[tokio::test]
