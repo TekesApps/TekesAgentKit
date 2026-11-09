@@ -495,7 +495,7 @@ mod tests {
         );
         assert_eq!(read["result"]["revision"], "remote-version");
         assert_eq!(read["result"]["truncated"], false);
-        let calls = connector.calls.lock().unwrap();
+        let calls = connector.calls.lock().unwrap().clone();
         assert_eq!(
             calls[0],
             (
@@ -506,7 +506,6 @@ mod tests {
         assert_eq!(calls[1].0, "typed-stat");
         assert_eq!(calls[2].0, "typed-bytes");
         assert_eq!(calls.len(), 3);
-        drop(calls);
         shared.runtime.stop().await.unwrap();
     }
 
