@@ -28,6 +28,95 @@ impl SessionRuntime {
         self.call_with_validation(method, payload, rpc_id, validate)
             .await
     }
+    /// Optional calls whose admission and actor dispatch must stay on the
+    /// caller's observed connection. Capability authority comes from that same
+    /// connection snapshot, rather than a separate un-fenced capabilities RPC.
+    pub async fn call_optional_at_epoch_with_validation(
+        &self,
+        expected_epoch: u64,
+        method: &str,
+        payload: Value,
+        rpc_id: &str,
+        validate: impl FnOnce() -> Result<()> + Send,
+    ) -> Result<Value> {
+        self.call_at_epoch_with_validation(expected_epoch, method, payload, rpc_id, move || {
+            self.inspect(|state| {
+                require(
+                    state.connection_epoch == expected_epoch
+                        && state.connection == crate::ConnectionState::Ready,
+                    "optional call connection changed before admission",
+                )?;
+                if !state.endpoint_capabilities.supports(method) {
+                    return Err(unsupported(method));
+                }
+                Ok(())
+            })?;
+            validate()
+        })
+        .await
+    }
+    pub async fn fork_at_epoch_with_validation(
+        &self,
+        expected_epoch: u64,
+        request: ForkRequest,
+        rpc_id: &str,
+        validate: impl FnOnce() -> Result<()> + Send,
+    ) -> Result<SessionCreated> {
+        request.validate()?;
+        Ok(serde_json::from_value(
+            self.call_optional_at_epoch_with_validation(
+                expected_epoch,
+                "session.fork",
+                serde_json::to_value(request)?,
+                rpc_id,
+                validate,
+            )
+            .await?,
+        )?)
+    }
+    pub async fn cancel_at_epoch(&self, expected_epoch: u64, id: &str, rpc_id: &str) -> Result<()> {
+        self.call_optional_at_epoch_with_validation(
+            expected_epoch,
+            "session.cancel",
+            json!({"sessionId":id}),
+            rpc_id,
+            || Ok(()),
+        )
+        .await?;
+        Ok(())
+    }
+    pub async fn discard_at_epoch(
+        &self,
+        expected_epoch: u64,
+        id: &str,
+        rpc_id: &str,
+    ) -> Result<()> {
+        self.call_optional_at_epoch_with_validation(
+            expected_epoch,
+            "session.discard",
+            json!({"sessionId":id}),
+            rpc_id,
+            || Ok(()),
+        )
+        .await?;
+        Ok(())
+    }
+    pub async fn rename_at_epoch(
+        &self,
+        expected_epoch: u64,
+        id: &str,
+        title: &str,
+        rpc_id: &str,
+    ) -> Result<Value> {
+        self.call_optional_at_epoch_with_validation(
+            expected_epoch,
+            "session.rename",
+            json!({"sessionId":id,"title":title}),
+            rpc_id,
+            || Ok(()),
+        )
+        .await
+    }
     pub async fn create(
         &self,
         request: CreateSessionRequest,

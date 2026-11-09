@@ -6,6 +6,16 @@ Native HTTP and WebSocket requests connect directly to the explicitly configured
 
 日期：2026-10-17。改动只在 TekesAgentKit；ClientKit、Tekes、Kernel、Pi、DSH 作为只读来源和运行时。
 
+## 当前共享交付边界（2026-11-09）
+
+当前候选目标为 Kernel 0.9.22、Pi 1.5.0、DSH 0.2.2-rc.1。ClientKit 计划退役，不属于这条交付链；旧版本和历史行为参照不构成当前依赖或验收门槛。AgentKit 统一公共接口与状态，WebUI 和未来 Native App 消费它们；各 adapter 优先使用各自 Harness 的公开能力。
+
+DSH 现有 `workspaceFiles/list/read/readBytes/stat/changes` 是真正的公开 Remote，绑定 `workspaceFileScopeId = sessionId`，由 DSH 从该会话 header 确定工作区与读权限。外部 UI 不传 root，也不把 DSH 的绝对路径转换成本机路径。共享文件面板使用独立 Harness 来源；失败不能自动转到本地同名路径。
+
+Pi stock RPC 没有专用文件/Git方法。公开 Bash RPC 与 SDK 文件工具并不等于现成 typed 文件服务。现有 Pi 受限本地文件读取和独立 WorkspaceService 都明确属于宿主 authority。文件写入和 Git 管理仅使用显式注册的宿主工作区及 grants，不宣称是三端各自实现。DSH 的每轮 changes.summary/diff 是另一个有生命周期限制的特有能力，不等于当前 Git status/branch/commit/push。
+
+新增共享控制面见 [host-controls.md](host-controls.md)。本轮源码、完整兼容检查和真实浏览器证据需保持各自精确身份，下面历史验收不升级为新版本结论。
+
 ## 契约与路由
 
 `NativeSessionEndpoint`、`PiSessionEndpoint`、`DshSessionEndpoint` 分别实现 `SessionEndpoint`。

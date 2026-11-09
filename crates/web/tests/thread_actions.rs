@@ -631,8 +631,8 @@ async fn footnote_fork_uses_the_selected_settled_boundary_and_rejects_unknown_tu
 }
 
 #[tokio::test]
-async fn queue_removal_public_contract_fences_dispatch_and_waits_for_authority() {
-    for queue_fails in [false, true] {
+async fn queue_mutations_public_contract_fence_dispatch_and_wait_for_authority() {
+    for (queue_fails, editing) in [(false, false), (true, false), (false, true), (true, true)] {
         let connector = Connector {
             queue_enabled: true,
             queue_fails,
@@ -659,7 +659,7 @@ async fn queue_removal_public_contract_fences_dispatch_and_waits_for_authority()
         .await
         .unwrap();
         let epoch = runtime.inspect(|s| s.connection_epoch);
-        let request = |item: &str, epoch: u64| json!({"op":"call","endpoint":"test","method":"agent.queue.remove","rpcId":"queue-operation","payload":{"sessionId":"source","itemId":item,"connectionEpoch":epoch}});
+        let request = |item: &str, epoch: u64| json!({"op":"call","endpoint":"test","method":if editing {"agent.queue.edit"} else {"agent.queue.remove"},"rpcId":"queue-operation","payload":{"sessionId":"source","itemId":item,"connectionEpoch":epoch,"text":"edited input"}});
         assert!(
             agent
                 .request(&request("queued-1", epoch + 1))
@@ -667,6 +667,11 @@ async fn queue_removal_public_contract_fences_dispatch_and_waits_for_authority()
                 .is_err()
         );
         assert!(agent.request(&request("missing", epoch)).await.is_err());
+        if editing {
+            let mut empty = request("queued-1", epoch);
+            empty["payload"]["text"] = json!(" \n");
+            assert!(agent.request(&empty).await.is_err());
+        }
         assert!(
             connector.calls.lock().unwrap().is_empty(),
             "rejected UI facts must not reach the Harness"
@@ -678,7 +683,7 @@ async fn queue_removal_public_contract_fences_dispatch_and_waits_for_authority()
             *connector.calls.lock().unwrap(),
             vec![(
                 "session.updateQueue".into(),
-                json!({"sessionId":"source","itemId":"queued-1","action":{"kind":"remove"}}),
+                json!({"sessionId":"source","itemId":"queued-1","action":if editing {json!({"kind":"edit","content":[{"type":"text","text":"edited input"}]})} else {json!({"kind":"remove"})}}),
                 "queue-operation".into()
             )],
             "one request, including uncertain failures; never retry"

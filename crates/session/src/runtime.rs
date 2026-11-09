@@ -1,4 +1,4 @@
-use crate::{ConnectionState, MemoryProjectionStore};
+use crate::{ConnectionState, MemoryProjectionStore, SessionRecoveryOutcome};
 use futures_util::{
     StreamExt,
     stream::{self, BoxStream, SelectAll},
@@ -40,7 +40,61 @@ async fn enqueue_after_validation<T: Send>(
 type HistoryOwners =
     std::sync::Mutex<std::collections::BTreeMap<String, Arc<tokio::sync::Mutex<BTreeSet<String>>>>>;
 type Reply<T> = oneshot::Sender<Result<T>>;
-type OperationResult = Option<(Option<String>, Reply<Value>, Result<Value>)>;
+type OperationResult = Option<(
+    Option<String>,
+    Option<RecoveryAdmission>,
+    Reply<Value>,
+    Result<Value>,
+)>;
+#[derive(Default)]
+struct RecoveryTracking {
+    unresolved: BTreeSet<String>,
+    pending: BTreeSet<String>,
+}
+type SharedRecoveryTracking = Arc<std::sync::Mutex<RecoveryTracking>>;
+/// The guard travels with the result until the actor consumes it. Cancellation
+/// or discarding a completed task cannot turn an admitted mutation into permission
+/// to replay it on the next connection.
+struct RecoveryAdmission {
+    tracking: SharedRecoveryTracking,
+    ids: Vec<String>,
+}
+impl RecoveryAdmission {
+    fn start(tracking: &SharedRecoveryTracking, ids: Vec<String>) -> Result<Self> {
+        {
+            let mut state = tracking.lock().expect("recovery tracking lock");
+            require(
+                !ids.iter().any(|id| state.pending.contains(id)),
+                "session recovery is already pending",
+            )?;
+            state.pending.extend(ids.iter().cloned());
+            state.unresolved.extend(ids.iter().cloned());
+        }
+        Ok(Self {
+            tracking: tracking.clone(),
+            ids,
+        })
+    }
+    fn confirm(self, outcome: &SessionRecoveryOutcome) {
+        let mut state = self.tracking.lock().expect("recovery tracking lock");
+        for id in &outcome.recovered_session_ids {
+            state.unresolved.remove(id);
+        }
+        state
+            .unresolved
+            .extend(outcome.unresolved_session_ids.iter().cloned());
+        drop(state);
+    }
+}
+impl Drop for RecoveryAdmission {
+    fn drop(&mut self) {
+        let mut state = self.tracking.lock().expect("recovery tracking lock");
+        for id in &self.ids {
+            state.pending.remove(id);
+        }
+    }
+}
+
 enum EarlierValue {
     Journal(HistoryRequest, HistoryPage),
     Native(bool),
@@ -658,6 +712,9 @@ async fn run(
 ) {
     let mut wanted = BTreeSet::new();
     let mut deferred_closes = BTreeSet::new();
+    // Unknown/omitted recovery outcomes cannot be replayed by a later automatic
+    // stream reconnect. An explicit sessions.recover call can reconcile them.
+    let unresolved_recovery = Arc::new(std::sync::Mutex::new(RecoveryTracking::default()));
     let mut failures = 0u32;
     let mut epoch = 0u64;
     'connections: loop {
@@ -704,6 +761,7 @@ async fn run(
                         &store,
                         &mut wanted,
                         &mut deferred_closes,
+                        &unresolved_recovery,
                         epoch,
                     )
                     .await;
@@ -776,9 +834,10 @@ fn reject(command: Command) {
 async fn connected(
     endpoint: Arc<dyn SessionEndpoint>,
     commands: &mut mpsc::Receiver<Command>,
-    store: &SharedProjection,
+    store: &Arc<SharedProjection>,
     wanted: &mut BTreeSet<String>,
     deferred_closes: &mut BTreeSet<String>,
+    unresolved_recovery: &SharedRecoveryTracking,
     epoch: u64,
 ) -> Result<bool> {
     let connection_epoch = store.read(|state| state.connection_epoch);
@@ -836,7 +895,7 @@ async fn connected(
         }
     }
     let mut journal_retries = std::collections::BTreeMap::<String, usize>::new();
-    let mut recovered = false;
+    let mut baselines_ready = false;
     let baseline_deadline = tokio::time::sleep(Duration::from_secs(30));
     tokio::pin!(baseline_deadline);
     loop {
@@ -931,7 +990,14 @@ async fn connected(
                 }
             },
             completed = operations.join_next(), if !operations.is_empty() => {
-                if let Some(Ok(Some((removed,reply,result))))=completed {
+                if let Some(Ok(Some((removed,recovery_admission,reply,mut result))))=completed {
+                    if let Some(admission) = recovery_admission {
+                        let outcome = recovery_outcome(connection_epoch, admission.ids.clone(), &result, Vec::new());
+                        if result.is_ok() && let Some(error) = &outcome.error {
+                            result = Err(Error::Protocol(error.clone()));
+                        }
+                        remember_recovery(store, admission, outcome);
+                    }
                     if result.is_ok() && let Some(id) = &removed { deferred_closes.remove(id); }
                     if result.is_err() && let Some(id)=removed {
                         next_journal_epoch+=1;
@@ -942,7 +1008,7 @@ async fn connected(
                     let _=reply.send(result);
                 }
             },
-            _ = &mut baseline_deadline, if !recovered => return Err(Error::Timeout),
+            _ = &mut baseline_deadline, if !baselines_ready => return Err(Error::Timeout),
             frame = streams.next() => {
                 let Some((name, frame_epoch, frame)) = frame else { return Err(Error::Disconnected); };
                 if let Some(id) = name.strip_prefix("journal:") {
@@ -953,7 +1019,7 @@ async fn connected(
                 let is_live = frame.as_ref().is_ok_and(|frame| frame["type"] == "event");
                 let result = frame.and_then(|frame| store.update(|s| {
                     let result = s.apply(&name, frame);
-                    if !recovered { s.connection = ConnectionState::Connecting; }
+                    if !baselines_ready { s.connection = ConnectionState::Connecting; }
                     result
                 }));
                 if let Err(error) = result {
@@ -991,10 +1057,31 @@ async fn connected(
                     return Err(error);
                 }
                 if is_live && let Some(id) = name.strip_prefix("journal:") { journal_retries.remove(id); }
-                if store.read(MemoryProjectionStore::ready) && !recovered {
-                    let ids: Vec<_> = store.read(|s| s.sessions.iter().filter(|(_, s)| s.summary.is_some()).map(|(id, _)| id.clone()).collect());
-                    if !ids.is_empty() && endpoint.supports_recovery() { endpoint.call("sessions.recover", json!({"sessionIds":ids}), &rpc_id()).await?; }
-                    recovered = true;
+                if store.read(MemoryProjectionStore::ready) && !baselines_ready {
+                    if endpoint.supports_recovery() {
+                        let interested: Vec<_> = store.read(|state| wanted.difference(deferred_closes).filter(|id| {
+                            !state.archived_session_ids.contains(*id)
+                                && state.sessions.get(*id).and_then(|session| session.summary.as_ref())
+                                    .is_some_and(|summary| summary["status"] != "archived")
+                        }).cloned().collect());
+                        let (not_retried, ids): (Vec<_>, Vec<_>) = {
+                            let tracking = unresolved_recovery.lock().expect("recovery tracking lock");
+                            interested.into_iter().partition(|id| tracking.unresolved.contains(id))
+                        };
+                        if !ids.is_empty() {
+                            let admission = RecoveryAdmission::start(unresolved_recovery, ids.clone())?;
+                            publish_pending_recovery(store, connection_epoch, &ids);
+                            let result = endpoint.call("sessions.recover", json!({"sessionIds":ids}), &rpc_id()).await;
+                            remember_recovery(store, admission, recovery_outcome(connection_epoch, ids, &result, not_retried));
+                        } else if !not_retried.is_empty() {
+                            store.update(|state| state.recovery = Some(SessionRecoveryOutcome {
+                                connection_epoch, unresolved_session_ids: not_retried.clone(), not_retried_session_ids: not_retried,
+                                error: Some("prior recovery remains unresolved; it was not retried automatically".into()),
+                                ..Default::default()
+                            }));
+                        }
+                    }
+                    baselines_ready = true;
                     store.update(|s| { s.connection = ConnectionState::Ready; s.last_error = None; });
                 }
             }
@@ -1078,6 +1165,12 @@ async fn connected(
                     }
                     Command::Call { method, payload, rpc_id, expected_epoch, mut reply } => {
                         if !store.read(|state|state.ready() && expected_epoch.is_none_or(|epoch|epoch==state.connection_epoch)) || operations.len() >= 64 { let _ = reply.send(Err(Error::Disconnected)); continue; }
+                        let recovery_ids = if method == "sessions.recover" && endpoint.supports_recovery() {
+                            match requested_recovery_ids(&payload) {
+                                Ok(ids) => Some(ids),
+                                Err(error) => { let _ = reply.send(Err(error)); continue; }
+                            }
+                        } else { None };
                         let endpoint = endpoint.clone();
                         let removed=if matches!(method.as_str(),"session.discard"|"session.archive") {
                             let id=payload["sessionId"].as_str().unwrap_or("").to_owned();
@@ -1086,7 +1179,18 @@ async fn connected(
                                 store.update(|s|s.reset_journal(&id));Some(id)
                             } else {None}
                         } else {None};
+                        let recovery_tracking = unresolved_recovery.clone();
+                        let recovery_store = store.clone();
                         operations.spawn(async move {
+                            let recovery_admission = if let Some(ids) = recovery_ids {
+                                match RecoveryAdmission::start(&recovery_tracking, ids) {
+                                    Ok(admission) => {
+                                        publish_pending_recovery(&recovery_store, connection_epoch, &admission.ids);
+                                        Some(admission)
+                                    }
+                                    Err(error) => return Some((removed, None, reply, Err(error))),
+                                }
+                            } else { None };
                             let result = if method == "session.search" {
                                 // Cancel only this specified read operation. Losing a mutation
                                 // receiver must never be interpreted as cancelling remote work.
@@ -1095,7 +1199,7 @@ async fn connected(
                                     result = invoke(endpoint.as_ref(), &method, payload, &rpc_id) => result,
                                 }
                             } else { invoke(endpoint.as_ref(), &method, payload, &rpc_id).await };
-                            Some((removed,reply,result))
+                            Some((removed,recovery_admission,reply,result))
                         });
                     }
                     Command::Respond { id, revision, outcome, reply } => {
@@ -1231,6 +1335,87 @@ async fn invoke(
         )?),
         _ => endpoint.call(method, payload, rpc_id).await,
     }
+}
+
+fn requested_recovery_ids(payload: &Value) -> Result<Vec<String>> {
+    let mut seen = BTreeSet::new();
+    array(payload, "sessionIds")?
+        .iter()
+        .map(|value| {
+            let id = value
+                .as_str()
+                .ok_or_else(|| Error::Protocol("recovery session ID must be text".into()))?;
+            require(
+                !id.is_empty() && seen.insert(id.to_owned()),
+                "duplicate or empty recovery session ID",
+            )?;
+            Ok(id.to_owned())
+        })
+        .collect()
+}
+fn recovery_outcome(
+    epoch: u64,
+    requested: Vec<String>,
+    result: &Result<Value>,
+    not_retried: Vec<String>,
+) -> SessionRecoveryOutcome {
+    let parsed = match result {
+        Ok(receipt) => (|| {
+            let ids = array(receipt, "recoveredSessionIds")?;
+            let mut seen = BTreeSet::new();
+            ids.iter()
+                .map(|value| {
+                    let id = value.as_str().ok_or_else(|| {
+                        Error::Protocol("recovered session ID must be text".into())
+                    })?;
+                    require(
+                        requested.iter().any(|requested| requested == id)
+                            && seen.insert(id.to_owned()),
+                        "recovery receipt has an unrequested or duplicate session ID",
+                    )?;
+                    Ok(id.to_owned())
+                })
+                .collect::<Result<Vec<_>>>()
+        })(),
+        Err(error) => Err(Error::Protocol(error.to_string())),
+    };
+    let (recovered, error) = match parsed {
+        Ok(ids) => (ids, None),
+        Err(error) => (Vec::new(), Some(error.to_string())),
+    };
+    let mut unresolved: Vec<_> = requested
+        .iter()
+        .filter(|id| !recovered.contains(id))
+        .cloned()
+        .collect();
+    unresolved.extend(not_retried.iter().cloned());
+    SessionRecoveryOutcome {
+        connection_epoch: epoch,
+        requested_session_ids: requested,
+        recovered_session_ids: recovered,
+        unresolved_session_ids: unresolved,
+        not_retried_session_ids: not_retried,
+        error,
+    }
+}
+fn publish_pending_recovery(store: &SharedProjection, epoch: u64, ids: &[String]) {
+    store.update(|state| {
+        state.recovery = Some(SessionRecoveryOutcome {
+            connection_epoch: epoch,
+            requested_session_ids: ids.to_vec(),
+            unresolved_session_ids: ids.to_vec(),
+            error: Some("recovery request was admitted; its outcome is not yet confirmed".into()),
+            ..Default::default()
+        })
+    });
+}
+fn remember_recovery(
+    store: &SharedProjection,
+    admission: RecoveryAdmission,
+    outcome: SessionRecoveryOutcome,
+) {
+    admission.confirm(&outcome);
+    store.update(|state| state.recovery = Some(outcome));
 }
 
 /// Drop releases only this consumer. Runtime shutdown does not require a live executor.

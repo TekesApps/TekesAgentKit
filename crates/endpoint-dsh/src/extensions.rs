@@ -124,6 +124,16 @@ pub(crate) fn route(method: &str, payload: &Value) -> Result<Option<(String, Val
             json!({"agentId":agent()?,"query":payload["query"]}),
         ),
         "goals.get" => ("goals/get", json!({"agentId":agent()?})),
+        "goals.create" => {
+            let mut request = json!({"objective":string(payload, "objective")?});
+            if let Some(rounds) = payload.get("maxGoalRounds") {
+                request["maxGoalRounds"] = rounds.clone();
+            }
+            (
+                "goals/create",
+                json!({"agentId":agent()?,"request":request}),
+            )
+        }
         "goals.edit" => (
             "goals/edit",
             json!({"agentId":agent()?,"ref":payload["ref"],"request":{"objective":payload["objective"]}}),
@@ -179,6 +189,7 @@ pub(crate) const ALIASES: &[&str] = &[
     "references.files",
     "references.sessions",
     "goals.get",
+    "goals.create",
     "goals.edit",
     "goals.clear",
     "goals.pause",
@@ -362,6 +373,27 @@ mod tests {
         ] {
             assert!(normalize_feedback_reply(method, reply).is_err());
         }
+    }
+    #[test]
+    fn goal_creation_uses_remote_create_request_and_preserves_optional_round_cap() {
+        assert!(ALIASES.contains(&"goals.create"));
+        let (method, args) = route(
+            "goals.create",
+            &json!({"sessionId":"s","objective":"ship","maxGoalRounds":4}),
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(method, "goals/create");
+        assert_eq!(
+            args,
+            json!({"agentId":"s","request":{"objective":"ship","maxGoalRounds":4}})
+        );
+        let (_, args) = route("goals.create", &json!({"sessionId":"s","objective":"ship"}))
+            .unwrap()
+            .unwrap();
+        assert!(args["request"].get("maxGoalRounds").is_none());
+        assert!(route("goals.create", &json!({"objective":"ship"})).is_err());
+        assert!(route("goals.create", &json!({"sessionId":"s"})).is_err());
     }
     #[test]
     fn routes_preserve_request_wrappers_and_agent_authority() {

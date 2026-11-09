@@ -3,19 +3,19 @@
 [![Rust headless](https://github.com/TekesApps/TekesAgentKit/actions/workflows/ci.yml/badge.svg)](https://github.com/TekesApps/TekesAgentKit/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-**A Rust Agent client suite aligned with TekesClientKit — independent SessionEndpoints, memory projection, and renderer-free Run / Transcript / Composer state.**
+**A Rust Agent client suite for multiple Harnesses — independent SessionEndpoints, memory projection, and renderer-free Run / Transcript / Composer state.**
 
-与 TekesClientKit 对齐的 Rust Agent 客户端库。没有 Swift，不依赖 TekesUI、SQLite 或 harness 的内部数据库；本地连接不需要客户端磁盘 Mirror。
+面向多个 Harness 的共享 Rust Agent 客户端库。没有 Swift，不依赖 TekesUI、SQLite 或 harness 的内部数据库；本地连接不需要客户端磁盘 Mirror。
 
-## SessionEndpoints + Web 服务交付候选
+## SessionEndpoints + 共享 Web 服务
 
-当前开发优先级是三端 SessionEndpoint、共享 presentation 和现有
-[TekesWebUI](https://github.com/TekesApps/TekesWebUI) 接入。`0.4.0` 是待验收的候选，
-尚未发布；历史 tag 的通过不代表该候选已通过。浏览器应用与认证/凭证/进程宿主仍在
+`v0.4.0` 已发布 Native 与现有 [TekesWebUI](https://github.com/TekesApps/TekesWebUI) 的交付。
+`0.5.0` 代码扩展三端适配、共享控制接口及宿主 WorkspaceService；精确验收范围以
+对应发布附件为准，不把历史 tag 的结果升级为新版本结果。浏览器应用与认证/凭证/进程宿主仍在
 TekesWebUI，AgentKit 的 `tekes-agent-web` 仅提供私有 JSON-lines 桥接，不另建 HTTP 服务。
 
 共享权限 DTO、Run/Transcript/Composer、任务/子代理与观察生命周期通过该服务消费。
-[Web 服务契约](crates/web/README.md)、[任务/子代理契约](docs/web-family-contract.md) 和
+[共享宿主控制接口](docs/host-controls.md)、[Web 服务契约](crates/web/README.md)、[任务/子代理契约](docs/web-family-contract.md) 和
 [本期范围与门禁](docs/headless-web-delivery-scope.md) 记录精确边界。Native/Pi/DSH 的实际
 协议、性能和浏览器验收仍须绑定最终程序；已知失败不改列 Unsupported。
 Rust 原生 TekesUI 的非必要扩展延后，既有代码和原生专属门禁保留，不作为隔离 Web
@@ -25,7 +25,9 @@ Rust 原生 TekesUI 的非必要扩展延后，既有代码和原生专属门禁
 
 `v0.1.0` 保存三个 SEP 与无 UI presentation 的阶段成果；`v0.1.1` 增加公开仓库的 MIT 授权、包元数据和使用文档；`v0.2.0` 冻结任务、子代理、SideChat 与 Summary 的无 UI 状态层；`v0.3.0` 补齐 Pi 子代理与 Native 有界子历史，见 [说明](docs/child-history.md)。API 仍处于早期阶段，crate 尚未发布到 crates.io（`publish = false`）。宿主应固定 tag/完整 commit，升级前检查变更。
 
-| Endpoint | 验证版本 | 权威数据路径 |
+以下表格保留早期协议验证版本，不代表本轮完整验收；本轮目标为 Kernel 0.9.22、Pi 1.5.0、DSH 0.2.2-rc.1。
+
+| Endpoint | 历史验证版本 | 权威数据路径 |
 |---|---|---|
 | `NativeSessionEndpoint` | Kernel **0.9.1 / v4**（兼容 0.9.0；子历史需 0.9.1） | bearer HTTP、WebSocket mux、journal 与 frozen-cut history |
 | `PiSessionEndpoint` | Pi **1.3.0** | 每会话原生 stdio RPC、native entry tree 活动分支 |

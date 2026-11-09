@@ -27,6 +27,8 @@ export interface WorkspaceFileEntry {
   path: string;
   kind: string;
   hidden: boolean;
+  /** Present when the source Harness reports regular-file size. */
+  size?: number;
 }
 export interface WorkspaceListing {
   workspaceId: string;
@@ -252,3 +254,25 @@ export type WorkspaceCall = (
   request: Record<string, unknown>,
   rpcId: string,
 ) => Promise<unknown>;
+
+/** Read-only file service provided by the selected Harness, not a host fallback. */
+export type HarnessWorkspaceMethod = "capabilities" | "filesList" | "filesRead";
+export type HarnessWorkspaceReadRequest = {
+  [M in HarnessWorkspaceMethod]: {
+    sessionId: string;
+    connectionEpoch: number;
+    method: M;
+    request: WorkspaceRequests[M];
+  };
+}[HarnessWorkspaceMethod];
+export type HarnessWorkspaceReadResponse = {
+  [M in HarnessWorkspaceMethod]: {
+    provider: "harness";
+    endpointId: string;
+    sessionId: string;
+    /** This is the source Session identity, never a local workspace/root mapping. */
+    workspaceId: string;
+    connectionEpoch: number;
+    method: M;
+  } & ({ result: WorkspaceResponses[M] } | { error: unknown });
+}[HarnessWorkspaceMethod];

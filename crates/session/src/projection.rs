@@ -382,6 +382,19 @@ fn preview_key(event: &SessionEvent) -> String {
     format!("{}:{}", event.data["turn"], event.data["step"])
 }
 
+/// Receipt from the Kernel's explicit recovery admission, separate from connection readiness.
+/// Omitted IDs remain unreleased; an error is an unknown outcome, never success.
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionRecoveryOutcome {
+    pub connection_epoch: u64,
+    pub requested_session_ids: Vec<String>,
+    pub recovered_session_ids: Vec<String>,
+    pub unresolved_session_ids: Vec<String>,
+    pub not_retried_session_ids: Vec<String>,
+    pub error: Option<String>,
+}
+
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct MemoryProjectionStore {
     pub endpoint_id: String,
@@ -389,6 +402,8 @@ pub struct MemoryProjectionStore {
     pub connection: ConnectionState,
     pub host: Option<HostDescription>,
     pub last_error: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub recovery: Option<SessionRecoveryOutcome>,
     pub sessions: BTreeMap<String, SessionProjection>,
     pub actionables: BTreeMap<String, Value>,
     pub endpoint_capabilities: EndpointCapabilities,
@@ -435,6 +450,7 @@ impl MemoryProjectionStore {
         self.connection = ConnectionState::Connecting;
     }
     pub fn disconnect(&mut self) {
+        self.recovery = None;
         self.connection_epoch = self.connection_epoch.wrapping_add(1);
         self.validators.clear();
         self.actionables.clear();
