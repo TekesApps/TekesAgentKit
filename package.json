@@ -8,6 +8,10 @@
     ".": {
       "types": "./web-contract/index.d.ts",
       "default": "./web-contract/index.js"
+    },
+    "./workspace": {
+      "types": "./web-contract/workspace.d.ts",
+      "default": "./web-contract/workspace.js"
     }
   }
 }
