@@ -39,6 +39,53 @@ current settings integration is read-only even where its upstream SDK has
 separate setters. Existing Pi/DSH string presets remain distinct from Kernel
 structured presets.
 
+## Application session organization
+
+`thread.actions` / `thread.performAction` use the existing `archive` and
+`unarchive` action IDs for **AgentKit-owned application organization** on Kernel,
+Pi and DSH. They write `ThreadPreferences` only. They never call a Harness archive,
+unarchive, cancel or recovery operation. Archiving a running conversation changes
+its navigation membership while its work, observer, history and draft continue;
+both actions return `clearSelection:false`. Real execution actions retain their
+own normal admission rules. Without a configured local preference store, application
+archive is explicitly unavailable and never falls back to a Harness mutation. `SharedAgent::open_thread_preferences` is the
+single application-archive authority for grouping, menus, actions, snapshots and
+search revisions. Installing a custom `ThreadActionHost` alone supplies no archive
+store, even if it advertises `thread.setArchived`; such a host continues to own its
+other declared local actions. Each inventory response captures one archive snapshot
+and uses that same revision and membership for every row.
+
+The existing private preference file migrates to format 5. Missing
+`applicationArchived` fields initialize as empty. Every scope stores an independent
+set of `{endpoint,sessionId}` identities plus a monotonic `applicationArchiveRevision`;
+no titles or conversation contents are copied into this file. Pins, Sidebar
+preferences and local RPC replay receipts remain preserved. Atomic replace, the
+existing exclusive file lock, and a shared watch stream apply to organization as
+well. Multiple browser/native consumers of one service observe the same owner;
+two independent services cannot simultaneously own the same preference file.
+Hosts must keep the same private path, account/workspace scope and endpoint IDs
+across normal restart or release-directory changes. The preference file remains
+outside public release artifacts.
+
+Public inventory rows and search items carry
+`organization:{archived,applicationArchived,harnessArchived,archiveOwner}`;
+`archiveOwner` is `agentkit`, `harness` or null. The original Harness summary and
+`archiveFacts.archivedSessionIds` are not rewritten. Snapshot/inventory separately
+expose `applicationArchive:{revision,sessionIds}`. On restart, normal Harness active
+inventory supplies real titles and projections, and ordinary history reads still
+work; the durable application mark only decides the active/archived list. An
+absent source summary is never fabricated. Existing Harness-native archives remain
+legacy facts: no automatic migration, native restore or active-state claim occurs.
+Whenever `harnessArchived` is true, the ordinary application Restore action is
+disabled even if a local mark also exists; the original Harness owns that state.
+
+Name search asks the upstream authority for `visibility:all`, consumes each entire
+source page, then applies effective application/Harness visibility. A filtered
+page may be empty while retaining a continuation cursor. The opaque consumer
+cursor binds endpoint, connection epoch, query, visibility, session filter and the
+durable application-archive revision; changing organization invalidates continuation
+with an explicit error. No hidden restart or cursor retry is performed.
+
 ## WorkspaceService
 
 WorkspaceService is independent of SessionRuntime and of the chosen Harness.

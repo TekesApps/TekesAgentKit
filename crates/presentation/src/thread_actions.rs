@@ -10,7 +10,9 @@ pub struct ThreadActionContext<'a> {
     pub capabilities: &'a EndpointCapabilities,
     pub ready: bool,
     pub running: bool,
+    /// Original Harness archive fact; never populated from application organization.
     pub archived: bool,
+    pub application_archive: Option<&'a ApplicationArchiveState>,
     pub pin: Option<&'a ThreadPinState>,
     pub host_methods: &'a BTreeSet<String>,
 }
@@ -54,13 +56,6 @@ pub fn thread_actions(context: &ThreadActionContext<'_>) -> ThreadActionsPresent
     } else {
         None
     };
-    let capability = |method: &str| {
-        unavailable
-            .or_else(|| (!c.capabilities.supports(method)).then_some("当前 Harness 不支持此操作"))
-    };
-    let idle_capability = |method: &str| {
-        capability(method).or_else(|| c.running.then_some("会话仍有运行或排队中的任务"))
-    };
     let pin_support = {
         (c.pin.is_none() || !c.host_methods.contains("thread.setPinned"))
             .then_some("当前连接暂不支持置顶")
@@ -92,22 +87,35 @@ pub fn thread_actions(context: &ThreadActionContext<'_>) -> ThreadActionsPresent
     };
     copy.copy_text = Some(format!("{}://{backend}/{raw}", c.url_scheme));
     items.push(copy);
+    let local_archive = c.application_archive.is_some_and(|state| state.archived);
+    let local_unavailable = (c.application_archive.is_none()
+        || !c.host_methods.contains("thread.setArchived"))
+    .then_some("当前宿主未提供应用归档存储");
     if c.archived {
-        if c.capabilities.supports_unarchive_session && c.capabilities.supports("session.unarchive")
-        {
-            items.push(action(
-                "unarchive",
-                "取消归档",
-                "unarchive",
-                "execute",
-                unavailable,
-            ));
-        }
+        items.push(action(
+            "unarchive",
+            "取消归档",
+            "unarchive",
+            "execute",
+            Some("此会话已在原 Harness 归档，请在原 Harness 恢复"),
+        ));
+    } else if local_archive {
+        items.push(action(
+            "unarchive",
+            "取消归档",
+            "unarchive",
+            "execute",
+            local_unavailable,
+        ));
     } else {
-        let reason = idle_capability("session.archive").or_else(|| {
-            (!c.capabilities.supports_archive_session).then_some("当前 Harness 不支持归档")
-        });
-        items.push(action("archive", "归档会话", "archive", "execute", reason));
+        // Application organization never stops or mutates a Harness run.
+        items.push(action(
+            "archive",
+            "归档会话",
+            "archive",
+            "execute",
+            local_unavailable,
+        ));
     }
     ThreadActionsPresentation {
         endpoint: c.endpoint.into(),
@@ -224,6 +232,7 @@ mod tests {
             ready: true,
             running: false,
             archived: false,
+            application_archive: Some(&ApplicationArchiveState { archived: false }),
             pin: None,
             host_methods: &methods,
         };
@@ -260,7 +269,7 @@ mod tests {
     #[test]
     fn pinned_order_and_archive_variant_come_from_authority() {
         let capabilities = caps();
-        let methods = BTreeSet::from(["thread.setPinned".into()]);
+        let methods = BTreeSet::from(["thread.setPinned".into(), "thread.setArchived".into()]);
         let pin = ThreadPinState { pinned: true };
         let context = ThreadActionContext {
             endpoint: "k",
@@ -270,7 +279,8 @@ mod tests {
             capabilities: &capabilities,
             ready: true,
             running: false,
-            archived: true,
+            archived: false,
+            application_archive: Some(&ApplicationArchiveState { archived: true }),
             pin: Some(&pin),
             host_methods: &methods,
         };
@@ -295,7 +305,7 @@ mod tests {
     #[test]
     fn fresh_policy_rejects_stale_commands_unknown_actions_and_wrong_targets() {
         let capabilities = caps();
-        let methods = BTreeSet::new();
+        let methods = BTreeSet::from(["thread.setArchived".into()]);
         let context = ThreadActionContext {
             endpoint: "k",
             session_id: "s",
@@ -305,6 +315,7 @@ mod tests {
             ready: true,
             running: false,
             archived: false,
+            application_archive: Some(&ApplicationArchiveState { archived: false }),
             pin: None,
             host_methods: &methods,
         };
@@ -322,7 +333,10 @@ mod tests {
             running: true,
             ..context
         });
-        assert!(thread_action_command(&active, &request).is_err());
+        assert!(matches!(
+            thread_action_command(&active, &request).unwrap(),
+            ThreadActionCommand::Archive
+        ));
         assert!(
             thread_action_command(
                 &idle,
@@ -370,5 +384,50 @@ mod tests {
             "Chat (10000000000000000000000000)"
         );
         assert_eq!(increased_fork_title("Chat (x)"), "Chat (x) (1)");
+    }
+    #[test]
+    fn application_archive_does_not_depend_on_harness_support_or_idle_work_and_legacy_restore_is_disabled()
+     {
+        let capabilities = EndpointCapabilities::default();
+        let methods = BTreeSet::from(["thread.setArchived".into()]);
+        let local = ApplicationArchiveState { archived: false };
+        let context = ThreadActionContext {
+            endpoint: "native",
+            session_id: "running",
+            kind: "tekes",
+            url_scheme: "agent",
+            capabilities: &capabilities,
+            ready: false,
+            running: true,
+            archived: false,
+            application_archive: Some(&local),
+            pin: None,
+            host_methods: &methods,
+        };
+        let menu = thread_actions(&context);
+        assert!(
+            menu.items
+                .iter()
+                .any(|item| item.id == "archive" && item.enabled)
+        );
+        let local = ApplicationArchiveState { archived: true };
+        let legacy = thread_actions(&ThreadActionContext {
+            archived: true,
+            application_archive: Some(&local),
+            ..context
+        });
+        let restore = legacy
+            .items
+            .iter()
+            .find(|item| item.id == "unarchive")
+            .unwrap();
+        assert!(!restore.enabled);
+        assert!(
+            restore
+                .disabled_reason
+                .as_ref()
+                .unwrap()
+                .contains("Harness")
+        );
     }
 }

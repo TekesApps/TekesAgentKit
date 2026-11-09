@@ -639,11 +639,26 @@ pub struct SharedAgent {
     inventory_changes: InventoryChanges,
     family_views: std::sync::Mutex<BTreeMap<String, family::FamilyChildView>>,
 }
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum ThreadArchiveOwner {
+    Agentkit,
+    Harness,
+}
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ThreadOrganization {
+    pub archived: bool,
+    pub application_archived: bool,
+    pub harness_archived: bool,
+    pub archive_owner: Option<ThreadArchiveOwner>,
+}
 struct ThreadActionInputs {
     capabilities: EndpointCapabilities,
     connected: bool,
     host_methods: BTreeSet<String>,
     pin: Option<ThreadPinState>,
+    application_archive: Option<ApplicationArchiveState>,
 }
 struct InventoryChanges(tokio::sync::watch::Sender<()>);
 impl Default for InventoryChanges {
@@ -698,32 +713,90 @@ impl SharedAgent {
         Ok(())
     }
     fn inventory(&self, shared: &SharedEndpoint, state: &MemoryProjectionStore) -> Result<Value> {
-        let sessions: Vec<Value> = active_inventory(state)
+        let application_archive = self.application_archive_snapshot(&state.endpoint_id);
+        let mut sessions = Vec::new();
+        let mut archived_sessions = Vec::new();
+        for row in active_inventory(state)
             .into_iter()
-            .map(|row| self.decorate_inventory_row(state, row))
-            .collect();
-        let archived_sessions: Vec<Value> = archived_inventory(state)
-            .into_iter()
-            .map(|row| self.decorate_inventory_row(state, row))
-            .collect();
+            .chain(archived_inventory(state))
+        {
+            let row = self.decorate_inventory_row(state, row, &application_archive);
+            if row["organization"]["archived"] == true {
+                archived_sessions.push(row);
+            } else {
+                sessions.push(row);
+            }
+        }
         let name_corpus = retained_name_corpus(state, self.endpoints.keys().cloned())?;
         Ok(
-            json!({"description":shared.description(),"sessions":sessions,"archivedSessions":archived_sessions,"inventoryReady":state.inventory_ready,"connectionEpoch":state.connection_epoch,"nameCorpus":name_corpus,"archiveFacts":inventory_archive_facts(state)}),
+            json!({"description":shared.description(),"sessions":sessions,"archivedSessions":archived_sessions,"inventoryReady":state.inventory_ready,"connectionEpoch":state.connection_epoch,"nameCorpus":name_corpus,"archiveFacts":inventory_archive_facts(state),"applicationArchive":application_archive}),
         )
     }
-    fn decorate_inventory_row(&self, state: &MemoryProjectionStore, row: Value) -> Value {
+    fn application_archive_snapshot(
+        &self,
+        endpoint: &str,
+    ) -> tekes_agent_presentation::ApplicationArchiveSnapshot {
+        self.thread_preferences
+            .as_ref()
+            .map(|store| store.application_archive_snapshot(endpoint))
+            .unwrap_or_else(|| tekes_agent_presentation::ApplicationArchiveSnapshot {
+                revision: 0,
+                session_ids: BTreeSet::new(),
+            })
+    }
+    fn thread_organization(&self, state: &MemoryProjectionStore, id: &str) -> ThreadOrganization {
+        self.organization_at_archive_snapshot(
+            state,
+            id,
+            &self.application_archive_snapshot(&state.endpoint_id),
+        )
+    }
+    fn organization_at_archive_snapshot(
+        &self,
+        state: &MemoryProjectionStore,
+        id: &str,
+        archive: &tekes_agent_presentation::ApplicationArchiveSnapshot,
+    ) -> ThreadOrganization {
+        let application_archived = archive.session_ids.contains(id);
+        let harness_archived = state.archived_session_ids.iter().any(|value| value == id)
+            || state
+                .sessions
+                .get(id)
+                .and_then(|session| session.summary.as_ref())
+                .is_some_and(|summary| summary["status"] == "archived");
+        ThreadOrganization {
+            archived: application_archived || harness_archived,
+            application_archived,
+            harness_archived,
+            archive_owner: if application_archived {
+                Some(ThreadArchiveOwner::Agentkit)
+            } else if harness_archived {
+                Some(ThreadArchiveOwner::Harness)
+            } else {
+                None
+            },
+        }
+    }
+    fn decorate_inventory_row(
+        &self,
+        state: &MemoryProjectionStore,
+        row: Value,
+        archive: &tekes_agent_presentation::ApplicationArchiveSnapshot,
+    ) -> Value {
         let id = row["sessionId"].as_str().expect("inventory identity");
         let pin = self
             .thread_action_host
             .as_ref()
             .and_then(|host| host.pin_state(&state.endpoint_id, id));
-        self.decorate_inventory_row_with_pin(state, row, pin.as_ref())
+        let organization = self.organization_at_archive_snapshot(state, id, archive);
+        self.decorate_inventory_row_with_pin(state, row, pin.as_ref(), organization)
     }
     fn decorate_inventory_row_with_pin(
         &self,
         state: &MemoryProjectionStore,
         mut row: Value,
         pin: Option<&ThreadPinState>,
+        organization: ThreadOrganization,
     ) -> Value {
         let id = row["sessionId"]
             .as_str()
@@ -732,6 +805,7 @@ impl SharedAgent {
         if pin.is_some_and(|pin| pin.pinned) {
             row["pin"] = json!(ThreadPinPresentation { pinned: true });
         }
+        row["organization"] = serde_json::to_value(organization).expect("organization projection");
         row["activity"] =
             serde_json::to_value(tekes_agent_presentation::thread_activity(state, &id))
                 .expect("thread activity");
@@ -756,21 +830,33 @@ impl SharedAgent {
     fn thread_action_inputs(&self, shared: &SharedEndpoint, id: &str) -> ThreadActionInputs {
         let endpoint = shared.connected().ok();
         let endpoint_id = shared.runtime.inspect(|s| s.endpoint_id.clone());
+        let mut host_methods = self
+            .thread_action_host
+            .as_ref()
+            .map(|host| host.methods())
+            .unwrap_or_default();
+        // Application organization has exactly one owner. A custom action host
+        // cannot advertise a second archive store through its method names.
+        if self.thread_preferences.is_some() {
+            host_methods.insert("thread.setArchived".into());
+        } else {
+            host_methods.remove("thread.setArchived");
+        }
         ThreadActionInputs {
             capabilities: endpoint
                 .as_ref()
                 .map(|e| e.capabilities())
                 .unwrap_or_default(),
             connected: endpoint.is_some(),
-            host_methods: self
-                .thread_action_host
-                .as_ref()
-                .map(|h| h.methods())
-                .unwrap_or_default(),
+            host_methods,
             pin: self
                 .thread_action_host
                 .as_ref()
                 .and_then(|h| h.pin_state(&endpoint_id, id)),
+            application_archive: self
+                .thread_preferences
+                .as_ref()
+                .and_then(|store| store.application_archive_state(&endpoint_id, id)),
         }
     }
     fn thread_actions_in_state(
@@ -798,6 +884,7 @@ impl SharedAgent {
                 ready: state.connection == ConnectionState::Ready && inputs.connected,
                 running,
                 archived,
+                application_archive: inputs.application_archive.as_ref(),
                 pin: inputs.pin.as_ref(),
                 host_methods: &inputs.host_methods,
             },
@@ -868,8 +955,10 @@ impl SharedAgent {
             None
         };
 
-        if matches!(request.action_id.as_str(), "pin" | "unpin")
-            && let Some(store) = &self.thread_preferences
+        if matches!(
+            request.action_id.as_str(),
+            "pin" | "unpin" | "archive" | "unarchive"
+        ) && let Some(store) = &self.thread_preferences
             && store.replay(&shared.runtime.snapshot().endpoint_id, &request, rpc_id)?
         {
             return Ok(ThreadActionOutcome::default());
@@ -933,20 +1022,13 @@ impl SharedAgent {
                 }
             }
             ThreadActionCommand::Archive | ThreadActionCommand::Unarchive => {
-                let archive = matches!(command, ThreadActionCommand::Archive);
-                shared
-                    .runtime
-                    .call(
-                        if archive {
-                            "session.archive"
-                        } else {
-                            "session.unarchive"
-                        },
-                        json!({"sessionId":request.session_id}),
-                        rpc_id,
-                    )
+                outcome = self
+                    .thread_preferences
+                    .as_ref()
+                    .ok_or_else(|| unsupported("application archive store unavailable"))?
+                    .perform(&presentation.endpoint, &request, rpc_id)
                     .await?;
-                outcome.clear_selection = archive;
+                self.invalidate_thread_inventory();
             }
             ThreadActionCommand::Host => {
                 let result = self
@@ -1037,7 +1119,13 @@ impl SharedAgent {
                 runtime.reconnect().await?;
                 Ok(shared.description())
             }
-            "snapshot" => Ok(serde_json::to_value(runtime.snapshot().as_ref())?),
+            "snapshot" => {
+                let state = runtime.snapshot();
+                let mut value = serde_json::to_value(state.as_ref())?;
+                value["applicationArchive"] =
+                    serde_json::to_value(self.application_archive_snapshot(&state.endpoint_id))?;
+                Ok(value)
+            }
             "call" => {
                 if request["method"] == "thread.actions" {
                     return Ok(serde_json::to_value(self.thread_actions(
@@ -1506,7 +1594,7 @@ mod archive_facts_tests {
     }
 
     #[tokio::test]
-    async fn public_inventory_consumer_restores_archived_row_with_its_metadata() {
+    async fn legacy_harness_archives_remain_separate_and_application_actions_cannot_restore_them() {
         use std::time::Duration;
         let (inventory, _) = tokio::sync::broadcast::channel(4);
         let calls = Arc::new(std::sync::Mutex::new(Vec::new()));
@@ -1556,42 +1644,20 @@ mod archive_facts_tests {
         assert_eq!(saved["pin"]["pinned"], true);
         assert_eq!(saved["activity"]["status"], "idle");
         assert_eq!(saved["activity"]["isStale"], false);
+        assert_eq!(saved["organization"]["archiveOwner"], "harness");
+        assert_eq!(saved["organization"]["applicationArchived"], false);
         let menu = agent.request(&json!({"op":"call","endpoint":"archive","method":"thread.actions","rpcId":"read","payload":{"sessionId":"saved"}})).await.unwrap();
         assert!(
             menu["items"]
                 .as_array()
                 .unwrap()
                 .iter()
-                .any(|item| item["id"] == "unarchive" && item["enabled"] == true)
+                .any(|item| item["id"] == "unarchive" && item["enabled"] == false)
         );
-        let receipt = agent.request(&json!({"op":"call","endpoint":"archive","method":"thread.performAction","rpcId":"restore-once","payload":{"sessionId":"saved","actionId":"unarchive"}})).await.unwrap();
-        assert_eq!(receipt["clearSelection"], false);
-        let after = tokio::time::timeout(Duration::from_secs(2), async {
-            loop {
-                let frame = frames.recv().await.unwrap();
-                if frame["archivedSessions"] == json!([]) {
-                    break frame;
-                }
-            }
-        })
-        .await
-        .unwrap();
-        assert_eq!(after["sessions"].as_array().unwrap().len(), 2);
-        let restored = after["sessions"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .find(|row| row["sessionId"] == "saved")
-            .unwrap();
-        assert_eq!(restored["pin"], saved["pin"]);
-        assert_eq!(restored["projections"], saved["projections"]);
-        assert_eq!(
-            calls.lock().unwrap().as_slice(),
-            &[(
-                "session.unarchive".into(),
-                json!({"sessionId":"saved"}),
-                "restore-once".into()
-            )]
+        assert!(agent.request(&json!({"op":"call","endpoint":"archive","method":"thread.performAction","rpcId":"restore-once","payload":{"sessionId":"saved","actionId":"unarchive"}})).await.is_err());
+        assert!(
+            calls.lock().unwrap().is_empty(),
+            "legacy archive cannot trigger a Harness restore"
         );
         follow.abort();
         agent
@@ -1601,6 +1667,167 @@ mod archive_facts_tests {
             .stop()
             .await
             .unwrap();
+    }
+
+    struct ArchiveClaimHost;
+    #[async_trait]
+    impl ThreadActionHost for ArchiveClaimHost {
+        fn methods(&self) -> BTreeSet<String> {
+            BTreeSet::from(["thread.setArchived".into()])
+        }
+        fn pin_state(&self, _: &str, _: &str) -> Option<ThreadPinState> {
+            None
+        }
+        async fn perform(
+            &self,
+            _: &str,
+            _: &ThreadActionRequest,
+            _: &str,
+        ) -> Result<ThreadActionOutcome> {
+            panic!("custom host cannot own application archive")
+        }
+    }
+    #[tokio::test]
+    async fn custom_action_host_cannot_supply_a_second_application_archive_authority() {
+        use std::time::Duration;
+        for with_preferences in [false, true] {
+            let (inventory, _) = tokio::sync::broadcast::channel(4);
+            let calls = Arc::new(std::sync::Mutex::new(Vec::new()));
+            let connector=ArchiveConnector{host:serde_json::from_value(json!({"protocolVersion":4,"product":{"name":"archive fixture","version":"1"},"capabilities":["session-inventory-sync","session-control-sync","actionable-sync"],"cwd":"/work","home":"/home","attachedSessions":0,"canOpenPath":false})).unwrap(),inventory,calls:calls.clone()};
+            let directory = std::env::temp_dir().join(format!(
+                "agentkit-archive-authority-{}",
+                uuid::Uuid::new_v4()
+            ));
+            let path = directory.join("preferences.json");
+            let mut agent = SharedAgent::default();
+            if with_preferences {
+                agent
+                    .open_thread_preferences(&path, "account/project")
+                    .unwrap();
+            }
+            agent.install_thread_action_host(Arc::new(ArchiveClaimHost));
+            agent
+                .register(
+                    "archive".into(),
+                    "tekes".into(),
+                    "Archive".into(),
+                    Arc::new(connector),
+                )
+                .unwrap();
+            let shared = agent.endpoint("archive").unwrap();
+            shared
+                .runtime
+                .wait_ready(Duration::from_secs(2))
+                .await
+                .unwrap();
+            let menu = agent.thread_actions(&shared, "active").unwrap();
+            assert_eq!(
+                menu.items
+                    .iter()
+                    .find(|action| action.id == "archive")
+                    .unwrap()
+                    .enabled,
+                with_preferences
+            );
+            let result=agent.request(&json!({"op":"call","endpoint":"archive","method":"thread.performAction","rpcId":"owned-archive","payload":{"sessionId":"active","actionId":"archive"}})).await;
+            assert_eq!(result.is_ok(), with_preferences);
+            let snapshot = shared.runtime.snapshot();
+            let view = agent.inventory(&shared, &snapshot).unwrap();
+            let archive = agent.application_archive_snapshot("archive");
+            assert_eq!(archive.session_ids.contains("active"), with_preferences);
+            assert_eq!(
+                view["applicationArchive"],
+                serde_json::to_value(&archive).unwrap()
+            );
+            assert_eq!(
+                view["sessions"].as_array().unwrap().len(),
+                if with_preferences { 0 } else { 1 }
+            );
+            assert!(calls.lock().unwrap().is_empty());
+            shared.runtime.stop().await.unwrap();
+            drop(shared);
+            drop(agent);
+            if with_preferences {
+                std::fs::remove_dir_all(directory).unwrap();
+            }
+        }
+    }
+    struct MutatingPinHost {
+        store: Arc<tekes_agent_presentation::ThreadPreferences>,
+        changed: std::sync::atomic::AtomicBool,
+    }
+    #[async_trait]
+    impl ThreadActionHost for MutatingPinHost {
+        fn methods(&self) -> BTreeSet<String> {
+            BTreeSet::from(["thread.setPinned".into()])
+        }
+        fn pin_state(&self, _: &str, _: &str) -> Option<ThreadPinState> {
+            use futures_util::FutureExt;
+            if !self.changed.swap(true, std::sync::atomic::Ordering::SeqCst) {
+                self.store
+                    .perform(
+                        "fixture",
+                        &ThreadActionRequest {
+                            session_id: "one".into(),
+                            action_id: "archive".into(),
+                            title: None,
+                        },
+                        "organization-change-during-pin-read",
+                    )
+                    .now_or_never()
+                    .expect("local preference commit completes synchronously")
+                    .unwrap();
+            }
+            Some(ThreadPinState { pinned: false })
+        }
+        async fn perform(
+            &self,
+            _: &str,
+            _: &ThreadActionRequest,
+            _: &str,
+        ) -> Result<ThreadActionOutcome> {
+            Err(unsupported("unused pin mutation"))
+        }
+    }
+    #[test]
+    fn inventory_uses_one_application_archive_snapshot_even_when_host_metadata_changes_preferences()
+    {
+        let directory = std::env::temp_dir().join(format!(
+            "agentkit-archive-snapshot-{}",
+            uuid::Uuid::new_v4()
+        ));
+        let path = directory.join("preferences.json");
+        let mut agent = SharedAgent::default();
+        agent
+            .open_thread_preferences(&path, "account/project")
+            .unwrap();
+        let store = agent.thread_preferences.as_ref().unwrap().clone();
+        agent.install_thread_action_host(Arc::new(MutatingPinHost {
+            store,
+            changed: std::sync::atomic::AtomicBool::new(false),
+        }));
+        let mut state = MemoryProjectionStore::new("fixture");
+        state.sessions.entry("one".into()).or_default().summary =
+            Some(json!({"sessionId":"one","title":"One","status":"idle"}));
+        // No endpoint/remote call is needed: this is the same inventory row projection.
+        let archive = agent.application_archive_snapshot("fixture");
+        let row = active_inventory(&state).pop().unwrap();
+        let rendered = agent.decorate_inventory_row(&state, row, &archive);
+        assert_eq!(rendered["organization"]["applicationArchived"], false);
+        assert!(archive.session_ids.is_empty());
+        assert!(
+            agent
+                .application_archive_snapshot("fixture")
+                .session_ids
+                .contains("one")
+        );
+        let later = agent.application_archive_snapshot("fixture");
+        let row = active_inventory(&state).pop().unwrap();
+        let rendered = agent.decorate_inventory_row(&state, row, &later);
+        assert_eq!(rendered["organization"]["applicationArchived"], true);
+        assert!(later.revision > archive.revision);
+        drop(agent);
+        std::fs::remove_dir_all(directory).unwrap();
     }
 
     #[test]

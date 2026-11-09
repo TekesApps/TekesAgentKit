@@ -156,7 +156,7 @@ fn request(action: &str) -> Value {
     json!({"op":"call","endpoint":"test","method":"thread.performAction","rpcId":"stable","payload":{"sessionId":"source","actionId":action}})
 }
 #[tokio::test]
-async fn commands_revalidate_current_policy_instead_of_trusting_an_open_menu() {
+async fn application_archive_requires_local_storage_and_does_not_fall_back_to_harness() {
     let (agent, connector) = setup().await;
     let menu=agent.request(&json!({"op":"call","endpoint":"test","method":"thread.actions","rpcId":"read","payload":{"sessionId":"source"}})).await.unwrap();
     assert!(
@@ -164,7 +164,7 @@ async fn commands_revalidate_current_policy_instead_of_trusting_an_open_menu() {
             .as_array()
             .unwrap()
             .iter()
-            .any(|i| i["id"] == "archive" && i["enabled"] == true)
+            .any(|i| i["id"] == "archive" && i["enabled"] == false)
     );
     connector.archive_disabled.store(true, Ordering::SeqCst);
     assert!(agent.request(&request("archive")).await.is_err());
@@ -702,5 +702,140 @@ async fn queue_mutations_public_contract_fence_dispatch_and_wait_for_authority()
         assert_eq!(connector.calls.lock().unwrap().len(), 1);
         lease.release().await.unwrap();
         runtime.stop().await.unwrap();
+    }
+}
+
+#[tokio::test]
+async fn application_archive_survives_restart_with_real_public_titles_and_history_without_harness_mutations()
+ {
+    async fn open(path: &std::path::Path, kind: &str, connector: Connector) -> Arc<SharedAgent> {
+        let mut agent = SharedAgent::default();
+        agent
+            .open_thread_preferences(path, "account/project")
+            .unwrap();
+        agent
+            .register(
+                "test".into(),
+                kind.into(),
+                "Shared organization".into(),
+                Arc::new(connector),
+            )
+            .unwrap();
+        agent
+            .endpoint("test")
+            .unwrap()
+            .runtime
+            .wait_ready(Duration::from_secs(2))
+            .await
+            .unwrap();
+        Arc::new(agent)
+    }
+    async fn inventory(agent: &Arc<SharedAgent>) -> Value {
+        let (tx, mut rx) = tokio::sync::mpsc::channel(8);
+        let owner = agent.clone();
+        let task = tokio::spawn(async move {
+            owner
+                .follow(&json!({"endpoint":"test","target":"state"}), tx)
+                .await
+        });
+        let value = tokio::time::timeout(Duration::from_secs(2), rx.recv())
+            .await
+            .unwrap()
+            .unwrap();
+        drop(rx);
+        task.await.unwrap().unwrap();
+        value
+    }
+    for kind in ["tekes", "pi", "dsh"] {
+        let directory = std::env::temp_dir().join(format!(
+            "agentkit-application-archive-{kind}-{}",
+            uuid::Uuid::new_v4()
+        ));
+        std::fs::create_dir_all(&directory).unwrap();
+        let path = directory.join("preferences.json");
+        let connector = Connector {
+            settled_journal: true,
+            ..Default::default()
+        };
+        let agent = open(&path, kind, connector.clone()).await;
+        agent
+            .endpoint("test")
+            .unwrap()
+            .runtime
+            .open_session("source")
+            .await
+            .unwrap();
+        let archive=agent.request(&json!({"op":"call","endpoint":"test","method":"thread.performAction","rpcId":"archive-local","payload":{"sessionId":"source","actionId":"archive"}})).await.unwrap();
+        assert_eq!(archive["clearSelection"], false);
+        let view = inventory(&agent).await;
+        assert_eq!(view["sessions"], json!([]));
+        assert_eq!(view["archivedSessions"][0]["summary"]["title"], "Topic (9)");
+        assert_eq!(
+            view["archivedSessions"][0]["organization"],
+            json!({"archived":true,"applicationArchived":true,"harnessArchived":false,"archiveOwner":"agentkit"})
+        );
+        let state = agent.endpoint("test").unwrap().runtime.snapshot();
+        assert!(state.archived_session_ids.is_empty());
+        assert!(state.sessions["source"].summary.is_some());
+        assert!(state.sessions["source"].journal_ready);
+        assert_eq!(state.sessions["source"].entries.len(), 6);
+        assert!(connector.calls.lock().unwrap().is_empty());
+        agent
+            .endpoint("test")
+            .unwrap()
+            .runtime
+            .stop()
+            .await
+            .unwrap();
+        drop(agent);
+        let restarted = open(&path, kind, connector.clone()).await;
+        let view = inventory(&restarted).await;
+        assert_eq!(view["sessions"], json!([]));
+        assert_eq!(view["archivedSessions"][0]["summary"]["title"], "Topic (9)");
+        restarted
+            .endpoint("test")
+            .unwrap()
+            .runtime
+            .open_session("source")
+            .await
+            .unwrap();
+        assert_eq!(
+            restarted
+                .endpoint("test")
+                .unwrap()
+                .runtime
+                .snapshot()
+                .sessions["source"]
+                .entries
+                .len(),
+            6
+        );
+        let menu=restarted.request(&json!({"op":"call","endpoint":"test","method":"thread.actions","rpcId":"read-restore","payload":{"sessionId":"source"}})).await.unwrap();
+        assert!(
+            menu["items"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|item| item["id"] == "unarchive" && item["enabled"] == true)
+        );
+        restarted.request(&json!({"op":"call","endpoint":"test","method":"thread.performAction","rpcId":"archive-local","payload":{"sessionId":"source","actionId":"archive"}})).await.unwrap();
+        let restored=restarted.request(&json!({"op":"call","endpoint":"test","method":"thread.performAction","rpcId":"restore-local","payload":{"sessionId":"source","actionId":"unarchive"}})).await.unwrap();
+        assert_eq!(restored["clearSelection"], false);
+        let view = inventory(&restarted).await;
+        assert_eq!(view["sessions"].as_array().unwrap().len(), 1);
+        assert_eq!(view["archivedSessions"], json!([]));
+        assert!(
+            connector.calls.lock().unwrap().is_empty(),
+            "application archive never calls archive/unarchive/cancel/recover on any Harness"
+        );
+        restarted
+            .endpoint("test")
+            .unwrap()
+            .runtime
+            .stop()
+            .await
+            .unwrap();
+        drop(restarted);
+        std::fs::remove_dir_all(directory).unwrap();
     }
 }

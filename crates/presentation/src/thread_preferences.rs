@@ -19,12 +19,39 @@ struct PinIdentity {
     endpoint: String,
     session_id: String,
 }
-#[derive(Clone, Default, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 struct Scope {
     pins: BTreeSet<PinIdentity>,
+    #[serde(default, rename = "applicationArchived")]
+    application_archived: BTreeSet<PinIdentity>,
+    #[serde(
+        default = "initial_archive_revision",
+        rename = "applicationArchiveRevision"
+    )]
+    application_archive_revision: u64,
     #[serde(default)]
     sidebar: SidebarPreferencesSnapshot,
     receipts: BTreeMap<String, ThreadActionRequest>,
+}
+fn initial_archive_revision() -> u64 {
+    1
+}
+impl Default for Scope {
+    fn default() -> Self {
+        Self {
+            pins: BTreeSet::new(),
+            application_archived: BTreeSet::new(),
+            application_archive_revision: 1,
+            sidebar: Default::default(),
+            receipts: BTreeMap::new(),
+        }
+    }
+}
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ApplicationArchiveSnapshot {
+    pub revision: u64,
+    pub session_ids: BTreeSet<String>,
 }
 #[derive(Clone, Serialize, Deserialize)]
 struct Document {
@@ -68,13 +95,13 @@ impl ThreadPreferences {
         let mut document: Document = match fs::read(&path) {
             Ok(bytes) => serde_json::from_slice(&bytes)?,
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => Document {
-                version: 4,
+                version: 5,
                 scopes: BTreeMap::new(),
             },
             Err(e) => return Err(io_error(e)),
         };
         require(
-            matches!(document.version, 1..=4),
+            matches!(document.version, 1..=5),
             "unsupported thread preference version",
         )?;
         for value in document.scopes.values() {
@@ -83,22 +110,26 @@ impl ThreadPreferences {
                 "invalid Sidebar preference revision",
             )?;
             value.sidebar.preferences.validate()?;
-            let mut identities = BTreeSet::new();
-            for pin in &value.pins {
+            require(
+                value.application_archive_revision > 0,
+                "invalid application archive revision",
+            )?;
+            for identity in value.pins.iter().chain(&value.application_archived) {
                 require(
-                    !pin.endpoint.is_empty()
-                        && !pin.session_id.is_empty()
-                        && identities.insert((&pin.endpoint, &pin.session_id)),
-                    "invalid duplicate thread pin",
+                    !identity.endpoint.is_empty() && !identity.session_id.is_empty(),
+                    "invalid thread preference identity",
                 )?;
             }
         }
-        let migrate = document.version != 4;
-        document.version = 4;
+        let migrate = document.version != 5;
+        let had_application_archive = document.version == 5;
+        document.version = 5;
         for scope in document.scopes.values_mut() {
-            scope
-                .receipts
-                .retain(|_, r| matches!(r.action_id.as_str(), "pin" | "unpin"));
+            scope.receipts.retain(|_, r| {
+                matches!(r.action_id.as_str(), "pin" | "unpin")
+                    || had_application_archive
+                        && matches!(r.action_id.as_str(), "archive" | "unarchive")
+            });
         }
         let store = Self {
             path,
@@ -173,6 +204,32 @@ impl ThreadPreferences {
             })
             .unwrap_or_default()
     }
+    /// One atomic organization snapshot; no Harness title, history or execution data is stored.
+    pub fn application_archive_snapshot(&self, endpoint: &str) -> ApplicationArchiveSnapshot {
+        let state = self.state.lock().expect("preferences lock");
+        let scope = state.scopes.get(&self.scope);
+        ApplicationArchiveSnapshot {
+            revision: scope.map(|s| s.application_archive_revision).unwrap_or(1),
+            session_ids: scope
+                .into_iter()
+                .flat_map(|s| &s.application_archived)
+                .filter(|identity| identity.endpoint == endpoint)
+                .map(|identity| identity.session_id.clone())
+                .collect(),
+        }
+    }
+    pub fn application_archive_state(
+        &self,
+        endpoint: &str,
+        session: &str,
+    ) -> Option<ApplicationArchiveState> {
+        Some(ApplicationArchiveState {
+            archived: self
+                .application_archive_snapshot(endpoint)
+                .session_ids
+                .contains(session),
+        })
+    }
     /// Reconcile an acknowledged local action before checking today's menu state.
     pub fn replay(
         &self,
@@ -231,7 +288,7 @@ impl ThreadPreferences {
 #[async_trait]
 impl ThreadActionHost for ThreadPreferences {
     fn methods(&self) -> BTreeSet<String> {
-        BTreeSet::from(["thread.setPinned".into()])
+        BTreeSet::from(["thread.setPinned".into(), "thread.setArchived".into()])
     }
     fn pin_state(&self, endpoint: &str, session: &str) -> Option<ThreadPinState> {
         let pins = self.pins();
@@ -253,6 +310,10 @@ impl ThreadActionHost for ThreadPreferences {
         if Self::replayed(state.scopes.get(&self.scope), endpoint, request, rpc_id)? {
             return Ok(ThreadActionOutcome::default());
         }
+        require(
+            !endpoint.is_empty() && !request.session_id.is_empty(),
+            "local thread identity is required",
+        )?;
         let mut next = state.clone();
         let scope = next.scopes.entry(self.scope.clone()).or_default();
         let identity = PinIdentity {
@@ -265,6 +326,21 @@ impl ThreadActionHost for ThreadPreferences {
             }
             "unpin" => {
                 scope.pins.remove(&identity);
+            }
+            "archive" | "unarchive" => {
+                let changed = if request.action_id == "archive" {
+                    scope.application_archived.insert(identity)
+                } else {
+                    scope.application_archived.remove(&identity)
+                };
+                if changed {
+                    scope.application_archive_revision = scope
+                        .application_archive_revision
+                        .checked_add(1)
+                        .ok_or_else(|| {
+                            Error::Protocol("application archive revision exhausted".into())
+                        })?;
+                }
             }
             _ => return Err(unsupported("unknown local thread action")),
         }
@@ -376,7 +452,7 @@ mod tests {
         assert!(store.pin_state("z", "same").unwrap().pinned);
         assert!(store.pin_state("a", "same").unwrap().pinned);
         let value: serde_json::Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
-        assert_eq!(value["version"], 4);
+        assert_eq!(value["version"], 5);
         assert_eq!(value["scopes"]["s"]["receipts"], serde_json::json!({}));
         assert!(
             value["scopes"]["s"]["pins"]
@@ -396,6 +472,28 @@ mod tests {
         assert!(store.perform("k", &request("s", "pin"), "1").await.is_err());
         assert!(store.pins().is_empty());
         assert!(!store.replay("k", &request("s", "pin"), "1").unwrap());
+        let archive_before = store.application_archive_snapshot("k");
+        assert!(
+            store
+                .perform("k", &request("s", "archive"), "archive-failed")
+                .await
+                .is_err()
+        );
+        assert!(
+            store
+                .application_archive_snapshot("k")
+                .session_ids
+                .is_empty()
+        );
+        assert_eq!(
+            store.application_archive_snapshot("k").revision,
+            archive_before.revision
+        );
+        assert!(
+            !store
+                .replay("k", &request("s", "archive"), "archive-failed")
+                .unwrap()
+        );
         fs::remove_dir(&path).unwrap();
         drop(store);
         fs::write(&path, b"broken").unwrap();
@@ -494,7 +592,7 @@ mod tests {
         assert!(value.preferences.collapsed_folders.is_empty());
         let document: serde_json::Value =
             serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
-        assert_eq!(document["version"], 4);
+        assert_eq!(document["version"], 5);
         drop(store);
         fs::remove_dir_all(path.parent().unwrap()).unwrap();
     }
@@ -533,6 +631,120 @@ mod tests {
                 .is_err()
         );
         assert_eq!(store.sidebar_preferences(), original);
+        drop(store);
+        fs::remove_dir_all(path.parent().unwrap()).unwrap();
+    }
+    #[tokio::test]
+    async fn application_archive_is_durable_scoped_and_replay_does_not_undo_later_restore() {
+        let path = path();
+        {
+            let store = ThreadPreferences::open(&path, "account/project").unwrap();
+            let mut changes = store.subscribe();
+            let initial = store.application_archive_snapshot("native");
+            assert!(initial.session_ids.is_empty());
+            assert!(
+                !store
+                    .perform("native", &request("same", "archive"), "archive-1")
+                    .await
+                    .unwrap()
+                    .clear_selection
+            );
+            changes.changed().await.unwrap();
+            assert!(
+                store
+                    .application_archive_snapshot("native")
+                    .session_ids
+                    .contains("same")
+            );
+            assert!(
+                !store
+                    .application_archive_snapshot("pi")
+                    .session_ids
+                    .contains("same")
+            );
+            assert_eq!(
+                store.application_archive_snapshot("native").revision,
+                initial.revision + 1
+            );
+            store
+                .perform("pi", &request("same", "archive"), "archive-1")
+                .await
+                .unwrap();
+            store
+                .perform("native", &request("same", "unarchive"), "restore-1")
+                .await
+                .unwrap();
+            let restored = store.application_archive_snapshot("native");
+            store
+                .perform("native", &request("same", "archive"), "archive-1")
+                .await
+                .unwrap();
+            assert!(
+                !store
+                    .application_archive_state("native", "same")
+                    .unwrap()
+                    .archived,
+                "replay is not a new archive after restore"
+            );
+            assert_eq!(
+                store.application_archive_snapshot("native").revision,
+                restored.revision
+            );
+            assert!(
+                store
+                    .perform("native", &request("other", "archive"), "archive-1")
+                    .await
+                    .is_err()
+            );
+        }
+        {
+            let reopened = ThreadPreferences::open(&path, "account/project").unwrap();
+            assert!(
+                reopened
+                    .application_archive_state("pi", "same")
+                    .unwrap()
+                    .archived
+            );
+            assert!(
+                !reopened
+                    .application_archive_state("native", "same")
+                    .unwrap()
+                    .archived
+            );
+            assert!(
+                reopened
+                    .replay("pi", &request("same", "archive"), "archive-1")
+                    .unwrap()
+            );
+            let document: serde_json::Value =
+                serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+            assert_eq!(document["version"], 5);
+            assert!(document["scopes"]["account/project"].get("title").is_none());
+        }
+        {
+            let other = ThreadPreferences::open(&path, "other-account/project").unwrap();
+            assert!(
+                other
+                    .application_archive_snapshot("pi")
+                    .session_ids
+                    .is_empty()
+            );
+        }
+        fs::remove_dir_all(path.parent().unwrap()).unwrap();
+    }
+    #[test]
+    fn version_four_preferences_migrate_with_empty_application_archive() {
+        let path = path();
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(&path,br#"{"version":4,"scopes":{"s":{"pins":[{"endpoint":"native","sessionId":"keep"}],"receipts":{}}}}"#).unwrap();
+        let store = ThreadPreferences::open(&path, "s").unwrap();
+        assert!(store.pin_state("native", "keep").unwrap().pinned);
+        assert!(
+            store
+                .application_archive_snapshot("native")
+                .session_ids
+                .is_empty()
+        );
         drop(store);
         fs::remove_dir_all(path.parent().unwrap()).unwrap();
     }

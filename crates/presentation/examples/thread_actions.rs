@@ -13,6 +13,7 @@ fn main() {
         ready: true,
         running: false,
         archived: false,
+        application_archive: None,
         pin: None,
         host_methods: &BTreeSet::new(),
     });
