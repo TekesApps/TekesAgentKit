@@ -6,6 +6,16 @@ Native HTTP and WebSocket requests connect directly to the explicitly configured
 
 日期：2026-10-17。改动只在 TekesAgentKit；ClientKit、Tekes、Kernel、Pi、DSH 作为只读来源和运行时。
 
+## 当前共享交付边界（2026-11-09）
+
+当前候选目标为 Kernel 0.9.22、Pi 1.5.0、DSH 0.2.2-rc.1。ClientKit 计划退役，不属于这条交付链；旧版本和历史行为参照不构成当前依赖或验收门槛。AgentKit 统一公共接口与状态，WebUI 和未来 Native App 消费它们；各 adapter 优先使用各自 Harness 的公开能力。
+
+DSH 现有 `workspaceFiles/list/read/readBytes/stat/changes` 是真正的公开 Remote，绑定 `workspaceFileScopeId = sessionId`，由 DSH 从该会话 header 确定工作区与读权限。外部 UI 不传 root，也不把 DSH 的绝对路径转换成本机路径。共享文件面板使用独立 Harness 来源；失败不能自动转到本地同名路径。
+
+Pi stock RPC 没有专用文件/Git方法。公开 Bash RPC 与 SDK 文件工具并不等于现成 typed 文件服务。现有 Pi 受限本地文件读取和独立 WorkspaceService 都明确属于宿主 authority。文件写入和 Git 管理仅使用显式注册的宿主工作区及 grants，不宣称是三端各自实现。DSH 的每轮 changes.summary/diff 是另一个有生命周期限制的特有能力，不等于当前 Git status/branch/commit/push。
+
+新增共享控制面见 [host-controls.md](host-controls.md)。本轮源码、完整兼容检查和真实浏览器证据需保持各自精确身份，下面历史验收不升级为新版本结论。
+
 ## 契约与路由
 
 `NativeSessionEndpoint`、`PiSessionEndpoint`、`DshSessionEndpoint` 分别实现 `SessionEndpoint`。
@@ -149,3 +159,63 @@ Harness-specific cancellation shape or cancel the whole Run instead. Remote raw
 Disconnected and historical-read-only views keep their existing actionable
 suppression; archived questions do not offer the cancellation outcome. The public
 TypeScript `QuestionCancellationOutcome` describes this optional field.
+
+## Pi 1.5.0 / DSH 0.2.2-rc.1 upgrade candidate (2026-11-08)
+
+Tracked under #55 and #58. The base is published AgentKit 0.4.0 source
+`f1351e855634b20f05c360a3f1eab2a59208a131`; this section describes a new
+unpublished candidate, not a re-label of previous runtime evidence.
+
+Pi 1.5.0 keeps the companion extension APIs used here. Its official extension
+loader retains TypeBox import compatibility; the existing companion tools use
+standard JSON Schema supported by the new pi-schema validator. The candidate
+retains 1.3.0/1.4.0 support and adds 1.5.0 after source/API review. Actual runtime
+acceptance and Web consumer evidence are recorded separately.
+
+DSH 0.2.2-rc.1 changes control projections to atomic `changes` batches. The adapter
+normalizes the complete batch at its single sequence instead of splitting it into
+separate authority updates. Old key/value projections remain supported. The
+authenticated runtime-probe companion must be installed together with the adapter.
+Normal `SessionJournal` opening on 0.2.2-rc.1 explicitly sends `activate: true`,
+matching the official Web client and the old runtime's automatic cold-Agent
+restoration on ordinary session opens. Restoration may repair interrupted turns
+and initialize Agent plugins; it is not a guarantee of a model request. Attachment
+reference lookup remains a passive, bounded history observation with no activation
+flag. Older runtime requests retain their original shape.
+
+
+The acceptance runner accepts an explicit frozen headless executable and a new
+private evidence directory. With that option, fixture data and consumer request,
+stdout/stderr and exit receipts remain available after success or failure. Real
+runtime tests use a local synthetic provider; they do not establish paid-model
+or browser interaction acceptance. Daily instances and original data stay separate.
+
+### Cross-Harness product rule
+
+The shared contract unifies common user operations, not the lowest supported
+feature set. Kernel public product capabilities remain fully in scope. Pi and
+DSH must cover capabilities normally available in their mainstream clients; an
+upstream-supported but unimplemented adapter/host path is an integration gap,
+not Unsupported. Harness-specific capabilities remain discoverable through
+explicit capability declarations and dedicated UI where applicable.
+
+Track each feature as shared support, Harness-specific support, adapter/host gap,
+or genuine upstream absence. Backend support, Web entry, and live acceptance are
+separate columns. Protocol tests alone never establish all three. In particular,
+Pi native ancestry paging implements the common earlier-history operation without
+inventing a durable raw journal cursor. DSH ordinary forks and continuable
+subagents retain different authority; Kernel bounded children remain read-only.
+
+Upgrade candidate verification: workspace tests 488 passed, strict all-targets
+Clippy, formatting and headless/Web builds passed. Pi official 1.5.0 runtime
+completed the existing lifecycle/protocol matrix with a local synthetic provider;
+the actual Web HTTP consumer reopened old Pi ancestry without duplicate items.
+DSH official 0.2.2-rc.1 completed the lifecycle/protocol matrix including both
+legacy image ID and full-reference reads. Its Web HTTP consumer paginated 236
+entries across 30 pages at one frozen cut, with repeat-identical content. Both
+HTTP consumers checked authentication, page assets and owned-process retirement.
+The first DSH image fixture failed because its synthetic model omitted image
+capability; that failure is retained separately from the corrected fixture pass.
+There were no paid model requests, daily-instance changes, GUI acceptance, main
+merge or release in this candidate batch. This does not close the broader Web
+capability gaps or re-label historical performance failures.

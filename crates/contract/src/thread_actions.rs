@@ -55,6 +55,13 @@ pub struct ThreadPinState {
     pub pinned: bool,
 }
 
+/// AgentKit organization is independent of Harness archival or execution state.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ApplicationArchiveState {
+    pub archived: bool,
+}
+
 /// Shared local-action authority. AgentKit supplies durable pin storage; hosts may adapt it. A consumer must not create an independent pin database.
 #[async_trait]
 pub trait ThreadActionHost: Send + Sync {

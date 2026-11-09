@@ -1,11 +1,16 @@
 #!/usr/bin/env python3
 """Exercise the three separate endpoints with owned temporary state and synthetic local providers."""
+import contextlib
 import argparse, base64, zlib, shutil, uuid, http.server, json, os, re, select, signal, struct, subprocess, tempfile, threading, time, urllib.request, urllib.parse
 from pathlib import Path
 ROOT=Path(__file__).resolve().parent.parent
 parser=argparse.ArgumentParser()
 parser.add_argument('--pi-root',type=Path)
+parser.add_argument('--headless-binary',type=Path,help='Use a frozen prebuilt consumer; do not build')
+parser.add_argument('--evidence-dir',type=Path,help='New private directory retaining fixture state and raw consumer receipts')
 parser.add_argument('--dsh-root',type=Path)
+parser.add_argument('--web-http-config',type=Path,help='Optional DSH Web HTTP consumer config template')
+parser.add_argument('--web-http-script',type=Path,help='Readonly HTTP consumer run while owned DSH is live')
 parser.add_argument('--kernel-root',type=Path)
 parser.add_argument('--kernel-target-dir',type=Path)
 parser.add_argument('--ui-demo',type=Path,help='Optional already-built AgentKit UI consumer for Native history-to-GPU acceptance')
@@ -16,7 +21,14 @@ if args.ui_demo and not args.kernel_root:
 if args.ui_output and not args.ui_demo:
     parser.error("--ui-output requires --ui-demo")
 if not any((args.pi_root,args.dsh_root,args.kernel_root)):parser.error("supply at least one runtime root")
-subprocess.run(['cargo','build','--locked','-p','tekes-agent-headless'],cwd=ROOT,check=True)
+if args.evidence_dir:
+    args.evidence_dir=args.evidence_dir.resolve()
+    args.evidence_dir.mkdir(mode=0o700,parents=True,exist_ok=False)
+if not args.headless_binary:
+    subprocess.run(['cargo','build','--locked','-p','tekes-agent-headless'],cwd=ROOT,check=True)
+headless=args.headless_binary.resolve() if args.headless_binary else ROOT/'target/debug/tekes-agent-headless'
+if not headless.is_file():raise FileNotFoundError(headless)
+execution_count=0
 requests=[]
 class Provider(http.server.BaseHTTPRequestHandler):
     def log_message(self,*_):pass
@@ -81,7 +93,15 @@ def commands(cwd,provider,model):
         {'op':'reconnect'},{'op':'open','sessionId':'s'},{'op':'snapshot'},
     ]
 def execute(config):
-    result=subprocess.run([str(ROOT/'target/debug/tekes-agent-headless')],input=json.dumps(config),text=True,capture_output=True,timeout=120)
+    global execution_count
+    execution_count+=1
+    receipt=args.evidence_dir/f'consumer-{execution_count:03}' if args.evidence_dir else None
+    if receipt:receipt.with_suffix('.input.json').write_text(json.dumps(config))
+    result=subprocess.run([str(headless)],input=json.dumps(config),text=True,capture_output=True,timeout=120)
+    if receipt:
+        receipt.with_suffix('.stdout').write_text(result.stdout)
+        receipt.with_suffix('.stderr').write_text(result.stderr)
+        receipt.with_suffix('.result.json').write_text(json.dumps({'exitCode':result.returncode}))
     if result.returncode:
         print(result.stdout[-12000:]);print(result.stderr[-3000:])
         if config['kind']=='native':
@@ -140,7 +160,7 @@ def run(config):
     print(config['kind'].upper()+'_PRESENTATION_LIVE_OK composer+immediate-echo+identity-reconciliation+final-answer+reconnect')
     return outputs
 try:
-    with tempfile.TemporaryDirectory(prefix='agentkit-three-endpoints-') as tmp:
+    with (contextlib.nullcontext(str(args.evidence_dir)) if args.evidence_dir else tempfile.TemporaryDirectory(prefix='agentkit-three-endpoints-')) as tmp:
         base=Path(tmp);cwd=base/'project';cwd.mkdir();(cwd/'proof.txt').write_text('proof line one\nline two\n')
         if args.pi_root:
             pi=args.pi_root.resolve();data=base/'pi';(data/'agent').mkdir(parents=True)
@@ -149,6 +169,7 @@ try:
             Path(config['environment']['HOME']).mkdir()
             extension=base/'question.mjs'
             extension.write_text("export default function(pi){pi.registerCommand('endpoint-question',{handler:async(args,ctx)=>{const value=await ctx.ui.select('Endpoint question',['yes','no']);pi.appendEntry('endpoint-answer',{value});}});pi.registerCommand('endpoint-settled',{handler:async()=>{pi.appendEntry('tekes.run.v1',{id:'endpoint-settled-turn',phase:'settled'});}});}")
+            config['expectedVersion']=json.loads((pi/'node_modules/@earendil-works/pi-coding-agent/package.json').read_text())['version']
             config['extensions']=[str(extension)]
             config['commands'].insert(-3,{'op':'promptAndAnswer','sessionId':'s','text':'/endpoint-question','outcome':{'value':'yes'}})
             outputs=run(config)
@@ -188,7 +209,7 @@ try:
             adopted=base/'adopted';adopted.mkdir();source=adopted/'existing.jsonl';shutil.copyfile(locator['nativeSessionFile'],source)
             imported_id=str(uuid.uuid4());resumed=dict(config,dataRoot=str(base/'resumed-pi'),sessionRoots=[str(adopted)])
             resumed['commands']=[{'op':'call','method':'session.adopt','args':{'sessionId':imported_id,'cwd':str(cwd),'sessionFile':str(source)}},{'op':'open','sessionId':imported_id},{'op':'snapshot'}]
-            result=subprocess.run([str(ROOT/'target/debug/tekes-agent-headless')],input=json.dumps(resumed),text=True,capture_output=True,timeout=40)
+            result=subprocess.run([str(headless)],input=json.dumps(resumed),text=True,capture_output=True,timeout=40)
             assert result.returncode==0,result.stderr
             assert 'ENDPOINT_REPLY_OK' in result.stdout and 'endpoint-answer' in result.stdout,'resumed native history missing'
             print('PI_NATIVE_POINTER_RESUME_LIVE_OK explicit root + native RPC history')
@@ -296,14 +317,11 @@ try:
 
         if args.dsh_root:
             dsh=args.dsh_root.resolve();node=dsh/'node/bin/node';entry=dsh/'node_modules/@deepseek-ai/dsh/lib/bin.js';home=base/'dsh';home.mkdir()
-            # This read-only host plugin exposes official runtime version evidence, like the ClientKit host adapter.
-            plugin=base/'version-probe.mjs'
-            package=dsh/'node_modules/@deepseek-ai/dsh-app-boot/lib/index.js'
-            plugin.write_text("import { getDshRuntimeVersion } from "+json.dumps(package.as_uri())+";\nexport const name='agentkit-version-probe';export const inject=['webServer'];export function apply(ctx){ctx.effect(()=>ctx.webServer.register({kind:'exact',path:'/api/agentkit/harness-version',handler(req,res){res.writeHead(200,{'Content-Type':'application/json'});res.end(JSON.stringify({product:'@deepseek-ai/dsh',version:getDshRuntimeVersion(),source:'@deepseek-ai/dsh-app-boot#getDshRuntimeVersion'}));}}));}\n")
+            plugin=ROOT/'integrations/dsh-runtime-probe/index.mjs'
             patch=base/'dsh.patch.yml';patch.write_text(json.dumps([
                 {'id':'llm-deepseek','disabled':True},
                 {'id':'agent-default-model','config':{'provider':'endpoint-test','model':'endpoint-test'}},
-                {'id':'llm-pi-ai','config':{'providers':{'endpoint-test':{'api':'openai-completions','apiKeyEnv':'AGENTKIT_SYNTHETIC_KEY','baseURL':base_url,'models':[{'id':'endpoint-test','contextWindow':32768,'maxTokens':1024}]}}}},
+                {'id':'llm-pi-ai','config':{'providers':{'endpoint-test':{'api':'openai-completions','apiKeyEnv':'AGENTKIT_SYNTHETIC_KEY','baseURL':base_url,'models':[{'id':'endpoint-test','contextWindow':32768,'maxTokens':1024,'input':['text','image']}]}}}},
                 {'id':'session-persistence-jsonl','config':{'root':str(base/'dsh-sessions'),'compression':'none'}},
                 {'insert':[{'name':plugin.as_uri()}]},
             ]))
@@ -350,6 +368,17 @@ try:
                 assert upload['file']['name']=='a+b.txt','upload query encoding lost plus'
                 assert any(workspace['title']=='DSH workspace proof' for workspace in extended[-1]['result']['workspaces']),'workspace sync lost'
                 print('DSH_EXTENSIONS_LIVE_OK models+commands+skills+settings+providers+policy+upload+workspace-sync')
+                # The upgraded attachment route requires a complete immutable image reference.
+                def png_chunk(kind,data):return struct.pack('!I',len(data))+kind+data+struct.pack('!I',zlib.crc32(kind+data))
+                png=base64.b64encode(b'\x89PNG\r\n\x1a\n'+png_chunk(b'IHDR',struct.pack('!IIBBBBB',1,1,8,6,0,0,0))+png_chunk(b'IDAT',zlib.compress(b'\x00\xff\x00\x00\xff'))+png_chunk(b'IEND',b'')).decode()
+                image_rows=execute(dict(config,commands=[{'op':'create','cwd':str(cwd),'saveAs':'image'}, {'op':'call','sessionId':'image','method':'session.selectModel','args':{'provider':'endpoint-test','model':'endpoint-test'}},{'op':'open','sessionId':'image'}, {'op':'call','sessionId':'image','method':'session.prompt','args':{'mode':'queue','content':[{'type':'text','text':'Image compatibility proof'},{'type':'image','mediaType':'image/png','data':png}]}},{'op':'waitSettled','sessionId':'image'},{'op':'snapshot'}]))
+                image_id=next(row['result']['sessionId'] for row in image_rows if row.get('op')=='create')
+                entries=image_rows[-1]['result']['sessions'][image_id]['entries'].values()
+                image_ref=next(part['attachment'] for e in entries if e['event']['type']=='user/message' for part in e['event']['data'].get('content',[]) if part.get('type')=='image')
+                image_reads=execute(dict(config,commands=[{'op':'call','sessionId':image_id,'method':'session.attachment','args':{'attachmentId':image_ref['attachmentId']}},{'op':'call','sessionId':image_id,'method':'session.attachment','args':{'attachment':image_ref}}]))
+                image_values=[row['result'] for row in image_reads if row.get('op')=='call']
+                assert len(image_values)==2 and image_values[0]==image_values[1] and base64.b64decode(image_values[0]['data']), 'image reference compatibility lost'
+                print('DSH_IMAGE_REFERENCE_LIVE_OK legacy-id+full-reference+same-bytes')
                 child_proof=[{'op':'create','cwd':str(cwd),'saveAs':'parent'},
                     {'op':'call','sessionId':'parent','method':'session.selectModel','args':{'provider':'endpoint-test','model':'endpoint-test'}},
                     {'op':'open','sessionId':'parent'},{'op':'compose','sessionId':'parent','text':'ENDPOINT_SUBAGENT_CATALOG'},
@@ -394,7 +423,7 @@ try:
                 assert before['has_more_before'] and len(after['entries'])>len(before['entries']),'history page did not extend window'
                 assert after['history_through_sequence']==before['history_through_sequence'],'history cut moved during paging'
                 print('DSH_FROZEN_HISTORY_LIVE_OK version='+version)
-                if version=='0.2.1-rc.2':
+                if version in ('0.2.1-rc.2','0.2.2-rc.1'):
                     child=cwd/'child';child.mkdir()
                     directory=[{'op':'create','cwd':str(cwd),'saveAs':'directory'},{'op':'call','sessionId':'directory','method':'session.selectModel','args':{'provider':'endpoint-test','model':'endpoint-test'}},{'op':'open','sessionId':'directory'},
                         {'op':'call','sessionId':'directory','method':'session.prompt','rpcId':'directory-1','args':{'mode':'queue','content':[{'type':'text','text':'ENDPOINT_CHANGE_DIRECTORY='+str(child)}]}},
@@ -404,10 +433,18 @@ try:
                     assert Path(locator['cwd']).resolve()==cwd.resolve() and Path(locator['workingDirectory']).resolve()==child.resolve(),locator
                     assert 'working-directory/change' in json.dumps(result[-1]),'new required event lost'
                     print('DSH_WORKING_DIRECTORY_LIVE_OK original root + current directory + reconnect')
+                if args.web_http_config:
+                    if not args.web_http_script:raise ValueError('web HTTP config requires script')
+                    web=json.loads(args.web_http_config.read_text())
+                    web['endpoint']={'id':'dsh022-web-http','kind':'dsh','name':'DSH isolated HTTP','url':url,'cookie':cookie}
+                    web['sessionId']=history_id;web['workspace']=str(cwd);web['output']=str(base/'web-http')
+                    web_path=base/'web-http-config.json';web_path.write_text(json.dumps(web));web_path.chmod(0o600)
+                    subprocess.run(['node',str(args.web_http_script.resolve()),str(web_path)],check=True,timeout=90)
             finally:
                 if process.poll() is None:os.killpg(process.pid,signal.SIGTERM)
                 try:process.wait(timeout=15)
                 except subprocess.TimeoutExpired:os.killpg(process.pid,signal.SIGKILL);process.wait(timeout=5)
+                if args.evidence_dir:(base/'dsh-process-exit.json').write_text(json.dumps({'pid':process.pid,'exitCode':process.returncode,'retired':process.poll() is not None}))
         if args.kernel_root:
             kernel=args.kernel_root.resolve();kernel_target=args.kernel_target_dir.resolve() if args.kernel_target_dir else kernel/'target';home=base/'kernel-home';home.mkdir()
             providers=json.loads((kernel/'fixtures/config/providers.canonical.json').read_text());providers['providers'][0]['endpoint']=base_url
@@ -479,3 +516,5 @@ try:
                 except subprocess.TimeoutExpired:process.terminate();process.wait(timeout=10)
 finally:
     server.shutdown();server.server_close()
+    if args.evidence_dir:
+        (args.evidence_dir/'provider-receipt.json').write_text(json.dumps({'localProviderRequests':len(requests),'requestPaths':requests,'paidModelRequests':0,'serverClosed':True}))

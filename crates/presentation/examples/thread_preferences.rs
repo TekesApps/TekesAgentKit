@@ -15,11 +15,43 @@ async fn main() -> tekes_agent_contract::Result<()> {
         preferences
             .perform("example", &request, "consumer-pin")
             .await?;
+        preferences
+            .perform(
+                "example",
+                &ThreadActionRequest {
+                    action_id: "archive".into(),
+                    ..request.clone()
+                },
+                "consumer-archive",
+            )
+            .await?;
     }
     {
         let reopened = ThreadPreferences::open(&path, "example/workspace")?;
         assert!(reopened.pin_state("example", "example").unwrap().pinned);
         assert!(reopened.replay("example", &request, "consumer-pin")?);
+        assert!(
+            reopened
+                .application_archive_state("example", "example")
+                .unwrap()
+                .archived
+        );
+        reopened
+            .perform(
+                "example",
+                &ThreadActionRequest {
+                    action_id: "unarchive".into(),
+                    ..request.clone()
+                },
+                "consumer-restore",
+            )
+            .await?;
+        assert!(
+            !reopened
+                .application_archive_state("example", "example")
+                .unwrap()
+                .archived
+        );
     }
     std::fs::remove_dir_all(root).unwrap();
     println!("THREAD_PREFERENCES_PUBLIC_CONSUMER_OK");

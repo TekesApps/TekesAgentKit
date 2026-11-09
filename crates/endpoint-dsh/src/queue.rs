@@ -83,6 +83,38 @@ pub(super) fn normalize_projection_delta(key: &str, value: &Value, seq: i64) -> 
     Ok(json!({"asOfSeq":seq,"values":values}))
 }
 
+/// DSH 0.2.2 publishes every projection changed by one event in one atomic block.
+/// Older supported runtimes publish a single key/value pair instead.
+pub(super) fn normalize_projection_update(frame: &Value) -> Result<Value> {
+    let seq = frame["seq"]
+        .as_i64()
+        .ok_or_else(|| Error::Protocol("missing DSH projection sequence".into()))?;
+    let Some(changes) = frame.get("changes") else {
+        return normalize_projection_delta(string(frame, "key")?, &frame["value"], seq);
+    };
+    require(
+        frame.get("key").is_none() && frame.get("value").is_none(),
+        "mixed DSH projection formats",
+    )?;
+    let changes = changes
+        .as_array()
+        .ok_or_else(|| Error::Protocol("invalid DSH projection changes".into()))?;
+    require(!changes.is_empty(), "empty DSH projection changes")?;
+    let mut values = Map::new();
+    for change in changes {
+        let key = string(change, "key")?;
+        let value = change
+            .get("val")
+            .ok_or_else(|| Error::Protocol("missing DSH projection value".into()))?;
+        require(
+            values.insert(key.into(), value.clone()).is_none(),
+            "duplicate DSH projection key",
+        )?;
+    }
+    normalize_projection(&json!({"asOfSeq":seq,"values":values}))?
+        .ok_or_else(|| Error::Protocol("missing DSH projection update".into()))
+}
+
 pub(super) fn normalize_inventory_snapshot(snapshot: &mut Value) -> Result<()> {
     reject_reserved_anywhere(snapshot)?;
     let Some(rows) = snapshot.get_mut("items").and_then(Value::as_array_mut) else {
@@ -360,6 +392,36 @@ mod tests {
         );
         assert!(reject_reserved_anywhere(&json!({"type":"projection","key":SEQUENCED_QUEUE_PROJECTION_KEY,"value":{"items":[]}})).is_err());
         assert!(reject_reserved_anywhere(&json!({"records":[{"data":{"nested":{(SEQUENCED_QUEUE_PROJECTION_KEY):"ordinary user JSON"}}}]})).is_ok());
+    }
+
+    #[test]
+    fn event_batch_keeps_same_sequence_queue_and_model_changes_together() {
+        let update = json!({"seq":53,"changes":[
+            {"key":"inbox","val":{"next-turn":[],"next-step":[]}},
+            {"key":"modelSelection","val":{"next":{"provider":"p","model":"m"}}}
+        ]});
+        let block = normalize_projection_update(&update).unwrap();
+        assert_eq!(block["asOfSeq"], 53);
+        assert_eq!(
+            block["values"][SEQUENCED_QUEUE_PROJECTION_KEY]["items"],
+            json!([])
+        );
+        assert_eq!(block["values"]["modelSelection"]["next"]["model"], "m");
+        assert_eq!(
+            normalize_projection_update(
+                &json!({"seq":53,"key":"modelSelection","value":{"next":null}})
+            )
+            .unwrap()["values"]["modelSelection"],
+            json!({"next":null})
+        );
+        for malformed in [
+            json!({"seq":53,"changes":[{"key":"inbox","val":null},{"key":"inbox","val":null}]}),
+            json!({"seq":53,"changes":[{"key":"inbox"}]}),
+            json!({"seq":53,"changes":[{"key":SEQUENCED_QUEUE_PROJECTION_KEY,"val":{"items":[]}}]}),
+            json!({"seq":53,"changes":[],"key":"inbox","value":null}),
+        ] {
+            assert!(normalize_projection_update(&malformed).is_err());
+        }
     }
 
     #[test]

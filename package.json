@@ -1,6 +1,6 @@
 {
   "name": "@tekesagentkit/client-contract",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "type": "module",
   "license": "MIT",
   "types": "./web-contract/index.d.ts",
@@ -8,6 +8,10 @@
     ".": {
       "types": "./web-contract/index.d.ts",
       "default": "./web-contract/index.js"
+    },
+    "./workspace": {
+      "types": "./web-contract/workspace.d.ts",
+      "default": "./web-contract/workspace.js"
     }
   }
 }

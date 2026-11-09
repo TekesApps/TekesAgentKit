@@ -2,7 +2,7 @@
 
 `integrations/dsh-runtime-probe` is the DSH Host plugin that provides AgentKit's authenticated runtime identity endpoint. DSH 0.2.1-rc.2 exposes `getDshRuntimeVersion()` only inside its local `@deepseek-ai/dsh-app-boot` package; its Remote handshake does not include a version. The plugin resolves the official package from the active DSH CLI entry (`process.argv[1]`) and returns that function's version from `GET /api/agentkit/harness-version`. It does not read or modify provider settings, credentials, session data, or workspace files. An unresolved runtime returns HTTP 503; it never guesses.
 
-The endpoint requires `ctx.connection.admit(req)` to accept the request and returns no version to unauthenticated callers. Only the DSH 0.2.1-rc.2 runtime is pinned as a peer dependency for the first delivery. The endpoint is exact and intentionally separate from the Tekes workspace plugin route. Install one provider for this route in the active Host profile; do not install competing providers that register the same exact path.
+The endpoint requires `ctx.connection.admit(req)` to accept the request and returns no version to unauthenticated callers. DSH 0.2.1-rc.2 and 0.2.2-rc.1 are pinned as explicit peer alternatives. The 0.2.2 upgrade candidate has authenticated real-host probe evidence; its adapter also handles the changed projection and image-reference contracts. The endpoint is exact and intentionally separate from the Tekes workspace plugin route. Install one provider for this route in the active Host profile; do not install competing providers that register the same exact path.
 
 ## Install into the existing Host
 

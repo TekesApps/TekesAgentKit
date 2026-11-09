@@ -358,6 +358,13 @@ impl SessionEndpoint for NativeSessionEndpoint {
             "skills/list",
             "commands/list",
             "commands/run",
+            "resources/list",
+            "resources/read",
+            "tools/list",
+            "tools/resolve",
+            "thread.search",
+            "usage.summary",
+            "usage.cacheAttribution",
             "sessions.recover",
             "attachments.policy",
             "approvals.policy",
@@ -581,10 +588,17 @@ impl SessionEndpoint for NativeSessionEndpoint {
                 .and_then(|object| object.remove("agentPreset"))
         {
             require(
-                payload.get("identityProfile").is_none(),
-                "conflicting identity profile",
+                payload.get("identityProfile").is_none()
+                    && payload.get("preset").is_none()
+                    && preset.is_string(),
+                "conflicting identity profile or structured preset",
             )?;
             payload["identityProfile"] = preset;
+        }
+        if method == "session.create" && payload.get("preset").is_some() {
+            let request: NativePresetCreateRequest = serde_json::from_value(payload.clone())?;
+            request.validate()?;
+            payload = serde_json::to_value(request)?;
         }
         if method == "commands/run" {
             if let Some(id) = payload

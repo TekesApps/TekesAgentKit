@@ -1,12 +1,10 @@
 # AgentKit ownership and scope
 
 This is a Rust repository. Do not add Swift source, embedded Swift code, Swift package targets,
-or build/test steps requiring a Swift toolchain. ClientKit is an external behavior/contract reference;
+or build/test steps requiring a Swift toolchain. ClientKit is a historical behavior/contract reference planned for deprecation, not a delivery dependency;
 keep protocol fixtures and verification inside this repository language-neutral or Rust-native.
 
-TekesAgentKit owns reusable Rust Agent components and presentation state. TekesClientKit remains
-the owner of Swift Agent UI. Align behavior with ClientKit; compare the ClientKit implementation
-and the Tekes host before changing cross-repo behavior. Preserve unrelated WIP in all checkouts.
+TekesAgentKit owns reusable Agent interfaces, components and presentation state for Web and future native consumers. ClientKit is not part of this delivery path. Preserve unrelated WIP in all checkouts; use the current public Harness contracts as authority.
 
 SessionEndpoint contracts, capability semantics and fixture parity precede UI implementation.
 Kernel, Pi and DSH adapters normalize into the same contract. Transport locality, harness identity
@@ -21,9 +19,7 @@ Kernel implementation changes are out of scope. Development overrides must be ex
 builds need immutable published pins. Do not silently depend on an active sibling worktree.
 
 For functional cross-repo UI changes validate AgentKit, its host and a second public-API consumer.
-Swift ownership changes additionally require Tekes/scripts/check-agent-ui-ownership.py against the
-intended ClientKit root and the shared Swift package/host/second-consumer checks. A Rust port alone
-does not make that Swift checker a Rust ownership test; add a suitable Rust dependency boundary check.
+Do not introduce ClientKit or its Swift ownership checker as a dependency of this delivery. Keep the appropriate Rust dependency boundary checks and real host/public-consumer validation.
 
 Report static, replay, integration, native UI, IME/accessibility and performance evidence separately.
 Native/Pi/DSH implement independent headless paths. Run/Transcript/Composer/connection presentation

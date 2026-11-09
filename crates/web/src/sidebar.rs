@@ -24,8 +24,14 @@ impl SharedAgent {
                 state.connection_epoch == epoch,
                 "Sidebar source changed during host metadata read",
             )?;
-            let item = inventory_summary(state, session_id)
-                .map(|row| self.decorate_inventory_row_with_pin(state, row, inputs.pin.as_ref()));
+            let item = retained_inventory_summary(state, session_id).map(|row| {
+                self.decorate_inventory_row_with_pin(
+                    state,
+                    row,
+                    inputs.pin.as_ref(),
+                    self.thread_organization(state, session_id),
+                )
+            });
             let actions = item
                 .as_ref()
                 .map(|_| self.thread_actions_in_state(shared, session_id, state, &inputs))

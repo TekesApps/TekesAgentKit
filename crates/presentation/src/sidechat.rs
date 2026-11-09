@@ -1,4 +1,4 @@
-use crate::RunScope;
+use crate::{RunPresentation, RunScope};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -23,6 +23,10 @@ pub enum SideChatPhase {
 pub struct SideChat {
     pub parent: RunScope,
     pub scope: RunScope,
+    /// Connection on which the fork was admitted. A Web handle can be
+    /// reconstructed after its reply observer disappears without rebinding it.
+    #[serde(default)]
+    pub connection_epoch: u64,
     pub title: String,
     pub phase: SideChatPhase,
     pub error: Option<String>,
@@ -164,15 +168,25 @@ impl SideChatController {
         title: Option<&str>,
         rpc_id: &str,
     ) -> Result<SideChat> {
+        let epoch = self.runtime.inspect(|state| state.connection_epoch);
+        self.create_at_epoch(parent, title, epoch, rpc_id).await
+    }
+    /// Web callbacks retain their originating connection through capability
+    /// lookup, channel backpressure and the actor's actual fork dispatch.
+    pub async fn create_at_epoch(
+        &self,
+        parent: RunScope,
+        title: Option<&str>,
+        expected_epoch: u64,
+        rpc_id: &str,
+    ) -> Result<SideChat> {
         parent.validate()?;
         require(
             self.runtime
                 .inspect(|s| s.endpoint_id == parent.endpoint_id),
             "side chat endpoint mismatch",
         )?;
-        if !self.supports().await? {
-            return Err(unsupported("ephemeral SideChat"));
-        }
+        self.validate_creation(&parent, expected_epoch)?;
         let key = serde_json::to_string(&parent)?;
         {
             let mut state = self.state.lock().expect("side chat lock");
@@ -188,9 +202,12 @@ impl SideChatController {
             creating: true,
             armed: true,
         };
+        let validation_runtime = self.runtime.clone();
+        let validation_parent = parent.clone();
         let created = self
             .runtime
-            .fork(
+            .fork_at_epoch_with_validation(
+                expected_epoch,
                 ForkRequest {
                     session_id: parent.session_id.clone(),
                     at_seq: None,
@@ -198,6 +215,9 @@ impl SideChatController {
                     ephemeral: true,
                 },
                 rpc_id,
+                move || {
+                    validate_creation_scope(&validation_runtime, &validation_parent, expected_epoch)
+                },
             )
             .await;
         let created = match created {
@@ -217,12 +237,19 @@ impl SideChatController {
                 return Err(error);
             }
         };
+        // A fork receipt cannot confer SideChat ownership over its parent or
+        // an empty address. Keep an uncertain creation for reconciliation.
+        require(
+            !created.session_id.is_empty() && created.session_id != parent.session_id,
+            "SideChat fork returned an invalid child identity",
+        )?;
         let chat = SideChat {
             parent,
             scope: RunScope::main(
                 self.runtime.inspect(|s| s.endpoint_id.clone()),
                 created.session_id,
             ),
+            connection_epoch: expected_epoch,
             title: title
                 .map(|t| format!("SideChat · {t}"))
                 .unwrap_or_else(|| "SideChat".into()),
@@ -240,7 +267,8 @@ impl SideChatController {
         guard.armed = false;
         let _ = self
             .runtime
-            .rename(
+            .rename_at_epoch(
+                expected_epoch,
                 &chat.scope.session_id,
                 &chat.title,
                 &format!("{rpc_id}:rename"),
@@ -250,20 +278,46 @@ impl SideChatController {
     }
     /// Settles a running child before discard. A timeout/error retains the pointer and draft.
     pub async fn close(&self, id: &str, rpc_id: &str) -> Result<()> {
-        self.close_guarded(id, None, rpc_id).await
+        let epoch = self.runtime.inspect(|state| state.connection_epoch);
+        self.close_guarded(id, None, epoch, rpc_id).await
     }
     /// Captured pane callbacks cannot close a pointer that now belongs to another
     /// parent or mutation state. Validate in the same lock that admits Closing.
     pub async fn close_owned(&self, expected: &SideChat, rpc_id: &str) -> Result<()> {
-        self.close_guarded(&expected.scope.session_id, Some(expected), rpc_id)
-            .await
+        let epoch = self.runtime.inspect(|state| state.connection_epoch);
+        self.close_owned_at_epoch(expected, epoch, rpc_id).await
+    }
+    pub async fn close_owned_at_epoch(
+        &self,
+        expected: &SideChat,
+        expected_epoch: u64,
+        rpc_id: &str,
+    ) -> Result<()> {
+        self.close_guarded(
+            &expected.scope.session_id,
+            Some(expected),
+            expected_epoch,
+            rpc_id,
+        )
+        .await
+    }
+    fn validate_creation(&self, parent: &RunScope, epoch: u64) -> Result<()> {
+        validate_creation_scope(&self.runtime, parent, epoch)
     }
     async fn close_guarded(
         &self,
         id: &str,
         expected: Option<&SideChat>,
+        expected_epoch: u64,
         rpc_id: &str,
     ) -> Result<()> {
+        require(
+            self.runtime.inspect(|state| {
+                state.connection == ConnectionState::Ready
+                    && state.connection_epoch == expected_epoch
+            }),
+            "SideChat close connection changed",
+        )?;
         {
             let mut state = self.state.lock().expect("side chat lock");
             let chat = state
@@ -287,7 +341,7 @@ impl SideChatController {
             creating: false,
             armed: true,
         };
-        let result = self.close_inner(id, rpc_id).await;
+        let result = self.close_inner(id, expected_epoch, rpc_id).await;
         let mut state = self.state.lock().expect("side chat lock");
         match &result {
             Ok(()) => {
@@ -309,14 +363,16 @@ impl SideChatController {
         guard.armed = false;
         result
     }
-    async fn close_inner(&self, id: &str, rpc_id: &str) -> Result<()> {
+    async fn close_inner(&self, id: &str, expected_epoch: u64, rpc_id: &str) -> Result<()> {
         let _lease = self.runtime.acquire_history(id).await?;
         let running = || {
             self.runtime
                 .inspect(|s| s.sessions.get(id).is_some_and(|s| s.run_open))
         };
         // turn/end may precede worker shutdown. Cancel is idempotent and settles that tail.
-        self.runtime.cancel(id, &format!("{rpc_id}:cancel")).await?;
+        self.runtime
+            .cancel_at_epoch(expected_epoch, id, &format!("{rpc_id}:cancel"))
+            .await?;
         if running() {
             let mut changes = self.runtime.subscribe();
             tokio::time::timeout(Duration::from_secs(5), async {
@@ -330,7 +386,11 @@ impl SideChatController {
         }
         let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
         loop {
-            match self.runtime.discard(id, rpc_id).await {
+            match self
+                .runtime
+                .discard_at_epoch(expected_epoch, id, rpc_id)
+                .await
+            {
                 Err(Error::Remote(error))
                     if error["code"] == "session-running"
                         && tokio::time::Instant::now() < deadline =>
@@ -397,5 +457,38 @@ impl SideChatController {
         }
         state.unknown_creations.remove(&key);
         Ok(())
+    }
+}
+
+fn validate_creation_scope(runtime: &SessionRuntime, parent: &RunScope, epoch: u64) -> Result<()> {
+    runtime.inspect(|state| {
+        require(
+            state.connection_epoch == epoch && state.connection == ConnectionState::Ready,
+            "SideChat creation connection changed",
+        )?;
+        require(
+            SideChatController::supports_capabilities(&state.endpoint_capabilities),
+            "ephemeral SideChat is unavailable",
+        )?;
+        require(
+            parent.endpoint_id == state.endpoint_id && parent.thread_id == parent.session_id,
+            "SideChat parent must be the endpoint's main session",
+        )?;
+        require(
+            RunPresentation::read(state, parent, true).can_submit,
+            "SideChat parent is unavailable or read-only",
+        )
+    })
+}
+
+#[cfg(test)]
+mod epoch_contract_tests {
+    use super::*;
+    #[test]
+    fn old_sidechat_receipts_remain_readable_without_rebinding_their_connection() {
+        let scope = RunScope::main("endpoint", "scratch");
+        let chat:SideChat = serde_json::from_value(serde_json::json!({"parent":RunScope::main("endpoint","parent"),"scope":scope,"title":"SideChat","phase":"ready","error":null})).unwrap();
+        assert_eq!(chat.connection_epoch, 0);
+        assert_eq!(serde_json::to_value(chat).unwrap()["connectionEpoch"], 0);
     }
 }

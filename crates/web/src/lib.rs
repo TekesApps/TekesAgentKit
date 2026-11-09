@@ -1,9 +1,21 @@
 //! Shared AgentKit service. Hosts own its authentication, listener and process lifetime.
 //! A disconnected view drops only its history lease; it never stops a runtime or Harness.
+mod catalog;
+mod context_details;
 mod family;
+mod feedback;
+mod goals;
+mod harness_workspace;
+mod presets;
 mod queue;
+mod recovery;
+mod settings;
 mod sidebar;
+mod sidechat;
 mod stdio;
+pub mod thread_search;
+mod workspace_registry;
+mod workspace_service;
 use async_trait::async_trait;
 use futures_util::StreamExt;
 use serde_json::{Value, json};
@@ -17,6 +29,8 @@ use tekes_agent_contract::*;
 use tekes_agent_presentation::{RunPresentation, RunScope, TranscriptSnapshot};
 use tekes_agent_session::{ConnectionState, MemoryProjectionStore, SessionRuntime};
 use tokio::sync::mpsc;
+pub use workspace_registry::WorkspaceRegistration;
+pub use workspace_service::HTTPWorkspaceServiceEndpoint;
 
 // Connection history belongs to this observation, never to another endpoint/view.
 fn view_run_presentation(
@@ -36,11 +50,14 @@ fn inventory_summary(state: &MemoryProjectionStore, id: &str) -> Option<Value> {
     {
         return None;
     }
-    let session = state.sessions.get(id)?;
-    let summary = session.summary.as_ref()?;
-    if summary["status"] == "archived" {
+    if state.sessions.get(id)?.summary.as_ref()?["status"] == "archived" {
         return None;
     }
+    retained_inventory_summary(state, id)
+}
+fn retained_inventory_summary(state: &MemoryProjectionStore, id: &str) -> Option<Value> {
+    let session = state.sessions.get(id)?;
+    let summary = session.summary.as_ref()?;
     let projections: BTreeMap<_, _> = session
         .projections
         .iter()
@@ -53,6 +70,23 @@ fn active_inventory(state: &MemoryProjectionStore) -> Vec<Value> {
         .sessions
         .keys()
         .filter_map(|id| inventory_summary(state, id))
+        .collect()
+}
+
+/// Archived rows retain the same public summary and projections as active rows.
+/// An archive identity without a retained public summary is not a fabricated row.
+fn archived_inventory(state: &MemoryProjectionStore) -> Vec<Value> {
+    state
+        .sessions
+        .iter()
+        .filter(|(id, session)| {
+            state.archived_session_ids.contains(id)
+                || session
+                    .summary
+                    .as_ref()
+                    .is_some_and(|s| s["status"] == "archived")
+        })
+        .filter_map(|(id, _)| retained_inventory_summary(state, id))
         .collect()
 }
 
@@ -443,6 +477,7 @@ pub struct SharedEndpoint {
     pub kind: String,
     pub name: String,
     pub runtime: Arc<SessionRuntime>,
+    pub(crate) side_chats: sidechat::SideChatOwner,
     connector: Arc<RwLock<Arc<dyn EndpointConnector>>>,
     endpoint: Arc<RwLock<Option<Arc<dyn SessionEndpoint>>>>,
 }
@@ -457,11 +492,124 @@ impl SharedEndpoint {
     pub fn description(&self) -> Value {
         let state = self.runtime.snapshot();
         let mut description = json!({"id":state.endpoint_id,"kind":self.kind,"name":self.name,
-            "canReconnect":matches!(state.connection, ConnectionState::Failed(_)),
+            "connectionEpoch":state.connection_epoch,"canReconnect":matches!(state.connection, ConnectionState::Failed(_)),
             "connection":match &state.connection {ConnectionState::Connecting=>json!("connecting"),ConnectionState::Ready=>json!("ready"),ConnectionState::Failed(e)=>json!({"failed":e}),ConnectionState::Stopped=>json!("stopped")},"host":state.host,
             "capabilities":self.connected().ok().map(|e| e.capabilities())});
         if let Some(methods) = description["capabilities"]["methods"].as_array_mut() {
             methods.push(json!("composer.compileAnnotations"));
+            methods.push(json!("agent.context.read"));
+            if self.connected().ok().is_some_and(|endpoint| {
+                harness_workspace::supports_harness_workspace(&self.kind, &endpoint.capabilities())
+            }) {
+                methods.push(json!("agent.workspace.read"));
+            }
+            if self.connected().ok().is_some_and(|endpoint| {
+                endpoint.capabilities().supports("session.presets.describe")
+                    && endpoint.capabilities().supports("session.presets.resolve")
+            }) {
+                methods.extend([
+                    json!("agent.preset.describe"),
+                    json!("agent.preset.preview"),
+                ]);
+            }
+
+            if self.connected().ok().is_some_and(|endpoint| {
+                let caps = endpoint.capabilities();
+                caps.supports_ephemeral_fork
+                    && caps.supports("session.fork")
+                    && caps.supports("session.discard")
+                    && caps.supports("session.cancel")
+            }) {
+                methods.extend(
+                    [
+                        "agent.sideChat.state",
+                        "agent.sideChat.create",
+                        "agent.sideChat.close",
+                        "agent.sideChat.reconcile",
+                        "agent.sideChat.prompt",
+                        "agent.sideChat.cancel",
+                    ]
+                    .into_iter()
+                    .map(|method| json!(method)),
+                );
+            }
+
+            if self
+                .connected()
+                .ok()
+                .is_some_and(|endpoint| endpoint.capabilities().supports("thread.search"))
+            {
+                methods.push(json!("agent.threadSearch"));
+            }
+
+            if self.connected().ok().is_some_and(|endpoint| {
+                endpoint.supports_recovery() && endpoint.capabilities().supports("sessions.recover")
+            }) {
+                methods.extend([json!("agent.recovery.read"), json!("agent.recovery.run")]);
+            }
+            for (upstream, public) in [
+                ("tools/list", "agent.tools.list"),
+                ("tools/resolve", "agent.tools.resolve"),
+                ("resources/list", "agent.resources.list"),
+                ("resources/read", "agent.resources.read"),
+            ] {
+                if self
+                    .connected()
+                    .ok()
+                    .is_some_and(|endpoint| endpoint.capabilities().supports(upstream))
+                {
+                    methods.push(json!(public));
+                }
+            }
+
+            let capabilities = self
+                .connected()
+                .ok()
+                .map(|endpoint| endpoint.capabilities());
+            if capabilities
+                .as_ref()
+                .is_some_and(|caps| caps.supports("feedback.list"))
+            {
+                methods.push(json!("agent.feedback.read"));
+                methods.push(json!("agent.feedback.action"));
+            }
+            if capabilities
+                .as_ref()
+                .is_some_and(|caps| caps.supports("settings.describe"))
+            {
+                methods.push(json!("agent.settings.read"));
+            }
+            if capabilities
+                .as_ref()
+                .is_some_and(|caps| caps.supports("settings.mutate"))
+            {
+                methods.push(json!("agent.settings.mutate"));
+            }
+            if capabilities
+                .as_ref()
+                .is_some_and(|caps| caps.supports("goals.get"))
+            {
+                methods.push(json!("agent.goal.read"));
+                methods.push(json!("agent.goal.action"));
+            }
+            if capabilities
+                .as_ref()
+                .is_some_and(|caps| caps.supports("commands/list") || caps.supports("skills/list"))
+            {
+                methods.push(json!("agent.catalog"));
+            }
+            if capabilities
+                .as_ref()
+                .is_some_and(|caps| caps.supports("commands/list") && caps.supports("commands/run"))
+            {
+                methods.push(json!("agent.command.run"));
+            }
+            if capabilities
+                .as_ref()
+                .is_some_and(|caps| caps.supports("skills/list"))
+            {
+                methods.push(json!("agent.skills.compile"));
+            }
             methods.push(json!("thread.actions"));
             methods.push(json!("thread.performAction"));
             methods.push(json!("agent.familySnapshot"));
@@ -475,6 +623,7 @@ impl SharedEndpoint {
                 .is_ok_and(|endpoint| endpoint.capabilities().supports("session.updateQueue"))
             {
                 methods.push(json!("agent.queue.remove"));
+                methods.push(json!("agent.queue.edit"));
             }
         }
         description
@@ -483,17 +632,33 @@ impl SharedEndpoint {
 #[derive(Default)]
 pub struct SharedAgent {
     endpoints: BTreeMap<String, Arc<SharedEndpoint>>,
+    workspace_services: workspace_registry::WorkspaceServices,
     thread_action_host: Option<Arc<dyn ThreadActionHost>>,
     session_url_scheme: Option<String>,
     thread_preferences: Option<Arc<tekes_agent_presentation::ThreadPreferences>>,
     inventory_changes: InventoryChanges,
     family_views: std::sync::Mutex<BTreeMap<String, family::FamilyChildView>>,
 }
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum ThreadArchiveOwner {
+    Agentkit,
+    Harness,
+}
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ThreadOrganization {
+    pub archived: bool,
+    pub application_archived: bool,
+    pub harness_archived: bool,
+    pub archive_owner: Option<ThreadArchiveOwner>,
+}
 struct ThreadActionInputs {
     capabilities: EndpointCapabilities,
     connected: bool,
     host_methods: BTreeSet<String>,
     pin: Option<ThreadPinState>,
+    application_archive: Option<ApplicationArchiveState>,
 }
 struct InventoryChanges(tokio::sync::watch::Sender<()>);
 impl Default for InventoryChanges {
@@ -548,28 +713,90 @@ impl SharedAgent {
         Ok(())
     }
     fn inventory(&self, shared: &SharedEndpoint, state: &MemoryProjectionStore) -> Result<Value> {
-        let sessions: Vec<Value> = active_inventory(state)
+        let application_archive = self.application_archive_snapshot(&state.endpoint_id);
+        let mut sessions = Vec::new();
+        let mut archived_sessions = Vec::new();
+        for row in active_inventory(state)
             .into_iter()
-            .map(|row| self.decorate_inventory_row(state, row))
-            .collect();
+            .chain(archived_inventory(state))
+        {
+            let row = self.decorate_inventory_row(state, row, &application_archive);
+            if row["organization"]["archived"] == true {
+                archived_sessions.push(row);
+            } else {
+                sessions.push(row);
+            }
+        }
         let name_corpus = retained_name_corpus(state, self.endpoints.keys().cloned())?;
         Ok(
-            json!({"description":shared.description(),"sessions":sessions,"inventoryReady":state.inventory_ready,"connectionEpoch":state.connection_epoch,"nameCorpus":name_corpus,"archiveFacts":inventory_archive_facts(state)}),
+            json!({"description":shared.description(),"sessions":sessions,"archivedSessions":archived_sessions,"inventoryReady":state.inventory_ready,"connectionEpoch":state.connection_epoch,"nameCorpus":name_corpus,"archiveFacts":inventory_archive_facts(state),"applicationArchive":application_archive}),
         )
     }
-    fn decorate_inventory_row(&self, state: &MemoryProjectionStore, row: Value) -> Value {
+    fn application_archive_snapshot(
+        &self,
+        endpoint: &str,
+    ) -> tekes_agent_presentation::ApplicationArchiveSnapshot {
+        self.thread_preferences
+            .as_ref()
+            .map(|store| store.application_archive_snapshot(endpoint))
+            .unwrap_or_else(|| tekes_agent_presentation::ApplicationArchiveSnapshot {
+                revision: 0,
+                session_ids: BTreeSet::new(),
+            })
+    }
+    fn thread_organization(&self, state: &MemoryProjectionStore, id: &str) -> ThreadOrganization {
+        self.organization_at_archive_snapshot(
+            state,
+            id,
+            &self.application_archive_snapshot(&state.endpoint_id),
+        )
+    }
+    fn organization_at_archive_snapshot(
+        &self,
+        state: &MemoryProjectionStore,
+        id: &str,
+        archive: &tekes_agent_presentation::ApplicationArchiveSnapshot,
+    ) -> ThreadOrganization {
+        let application_archived = archive.session_ids.contains(id);
+        let harness_archived = state.archived_session_ids.iter().any(|value| value == id)
+            || state
+                .sessions
+                .get(id)
+                .and_then(|session| session.summary.as_ref())
+                .is_some_and(|summary| summary["status"] == "archived");
+        ThreadOrganization {
+            archived: application_archived || harness_archived,
+            application_archived,
+            harness_archived,
+            archive_owner: if application_archived {
+                Some(ThreadArchiveOwner::Agentkit)
+            } else if harness_archived {
+                Some(ThreadArchiveOwner::Harness)
+            } else {
+                None
+            },
+        }
+    }
+    fn decorate_inventory_row(
+        &self,
+        state: &MemoryProjectionStore,
+        row: Value,
+        archive: &tekes_agent_presentation::ApplicationArchiveSnapshot,
+    ) -> Value {
         let id = row["sessionId"].as_str().expect("inventory identity");
         let pin = self
             .thread_action_host
             .as_ref()
             .and_then(|host| host.pin_state(&state.endpoint_id, id));
-        self.decorate_inventory_row_with_pin(state, row, pin.as_ref())
+        let organization = self.organization_at_archive_snapshot(state, id, archive);
+        self.decorate_inventory_row_with_pin(state, row, pin.as_ref(), organization)
     }
     fn decorate_inventory_row_with_pin(
         &self,
         state: &MemoryProjectionStore,
         mut row: Value,
         pin: Option<&ThreadPinState>,
+        organization: ThreadOrganization,
     ) -> Value {
         let id = row["sessionId"]
             .as_str()
@@ -578,6 +805,7 @@ impl SharedAgent {
         if pin.is_some_and(|pin| pin.pinned) {
             row["pin"] = json!(ThreadPinPresentation { pinned: true });
         }
+        row["organization"] = serde_json::to_value(organization).expect("organization projection");
         row["activity"] =
             serde_json::to_value(tekes_agent_presentation::thread_activity(state, &id))
                 .expect("thread activity");
@@ -602,21 +830,33 @@ impl SharedAgent {
     fn thread_action_inputs(&self, shared: &SharedEndpoint, id: &str) -> ThreadActionInputs {
         let endpoint = shared.connected().ok();
         let endpoint_id = shared.runtime.inspect(|s| s.endpoint_id.clone());
+        let mut host_methods = self
+            .thread_action_host
+            .as_ref()
+            .map(|host| host.methods())
+            .unwrap_or_default();
+        // Application organization has exactly one owner. A custom action host
+        // cannot advertise a second archive store through its method names.
+        if self.thread_preferences.is_some() {
+            host_methods.insert("thread.setArchived".into());
+        } else {
+            host_methods.remove("thread.setArchived");
+        }
         ThreadActionInputs {
             capabilities: endpoint
                 .as_ref()
                 .map(|e| e.capabilities())
                 .unwrap_or_default(),
             connected: endpoint.is_some(),
-            host_methods: self
-                .thread_action_host
-                .as_ref()
-                .map(|h| h.methods())
-                .unwrap_or_default(),
+            host_methods,
             pin: self
                 .thread_action_host
                 .as_ref()
                 .and_then(|h| h.pin_state(&endpoint_id, id)),
+            application_archive: self
+                .thread_preferences
+                .as_ref()
+                .and_then(|store| store.application_archive_state(&endpoint_id, id)),
         }
     }
     fn thread_actions_in_state(
@@ -644,6 +884,7 @@ impl SharedAgent {
                 ready: state.connection == ConnectionState::Ready && inputs.connected,
                 running,
                 archived,
+                application_archive: inputs.application_archive.as_ref(),
                 pin: inputs.pin.as_ref(),
                 host_methods: &inputs.host_methods,
             },
@@ -714,8 +955,10 @@ impl SharedAgent {
             None
         };
 
-        if matches!(request.action_id.as_str(), "pin" | "unpin")
-            && let Some(store) = &self.thread_preferences
+        if matches!(
+            request.action_id.as_str(),
+            "pin" | "unpin" | "archive" | "unarchive"
+        ) && let Some(store) = &self.thread_preferences
             && store.replay(&shared.runtime.snapshot().endpoint_id, &request, rpc_id)?
         {
             return Ok(ThreadActionOutcome::default());
@@ -779,20 +1022,13 @@ impl SharedAgent {
                 }
             }
             ThreadActionCommand::Archive | ThreadActionCommand::Unarchive => {
-                let archive = matches!(command, ThreadActionCommand::Archive);
-                shared
-                    .runtime
-                    .call(
-                        if archive {
-                            "session.archive"
-                        } else {
-                            "session.unarchive"
-                        },
-                        json!({"sessionId":request.session_id}),
-                        rpc_id,
-                    )
+                outcome = self
+                    .thread_preferences
+                    .as_ref()
+                    .ok_or_else(|| unsupported("application archive store unavailable"))?
+                    .perform(&presentation.endpoint, &request, rpc_id)
                     .await?;
-                outcome.clear_selection = archive;
+                self.invalidate_thread_inventory();
             }
             ThreadActionCommand::Host => {
                 let result = self
@@ -832,6 +1068,7 @@ impl SharedAgent {
             Arc::new(SharedEndpoint {
                 kind,
                 name,
+                side_chats: sidechat::SideChatOwner::new(runtime.clone()),
                 runtime,
                 connector,
                 endpoint,
@@ -865,6 +1102,12 @@ impl SharedAgent {
         )
     }
     pub async fn request(&self, request: &Value) -> Result<Value> {
+        if matches!(
+            request["op"].as_str(),
+            Some("workspace.list" | "workspace.call")
+        ) {
+            return self.workspace_request(request).await;
+        }
         if request["op"] == "endpoints" {
             return Ok(self.descriptions());
         }
@@ -876,7 +1119,13 @@ impl SharedAgent {
                 runtime.reconnect().await?;
                 Ok(shared.description())
             }
-            "snapshot" => Ok(serde_json::to_value(runtime.snapshot().as_ref())?),
+            "snapshot" => {
+                let state = runtime.snapshot();
+                let mut value = serde_json::to_value(state.as_ref())?;
+                value["applicationArchive"] =
+                    serde_json::to_value(self.application_archive_snapshot(&state.endpoint_id))?;
+                Ok(value)
+            }
             "call" => {
                 if request["method"] == "thread.actions" {
                     return Ok(serde_json::to_value(self.thread_actions(
@@ -917,6 +1166,154 @@ impl SharedAgent {
                 }
                 if request["method"] == "agent.child.close" {
                     return self.close_child(&shared, &request["payload"]).await;
+                }
+
+                if request["method"] == "agent.feedback.read" {
+                    return self
+                        .feedback_read(&shared, &request["payload"], string(request, "rpcId")?)
+                        .await;
+                }
+                if request["method"] == "agent.feedback.action" {
+                    return self
+                        .feedback_action(&shared, &request["payload"], string(request, "rpcId")?)
+                        .await;
+                }
+                if request["method"] == "agent.settings.read" {
+                    return self.settings_read(&shared, &request["payload"]).await;
+                }
+                if request["method"] == "agent.settings.mutate" {
+                    return self
+                        .settings_mutate(&shared, &request["payload"], string(request, "rpcId")?)
+                        .await;
+                }
+                if request["method"] == "agent.recovery.read" {
+                    return self.recovery_read(&shared, &request["payload"]);
+                }
+                if request["method"] == "agent.recovery.run" {
+                    return self
+                        .recovery_run(&shared, &request["payload"], string(request, "rpcId")?)
+                        .await;
+                }
+                if request["method"] == "agent.tools.list" {
+                    return self
+                        .tool_catalog(&shared, &request["payload"], string(request, "rpcId")?)
+                        .await;
+                }
+                if request["method"] == "agent.tools.resolve" {
+                    return self
+                        .resolve_catalog_tool(
+                            &shared,
+                            &request["payload"],
+                            string(request, "rpcId")?,
+                        )
+                        .await;
+                }
+                if request["method"] == "agent.resources.list" {
+                    return self
+                        .skill_resource_page(
+                            &shared,
+                            &request["payload"],
+                            string(request, "rpcId")?,
+                        )
+                        .await;
+                }
+                if request["method"] == "agent.resources.read" {
+                    return self
+                        .read_skill_resource(
+                            &shared,
+                            &request["payload"],
+                            string(request, "rpcId")?,
+                        )
+                        .await;
+                }
+                if request["method"] == "agent.threadSearch" {
+                    return self
+                        .thread_search(&shared, &request["payload"], string(request, "rpcId")?)
+                        .await;
+                }
+                if request["method"] == "agent.sideChat.state" {
+                    return self.side_chat_state(&shared, &request["payload"]);
+                }
+                if request["method"] == "agent.sideChat.create" {
+                    return self
+                        .side_chat_create(&shared, &request["payload"], string(request, "rpcId")?)
+                        .await;
+                }
+                if request["method"] == "agent.sideChat.close" {
+                    return self
+                        .side_chat_close(&shared, &request["payload"], string(request, "rpcId")?)
+                        .await;
+                }
+                if request["method"] == "agent.sideChat.prompt" {
+                    return self
+                        .side_chat_prompt(&shared, &request["payload"], string(request, "rpcId")?)
+                        .await;
+                }
+                if request["method"] == "agent.sideChat.cancel" {
+                    return self
+                        .side_chat_cancel(&shared, &request["payload"], string(request, "rpcId")?)
+                        .await;
+                }
+                if request["method"] == "agent.sideChat.reconcile" {
+                    return self.side_chat_reconcile(&shared, &request["payload"]).await;
+                }
+                if request["method"] == "agent.preset.describe" {
+                    return self.preset_describe(&shared, &request["payload"]).await;
+                }
+                if request["method"] == "agent.preset.preview" {
+                    return self
+                        .preset_preview(&shared, &request["payload"], string(request, "rpcId")?)
+                        .await;
+                }
+                if request["method"] == "agent.workspace.read" {
+                    return self
+                        .harness_workspace_read(
+                            &shared,
+                            &request["payload"],
+                            string(request, "rpcId")?,
+                        )
+                        .await;
+                }
+                if request["method"] == "agent.context.read" {
+                    return self
+                        .context_details_read(&shared, &request["payload"])
+                        .await;
+                }
+                if request["method"] == "agent.goal.read" {
+                    return self.goal_read(&shared, &request["payload"]).await;
+                }
+                if request["method"] == "agent.goal.action" {
+                    return self
+                        .goal_action(&shared, &request["payload"], string(request, "rpcId")?)
+                        .await;
+                }
+                if request["method"] == "agent.catalog" {
+                    return self
+                        .resource_catalog(&shared, &request["payload"], string(request, "rpcId")?)
+                        .await;
+                }
+                if request["method"] == "agent.command.run" {
+                    return self
+                        .run_catalog_command(
+                            &shared,
+                            &request["payload"],
+                            string(request, "rpcId")?,
+                        )
+                        .await;
+                }
+                if request["method"] == "agent.skills.compile" {
+                    return self
+                        .compile_catalog_skills(
+                            &shared,
+                            &request["payload"],
+                            string(request, "rpcId")?,
+                        )
+                        .await;
+                }
+                if request["method"] == "agent.queue.edit" {
+                    return self
+                        .edit_queued_input(&shared, &request["payload"], string(request, "rpcId")?)
+                        .await;
                 }
                 if request["method"] == "agent.queue.remove" {
                     return self
@@ -1068,6 +1465,371 @@ impl SharedAgent {
 #[cfg(test)]
 mod archive_facts_tests {
     use super::*;
+    #[test]
+    fn archived_rows_require_retained_summaries_and_follow_both_archive_authorities() {
+        let mut store = MemoryProjectionStore::new("fixture");
+        store.archived_session_ids =
+            vec!["workspace".into(), "missing".into(), "no-summary".into()];
+        for (id, summary) in [
+            ("active", json!({"sessionId":"active","status":"idle"})),
+            (
+                "workspace",
+                json!({"sessionId":"workspace","title":"Kept title","status":"idle"}),
+            ),
+            (
+                "summary",
+                json!({"sessionId":"summary","status":"archived"}),
+            ),
+        ] {
+            store.sessions.entry(id.into()).or_default().summary = Some(summary);
+        }
+        store.sessions.entry("no-summary".into()).or_default();
+        let archived = archived_inventory(&store);
+        assert_eq!(
+            archived
+                .iter()
+                .map(|row| row["sessionId"].as_str().unwrap())
+                .collect::<Vec<_>>(),
+            vec!["summary", "workspace"]
+        );
+        assert_eq!(archived[1]["summary"]["title"], "Kept title");
+        assert_eq!(active_inventory(&store).len(), 1);
+        assert_eq!(
+            store.archived_session_ids.len(),
+            3,
+            "read does not erase archive facts without summaries"
+        );
+        store.archived_session_ids.clear();
+        store
+            .sessions
+            .get_mut("summary")
+            .unwrap()
+            .summary
+            .as_mut()
+            .unwrap()["status"] = json!("idle");
+        assert!(archived_inventory(&store).is_empty());
+        assert_eq!(active_inventory(&store).len(), 3);
+    }
+
+    #[derive(Clone)]
+    struct ArchiveConnector {
+        host: HostDescription,
+        inventory: tokio::sync::broadcast::Sender<Value>,
+        calls: Arc<std::sync::Mutex<Vec<(String, Value, String)>>>,
+    }
+    #[async_trait]
+    impl EndpointConnector for ArchiveConnector {
+        async fn connect(&self) -> Result<Arc<dyn SessionEndpoint>> {
+            Ok(Arc::new(self.clone()))
+        }
+    }
+    #[async_trait]
+    impl SessionEndpoint for ArchiveConnector {
+        fn identity(&self) -> &str {
+            "archive"
+        }
+        fn host(&self) -> &HostDescription {
+            &self.host
+        }
+        fn capabilities(&self) -> EndpointCapabilities {
+            let mut capabilities = EndpointCapabilities::methods(&["session.unarchive"]);
+            capabilities.supports_unarchive_session = true;
+            capabilities
+        }
+        async fn follow(&self, target: StreamTarget) -> Result<FrameStream> {
+            use futures_util::stream;
+            match target {
+                StreamTarget::SessionInventory => {
+                    let receiver = self.inventory.subscribe();
+                    let baseline = json!({"type":"baseline","generation":"archive-g","snapshot":{"items":[
+                        {"sessionId":"active","title":"Active","status":"idle","running":false,"blank":false,"updatedAt":1},
+                        {"sessionId":"saved","title":"Retained","status":"archived","running":false,"blank":false,"updatedAt":1,"projections":{"asOfSeq":2,"values":{"title":"Current archived title"}}}
+                    ]}});
+                    Ok(Box::pin(stream::once(async { Ok(baseline) }).chain(stream::unfold(receiver, |mut receiver| async move {
+                        receiver.recv().await.ok().map(|value| (Ok(value), receiver))
+                    }))))
+                }
+                StreamTarget::SessionControl => Ok(Box::pin(stream::once(async { Ok(json!({"type":"baseline","generation":"control-g","snapshot":{"queues":[],"jobs":[],"projections":[]}})) }).chain(stream::pending()))),
+                StreamTarget::Actionables => Ok(Box::pin(stream::once(async { Ok(json!({"type":"reset","generation":"actionables-g"})) }).chain(stream::pending()))),
+                _ => Err(unsupported("archive fixture stream")),
+            }
+        }
+        async fn history_page(&self, _: HistoryRequest) -> Result<HistoryPage> {
+            Err(unsupported("archive fixture history"))
+        }
+        async fn respond(&self, _: &str, _: i64, _: Value) -> Result<()> {
+            Err(unsupported("archive fixture response"))
+        }
+        async fn call(&self, method: &str, payload: Value, rpc_id: &str) -> Result<Value> {
+            self.calls
+                .lock()
+                .unwrap()
+                .push((method.into(), payload.clone(), rpc_id.into()));
+            require(
+                method == "session.unarchive" && payload == json!({"sessionId":"saved"}),
+                "unexpected archive fixture call",
+            )?;
+            self.inventory.send(json!({"type":"upsert","generation":"archive-g","session":{"sessionId":"saved","title":"Retained","status":"idle","running":false,"blank":false,"updatedAt":2,"projections":{"asOfSeq":2,"values":{"title":"Current archived title"}}}})).map_err(|_| Error::Disconnected)?;
+            Ok(json!({}))
+        }
+        async fn close(&self) {}
+    }
+    struct ArchivePin;
+    #[async_trait]
+    impl ThreadActionHost for ArchivePin {
+        fn methods(&self) -> BTreeSet<String> {
+            BTreeSet::new()
+        }
+        fn pin_state(&self, endpoint: &str, session: &str) -> Option<ThreadPinState> {
+            (endpoint == "archive" && session == "saved").then_some(ThreadPinState { pinned: true })
+        }
+        async fn perform(
+            &self,
+            _: &str,
+            _: &ThreadActionRequest,
+            _: &str,
+        ) -> Result<ThreadActionOutcome> {
+            Err(unsupported("archive fixture host action"))
+        }
+    }
+
+    #[tokio::test]
+    async fn legacy_harness_archives_remain_separate_and_application_actions_cannot_restore_them() {
+        use std::time::Duration;
+        let (inventory, _) = tokio::sync::broadcast::channel(4);
+        let calls = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let connector = ArchiveConnector {
+            host: serde_json::from_value(json!({"protocolVersion":4,"product":{"name":"archive fixture","version":"1"},"capabilities":["session-inventory-sync","session-control-sync","actionable-sync"],"cwd":"/work","home":"/home","attachedSessions":0,"canOpenPath":false})).unwrap(),
+            inventory,
+            calls: calls.clone(),
+        };
+        let mut agent = SharedAgent::default();
+        agent.install_thread_action_host(Arc::new(ArchivePin));
+        agent
+            .register(
+                "archive".into(),
+                "test".into(),
+                "Archive".into(),
+                Arc::new(connector),
+            )
+            .unwrap();
+        agent
+            .endpoint("archive")
+            .unwrap()
+            .runtime
+            .wait_ready(Duration::from_secs(2))
+            .await
+            .unwrap();
+        let agent = Arc::new(agent);
+        let observed = agent.clone();
+        let (output, mut frames) = mpsc::channel(8);
+        let follow = tokio::spawn(async move {
+            observed
+                .follow(
+                    &json!({"op":"follow","endpoint":"archive","target":"state"}),
+                    output,
+                )
+                .await
+        });
+        let before = tokio::time::timeout(Duration::from_secs(2), frames.recv())
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(before["sessions"].as_array().unwrap().len(), 1);
+        assert_eq!(before["sessions"][0]["sessionId"], "active");
+        let saved = &before["archivedSessions"][0];
+        assert_eq!(saved["sessionId"], "saved");
+        assert_eq!(saved["summary"]["title"], "Retained");
+        assert_eq!(saved["projections"]["title"], "Current archived title");
+        assert_eq!(saved["pin"]["pinned"], true);
+        assert_eq!(saved["activity"]["status"], "idle");
+        assert_eq!(saved["activity"]["isStale"], false);
+        assert_eq!(saved["organization"]["archiveOwner"], "harness");
+        assert_eq!(saved["organization"]["applicationArchived"], false);
+        let menu = agent.request(&json!({"op":"call","endpoint":"archive","method":"thread.actions","rpcId":"read","payload":{"sessionId":"saved"}})).await.unwrap();
+        assert!(
+            menu["items"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|item| item["id"] == "unarchive" && item["enabled"] == false)
+        );
+        assert!(agent.request(&json!({"op":"call","endpoint":"archive","method":"thread.performAction","rpcId":"restore-once","payload":{"sessionId":"saved","actionId":"unarchive"}})).await.is_err());
+        assert!(
+            calls.lock().unwrap().is_empty(),
+            "legacy archive cannot trigger a Harness restore"
+        );
+        follow.abort();
+        agent
+            .endpoint("archive")
+            .unwrap()
+            .runtime
+            .stop()
+            .await
+            .unwrap();
+    }
+
+    struct ArchiveClaimHost;
+    #[async_trait]
+    impl ThreadActionHost for ArchiveClaimHost {
+        fn methods(&self) -> BTreeSet<String> {
+            BTreeSet::from(["thread.setArchived".into()])
+        }
+        fn pin_state(&self, _: &str, _: &str) -> Option<ThreadPinState> {
+            None
+        }
+        async fn perform(
+            &self,
+            _: &str,
+            _: &ThreadActionRequest,
+            _: &str,
+        ) -> Result<ThreadActionOutcome> {
+            panic!("custom host cannot own application archive")
+        }
+    }
+    #[tokio::test]
+    async fn custom_action_host_cannot_supply_a_second_application_archive_authority() {
+        use std::time::Duration;
+        for with_preferences in [false, true] {
+            let (inventory, _) = tokio::sync::broadcast::channel(4);
+            let calls = Arc::new(std::sync::Mutex::new(Vec::new()));
+            let connector=ArchiveConnector{host:serde_json::from_value(json!({"protocolVersion":4,"product":{"name":"archive fixture","version":"1"},"capabilities":["session-inventory-sync","session-control-sync","actionable-sync"],"cwd":"/work","home":"/home","attachedSessions":0,"canOpenPath":false})).unwrap(),inventory,calls:calls.clone()};
+            let directory = std::env::temp_dir().join(format!(
+                "agentkit-archive-authority-{}",
+                uuid::Uuid::new_v4()
+            ));
+            let path = directory.join("preferences.json");
+            let mut agent = SharedAgent::default();
+            if with_preferences {
+                agent
+                    .open_thread_preferences(&path, "account/project")
+                    .unwrap();
+            }
+            agent.install_thread_action_host(Arc::new(ArchiveClaimHost));
+            agent
+                .register(
+                    "archive".into(),
+                    "tekes".into(),
+                    "Archive".into(),
+                    Arc::new(connector),
+                )
+                .unwrap();
+            let shared = agent.endpoint("archive").unwrap();
+            shared
+                .runtime
+                .wait_ready(Duration::from_secs(2))
+                .await
+                .unwrap();
+            let menu = agent.thread_actions(&shared, "active").unwrap();
+            assert_eq!(
+                menu.items
+                    .iter()
+                    .find(|action| action.id == "archive")
+                    .unwrap()
+                    .enabled,
+                with_preferences
+            );
+            let result=agent.request(&json!({"op":"call","endpoint":"archive","method":"thread.performAction","rpcId":"owned-archive","payload":{"sessionId":"active","actionId":"archive"}})).await;
+            assert_eq!(result.is_ok(), with_preferences);
+            let snapshot = shared.runtime.snapshot();
+            let view = agent.inventory(&shared, &snapshot).unwrap();
+            let archive = agent.application_archive_snapshot("archive");
+            assert_eq!(archive.session_ids.contains("active"), with_preferences);
+            assert_eq!(
+                view["applicationArchive"],
+                serde_json::to_value(&archive).unwrap()
+            );
+            assert_eq!(
+                view["sessions"].as_array().unwrap().len(),
+                if with_preferences { 0 } else { 1 }
+            );
+            assert!(calls.lock().unwrap().is_empty());
+            shared.runtime.stop().await.unwrap();
+            drop(shared);
+            drop(agent);
+            if with_preferences {
+                std::fs::remove_dir_all(directory).unwrap();
+            }
+        }
+    }
+    struct MutatingPinHost {
+        store: Arc<tekes_agent_presentation::ThreadPreferences>,
+        changed: std::sync::atomic::AtomicBool,
+    }
+    #[async_trait]
+    impl ThreadActionHost for MutatingPinHost {
+        fn methods(&self) -> BTreeSet<String> {
+            BTreeSet::from(["thread.setPinned".into()])
+        }
+        fn pin_state(&self, _: &str, _: &str) -> Option<ThreadPinState> {
+            use futures_util::FutureExt;
+            if !self.changed.swap(true, std::sync::atomic::Ordering::SeqCst) {
+                self.store
+                    .perform(
+                        "fixture",
+                        &ThreadActionRequest {
+                            session_id: "one".into(),
+                            action_id: "archive".into(),
+                            title: None,
+                        },
+                        "organization-change-during-pin-read",
+                    )
+                    .now_or_never()
+                    .expect("local preference commit completes synchronously")
+                    .unwrap();
+            }
+            Some(ThreadPinState { pinned: false })
+        }
+        async fn perform(
+            &self,
+            _: &str,
+            _: &ThreadActionRequest,
+            _: &str,
+        ) -> Result<ThreadActionOutcome> {
+            Err(unsupported("unused pin mutation"))
+        }
+    }
+    #[test]
+    fn inventory_uses_one_application_archive_snapshot_even_when_host_metadata_changes_preferences()
+    {
+        let directory = std::env::temp_dir().join(format!(
+            "agentkit-archive-snapshot-{}",
+            uuid::Uuid::new_v4()
+        ));
+        let path = directory.join("preferences.json");
+        let mut agent = SharedAgent::default();
+        agent
+            .open_thread_preferences(&path, "account/project")
+            .unwrap();
+        let store = agent.thread_preferences.as_ref().unwrap().clone();
+        agent.install_thread_action_host(Arc::new(MutatingPinHost {
+            store,
+            changed: std::sync::atomic::AtomicBool::new(false),
+        }));
+        let mut state = MemoryProjectionStore::new("fixture");
+        state.sessions.entry("one".into()).or_default().summary =
+            Some(json!({"sessionId":"one","title":"One","status":"idle"}));
+        // No endpoint/remote call is needed: this is the same inventory row projection.
+        let archive = agent.application_archive_snapshot("fixture");
+        let row = active_inventory(&state).pop().unwrap();
+        let rendered = agent.decorate_inventory_row(&state, row, &archive);
+        assert_eq!(rendered["organization"]["applicationArchived"], false);
+        assert!(archive.session_ids.is_empty());
+        assert!(
+            agent
+                .application_archive_snapshot("fixture")
+                .session_ids
+                .contains("one")
+        );
+        let later = agent.application_archive_snapshot("fixture");
+        let row = active_inventory(&state).pop().unwrap();
+        let rendered = agent.decorate_inventory_row(&state, row, &later);
+        assert_eq!(rendered["organization"]["applicationArchived"], true);
+        assert!(later.revision > archive.revision);
+        drop(agent);
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
     #[test]
     fn archive_facts_preserve_readiness_and_raw_status_without_promoting_missing() {
         let mut store = MemoryProjectionStore::new("fixture");

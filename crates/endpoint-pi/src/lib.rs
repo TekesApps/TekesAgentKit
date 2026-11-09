@@ -51,7 +51,7 @@ impl PiConfiguration {
             data_root,
             extensions: Vec::new(),
             session_roots: Vec::new(),
-            supported_versions: ["1.3.0".into(), "1.4.0".into()].into(),
+            supported_versions: ["1.3.0".into(), "1.4.0".into(), "1.5.0".into()].into(),
         }
     }
 }
@@ -704,6 +704,7 @@ impl SessionEndpoint for PiSessionEndpoint {
             "session.files.read",
             "session.files.readBytes",
             "pi.getState",
+            "pi.getSessionStats",
             "pi.getTree",
             "pi.getMessages",
             "commands.list",
@@ -1372,6 +1373,7 @@ impl SessionEndpoint for PiSessionEndpoint {
                     "session.prompt" => self.context.direct_prompt(&rpc, &payload, rpc_id).await,
                     "session.history.export" => rpc.request("get_entries", json!({})).await,
                     "pi.getState" => rpc.request("get_state", json!({})).await,
+                    "pi.getSessionStats" => rpc.request("get_session_stats", json!({})).await,
                     "pi.getTree" => rpc.request("get_tree", json!({})).await,
                     "pi.getMessages" => rpc.request("get_messages", json!({})).await,
                     _ => Err(unsupported(&format!("Pi method {method}"))),

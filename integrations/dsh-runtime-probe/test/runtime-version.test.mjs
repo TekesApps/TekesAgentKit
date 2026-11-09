@@ -52,3 +52,10 @@ test('rejects malformed official version strings', async t => {
   const url = await withServer(t, await runtimeFixture(t, 'not-a-version'));
   assert.equal((await fetch(url, { headers: { authorization: 'Bearer valid' } })).status, 503);
 });
+
+test('resolves the upgraded official runtime through the CLI package boundary', async t => {
+  const url = await withServer(t, await runtimeFixture(t, '0.2.2-rc.1'));
+  const response = await fetch(url, { headers: { authorization: 'Bearer valid' } });
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { product: '@deepseek-ai/dsh', source: '@deepseek-ai/dsh-app-boot#getDshRuntimeVersion', version: '0.2.2-rc.1' });
+});
