@@ -2292,6 +2292,7 @@ name = "tekes-agent-ui-consumer-check"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "png 0.17.16",
  "serde_json",
  "tekes-agent-apphost",
  "tekes-agent-components-ui",

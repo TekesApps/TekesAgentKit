@@ -24,5 +24,8 @@ tekes-ui-scene.workspace = true
 tekes-ui-settings.workspace = true
 tekes-ui-tokens.workspace = true
 
+[dev-dependencies]
+png.workspace = true
+
 [lints]
 workspace = true
