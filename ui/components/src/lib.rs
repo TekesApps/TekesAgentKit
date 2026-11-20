@@ -1,5 +1,8 @@
 //! Agent-owned composition of public TekesUI controls. No endpoint or Run state machine.
+pub mod artifact;
+pub mod changes;
 pub mod composer;
+pub mod files;
 pub mod ids;
 pub mod layout_mode;
 pub mod shell;
@@ -7,7 +10,10 @@ pub mod sidebar;
 pub mod summary;
 pub mod transcript;
 
+pub use artifact::{ArtifactIntent, ArtifactViewKind, ArtifactViewModel, ArtifactViewerSurface};
+pub use changes::{ChangeRowModel, ChangesIntent, ChangesViewModel, WorkspaceChangesSurface};
 pub use composer::{ComposerIntent, ComposerSurface};
+pub use files::{FileTreeRowModel, FilesIntent, WorkspaceFilesSurface};
 pub use ids::*;
 pub use layout_mode::{COMPACT_WIDTH_BREAKPOINT, ResponsiveWidthMode};
 pub use shell::AgentContainerShell;

@@ -81,6 +81,50 @@ pub const SUMMARY_HOST_SECTIONS_ID: ComponentId = ComponentId(750);
 pub const SUMMARY_ROW_BASE: u64 = 20_000;
 pub const SUMMARY_KV_BASE: u64 = 21_000;
 
+// Workspace Files surface: 1100..=1199 (+ passive tree rows 30_000+)
+pub const FILES_SHELL_ID: ComponentId = ComponentId(1100);
+pub const FILES_ROOT_ID: ComponentId = ComponentId(1101);
+pub const FILES_HEADER_ID: ComponentId = ComponentId(1102);
+pub const FILES_SEARCH_ID: ComponentId = ComponentId(1103);
+pub const FILES_TREE_SCROLL_ID: ComponentId = ComponentId(1104);
+pub const FILES_TREE_ID: ComponentId = ComponentId(1105);
+pub const FILES_ACTIONS_ROW_ID: ComponentId = ComponentId(1106);
+pub const FILES_OPEN_BTN_ID: ComponentId = ComponentId(1107);
+pub const FILES_ATTACH_BTN_ID: ComponentId = ComponentId(1108);
+pub const FILES_REFRESH_BTN_ID: ComponentId = ComponentId(1109);
+pub const FILES_ROW_BASE: u64 = 30_000;
+
+// Workspace Changes surface: 1200..=1299 (+ passive list rows 31_000+)
+pub const CHANGES_SHELL_ID: ComponentId = ComponentId(1200);
+pub const CHANGES_ROOT_ID: ComponentId = ComponentId(1201);
+pub const CHANGES_HEADER_ID: ComponentId = ComponentId(1202);
+pub const CHANGES_MODE_SEG_ID: ComponentId = ComponentId(1203);
+pub const CHANGES_FILES_SCROLL_ID: ComponentId = ComponentId(1204);
+pub const CHANGES_FILES_LIST_ID: ComponentId = ComponentId(1205);
+pub const CHANGES_DIFF_SCROLL_ID: ComponentId = ComponentId(1206);
+pub const CHANGES_DIFF_RICH_ID: ComponentId = ComponentId(1207);
+pub const CHANGES_COMMIT_ROW_ID: ComponentId = ComponentId(1208);
+pub const CHANGES_QUOTE_BTN_ID: ComponentId = ComponentId(1209);
+pub const CHANGES_COMMIT_INPUT_ID: ComponentId = ComponentId(1210);
+pub const CHANGES_COMMIT_BTN_ID: ComponentId = ComponentId(1211);
+pub const CHANGES_ROW_BASE: u64 = 31_000;
+
+// Artifact Viewer surface: 1300..=1499
+pub const ARTIFACT_SHELL_ID: ComponentId = ComponentId(1300);
+pub const ARTIFACT_ROOT_ID: ComponentId = ComponentId(1301);
+pub const ARTIFACT_HEADER_ID: ComponentId = ComponentId(1302);
+pub const ARTIFACT_ACTIONS_ROW_ID: ComponentId = ComponentId(1303);
+pub const ARTIFACT_QUOTE_BTN_ID: ComponentId = ComponentId(1304);
+pub const ARTIFACT_ATTACH_BTN_ID: ComponentId = ComponentId(1305);
+pub const ARTIFACT_RELOAD_BTN_ID: ComponentId = ComponentId(1306);
+pub const ARTIFACT_BODY_SLOT_ID: ComponentId = ComponentId(1307);
+pub const ARTIFACT_BODY_SCROLL_ID: ComponentId = ComponentId(1308);
+pub const ARTIFACT_CODE_EDITOR_ID: ComponentId = ComponentId(1310);
+pub const ARTIFACT_MARKDOWN_RICH_ID: ComponentId = ComponentId(1311);
+pub const ARTIFACT_IMAGE_ID: ComponentId = ComponentId(1312);
+pub const ARTIFACT_DIAG_TEXT_ID: ComponentId = ComponentId(1313);
+pub const ARTIFACT_CUSTOM_SLOT_ID: ComponentId = ComponentId(1400);
+
 /// Replace all dynamic children of a mutable `StackContent` container while keeping `ComponentHost` IDs clean.
 pub fn replace_stack_children(
     host: &mut tekes_ui_controls::composition::ContentHost,

@@ -5,10 +5,10 @@ use std::cell::{Cell, RefCell};
 use std::collections::{BTreeMap, VecDeque};
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
-use tekes_agent_contract::SessionAddress;
+use tekes_agent_contract::{ArtifactSelectionReference, SessionAddress};
 use tekes_agent_ui_bindings::{
     ArtifactOpenRequest, ChildRunOpenRequest, ComposerQuoteRequest, RunWorkbenchBinding,
-    SideChatOpenRequest, UiWakeNotifier, WorkbenchCommand,
+    SideChatOpenRequest, UiWakeNotifier, WorkbenchCommand, WorkspaceBinding,
 };
 use tekes_ui_app_host::navigation;
 use tekes_ui_platform_macos::{WakeResult, WindowWake};
@@ -46,6 +46,9 @@ struct WorkbenchInner {
     active_session: Option<SessionAddress>,
     active_workspace_id: Option<String>,
     run: Option<Arc<RunWorkbenchBinding>>,
+    workspace: Option<Arc<WorkspaceBinding>>,
+    artifact_targets: BTreeMap<String, String>,
+    latest_quote: Option<ArtifactSelectionReference>,
     pending_navigation: VecDeque<navigation::Entry>,
     pending_commands: VecDeque<WorkbenchCommand>,
     pending_quotes: VecDeque<ComposerQuoteRequest>,
@@ -65,6 +68,7 @@ pub struct SharedAgentWorkbench {
     background_note: Arc<Mutex<Option<String>>>,
     last_observed_bg_revision: Rc<Cell<u64>>,
     last_observed_run_revision: Rc<Cell<u64>>,
+    last_observed_ws_revision: Rc<Cell<u64>>,
 }
 
 impl std::fmt::Debug for SharedAgentWorkbench {
@@ -90,6 +94,9 @@ impl SharedAgentWorkbench {
                 active_session: None,
                 active_workspace_id: Some("ws-main".to_owned()),
                 run: None,
+                workspace: None,
+                artifact_targets: BTreeMap::new(),
+                latest_quote: None,
                 pending_navigation: VecDeque::new(),
                 pending_commands: VecDeque::new(),
                 pending_quotes: VecDeque::new(),
@@ -103,6 +110,7 @@ impl SharedAgentWorkbench {
             background_note: Arc::new(Mutex::new(None)),
             last_observed_bg_revision: Rc::new(Cell::new(0)),
             last_observed_run_revision: Rc::new(Cell::new(0)),
+            last_observed_ws_revision: Rc::new(Cell::new(0)),
         }
     }
 
@@ -137,20 +145,82 @@ impl SharedAgentWorkbench {
         self.inner.borrow().run.clone()
     }
 
-    /// Reconcile any background-published state or async `RunController` snapshot changes into UI revision.
+    pub fn attach_workspace_binding(&self, binding: Arc<WorkspaceBinding>) {
+        let ws_id = binding.workspace_id();
+        let rev = binding.ui_revision();
+        self.last_observed_ws_revision.set(rev);
+        {
+            let mut inner = self.inner.borrow_mut();
+            inner.active_workspace_id = Some(ws_id);
+            inner.workspace = Some(binding);
+            inner.revision = inner.revision.saturating_add(1);
+        }
+        self.notify_wakes();
+    }
+
+    pub fn workspace_binding(&self) -> Option<Arc<WorkspaceBinding>> {
+        self.inner.borrow().workspace.clone()
+    }
+
+    pub fn set_artifact_target(&self, instance_id: impl Into<String>, path: impl Into<String>) {
+        let path = path.into();
+        {
+            let mut inner = self.inner.borrow_mut();
+            inner
+                .artifact_targets
+                .insert(instance_id.into(), path.clone());
+            inner.artifact_targets.insert("default".to_owned(), path);
+            inner.revision = inner.revision.saturating_add(1);
+        }
+        self.notify_wakes();
+    }
+
+    pub fn artifact_target(&self, instance_id: &str) -> Option<String> {
+        let inner = self.inner.borrow();
+        inner
+            .artifact_targets
+            .get(instance_id)
+            .or_else(|| inner.artifact_targets.get("default"))
+            .cloned()
+    }
+
+    pub fn pop_pending_artifact(&self) -> Option<ArtifactOpenRequest> {
+        self.inner.borrow_mut().pending_artifacts.pop_front()
+    }
+
+    pub fn set_latest_quote(&self, quote: ArtifactSelectionReference) {
+        {
+            let mut inner = self.inner.borrow_mut();
+            inner.latest_quote = Some(quote);
+            inner.revision = inner.revision.saturating_add(1);
+        }
+        self.notify_wakes();
+    }
+
+    pub fn latest_quote(&self) -> Option<ArtifactSelectionReference> {
+        self.inner.borrow().latest_quote.clone()
+    }
+
+    /// Reconcile any background-published state or async `RunController` / `WorkspaceBinding` changes into UI revision.
     pub fn sync_background_revision(&self) -> u64 {
         let bg_rev = self
             .background_revision
             .load(std::sync::atomic::Ordering::Acquire);
-        let run_opt = self.inner.borrow().run.clone();
+        let (run_opt, ws_opt) = {
+            let inner = self.inner.borrow();
+            (inner.run.clone(), inner.workspace.clone())
+        };
         let run_rev = run_opt.as_ref().map_or(0, |r| r.ui_revision());
+        let ws_rev = ws_opt.as_ref().map_or(0, |w| w.ui_revision());
 
         let bg_changed = bg_rev != self.last_observed_bg_revision.get();
         let run_changed = run_rev != self.last_observed_run_revision.get();
+        let ws_changed = ws_rev != self.last_observed_ws_revision.get();
 
-        if bg_changed || run_changed {
+        if bg_changed || run_changed || ws_changed {
             self.last_observed_bg_revision.set(bg_rev);
             self.last_observed_run_revision.set(run_rev);
+            self.last_observed_ws_revision.set(ws_rev);
             let mut inner = self.inner.borrow_mut();
             inner.revision = inner.revision.saturating_add(1);
             if bg_changed
@@ -193,6 +263,7 @@ impl SharedAgentWorkbench {
         };
         if let Some(run) = run {
             for q in quotes {
+                self.set_latest_quote(q.reference.clone());
                 run.apply_quote(q);
             }
             for (dest, path) in attachments {

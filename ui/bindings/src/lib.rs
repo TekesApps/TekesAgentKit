@@ -3,14 +3,21 @@
 //! `WorkspaceServiceEndpoint`, normalized settings) with desktop hosts.
 
 pub mod fixture_sep;
+pub mod fixture_wse;
 pub mod run;
+pub mod workspace;
 
 pub use fixture_sep::{
     CHILD_SUBAGENT_SESSION_ID, DEFAULT_MAIN_SESSION_ID, FixtureSessionEndpoint,
     SECONDARY_SESSION_ID,
 };
+pub use fixture_wse::{DeterministicWorkspaceEndpoint, ReadOnlyFsWorkspaceEndpoint};
 pub use run::{
     AVAILABLE_MODELS, AVAILABLE_PRESETS, RunWorkbenchBinding, SidebarFilterMode, SidebarSessionRow,
+};
+pub use workspace::{
+    ChangesSnapshot, ChangesViewMode, LoadedArtifact, LoadedArtifactContent, WorkspaceBinding,
+    WorkspaceChangedItem, WorkspaceTreeItem, sha256_prefixed,
 };
 
 use tekes_agent_contract::{ArtifactSelectionReference, SessionAddress};
