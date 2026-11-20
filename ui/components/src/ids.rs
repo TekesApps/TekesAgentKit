@@ -1,0 +1,101 @@
+//! Disjoint ComponentId namespaces across shared AgentKit Composition surfaces.
+//! Non-overlapping IDs allow containers (e.g. `AgentRunContainer`) to mount multiple
+//! surfaces into a single `ContentHost` without ID collisions.
+
+use tekes_ui_controls::composition::ComponentId;
+
+pub const RUN_CONTAINER_SHELL_ID: ComponentId = ComponentId(1);
+pub const RUN_CONTAINER_STACK_ID: ComponentId = ComponentId(10);
+
+// Transcript surface: 100..=399
+pub const TRANSCRIPT_ROOT_ID: ComponentId = ComponentId(100);
+pub const TRANSCRIPT_HEADER_ID: ComponentId = ComponentId(101);
+pub const TRANSCRIPT_STATUS_ID: ComponentId = ComponentId(102);
+pub const TRANSCRIPT_EARLIER_BTN_ID: ComponentId = ComponentId(103);
+pub const TRANSCRIPT_LATEST_BTN_ID: ComponentId = ComponentId(104);
+pub const TRANSCRIPT_SEARCH_ROW_ID: ComponentId = ComponentId(105);
+pub const TRANSCRIPT_SEARCH_ID: ComponentId = ComponentId(106);
+pub const TRANSCRIPT_READER_ID: ComponentId = ComponentId(107);
+pub const TRANSCRIPT_THINKING_DISC_ID: ComponentId = ComponentId(110);
+pub const TRANSCRIPT_THINKING_TRIGGER_ID: ComponentId = ComponentId(111);
+pub const TRANSCRIPT_THINKING_BODY_ID: ComponentId = ComponentId(112);
+pub const TRANSCRIPT_TOOL_DISC_ID: ComponentId = ComponentId(120);
+pub const TRANSCRIPT_TOOL_TRIGGER_ID: ComponentId = ComponentId(121);
+pub const TRANSCRIPT_TOOL_BODY_ID: ComponentId = ComponentId(122);
+pub const TRANSCRIPT_RICH_DISC_ID: ComponentId = ComponentId(130);
+pub const TRANSCRIPT_RICH_TRIGGER_ID: ComponentId = ComponentId(131);
+pub const TRANSCRIPT_RICH_SCROLL_ID: ComponentId = ComponentId(132);
+pub const TRANSCRIPT_RICH_BODY_ID: ComponentId = ComponentId(133);
+pub const TRANSCRIPT_ACTIONABLES_STACK_ID: ComponentId = ComponentId(140);
+pub const TRANSCRIPT_ACTIONABLE_BASE: u64 = 150;
+
+// Composer surface: 400..=599
+pub const COMPOSER_ROOT_ID: ComponentId = ComponentId(400);
+pub const COMPOSER_CHIPS_ROW_ID: ComponentId = ComponentId(401);
+pub const COMPOSER_EDITOR_ID: ComponentId = ComponentId(402);
+pub const COMPOSER_CONTROLS_STACK_ID: ComponentId = ComponentId(403);
+pub const COMPOSER_PRIMARY_ROW_ID: ComponentId = ComponentId(404);
+pub const COMPOSER_SECONDARY_ROW_ID: ComponentId = ComponentId(405);
+pub const COMPOSER_MODEL_SELECT_ID: ComponentId = ComponentId(410);
+pub const COMPOSER_PRESET_SELECT_ID: ComponentId = ComponentId(411);
+pub const COMPOSER_ATTACH_BTN_ID: ComponentId = ComponentId(412);
+pub const COMPOSER_RECONNECT_BTN_ID: ComponentId = ComponentId(413);
+pub const COMPOSER_CANCEL_BTN_ID: ComponentId = ComponentId(414);
+pub const COMPOSER_SEND_BTN_ID: ComponentId = ComponentId(415);
+pub const COMPOSER_CHIP_BASE: u64 = 450;
+
+// Sidebar surface: 600..=699 (+ passive rows 10_000+)
+pub const SIDEBAR_SHELL_ID: ComponentId = ComponentId(600);
+pub const SIDEBAR_ROOT_ID: ComponentId = ComponentId(601);
+pub const SIDEBAR_TOP_BAR_ID: ComponentId = ComponentId(602);
+pub const SIDEBAR_NEW_BTN_ID: ComponentId = ComponentId(603);
+pub const SIDEBAR_PIN_BTN_ID: ComponentId = ComponentId(604);
+pub const SIDEBAR_ARCHIVE_BTN_ID: ComponentId = ComponentId(605);
+pub const SIDEBAR_FILTER_ID: ComponentId = ComponentId(606);
+pub const SIDEBAR_SEARCH_ID: ComponentId = ComponentId(607);
+pub const SIDEBAR_LIST_SCROLL_ID: ComponentId = ComponentId(608);
+pub const SIDEBAR_LIST_ID: ComponentId = ComponentId(609);
+pub const SIDEBAR_RENAME_ROW_ID: ComponentId = ComponentId(610);
+pub const SIDEBAR_RENAME_INPUT_ID: ComponentId = ComponentId(611);
+pub const SIDEBAR_RENAME_BTN_ID: ComponentId = ComponentId(612);
+pub const SIDEBAR_ROW_BASE: u64 = 10_000;
+
+// Summary surface: 700..=999 (+ passive rows 20_000+, kv cells 21_000+)
+pub const SUMMARY_SHELL_ID: ComponentId = ComponentId(700);
+pub const SUMMARY_SCROLL_ID: ComponentId = ComponentId(701);
+pub const SUMMARY_STACK_ID: ComponentId = ComponentId(702);
+pub const SUMMARY_HEADER_ID: ComponentId = ComponentId(703);
+pub const SUMMARY_USAGE_DISC_ID: ComponentId = ComponentId(710);
+pub const SUMMARY_USAGE_TRIGGER_ID: ComponentId = ComponentId(711);
+pub const SUMMARY_USAGE_TABLE_ID: ComponentId = ComponentId(712);
+pub const SUMMARY_TASKS_DISC_ID: ComponentId = ComponentId(720);
+pub const SUMMARY_TASKS_TRIGGER_ID: ComponentId = ComponentId(721);
+pub const SUMMARY_TASKS_TABLE_ID: ComponentId = ComponentId(722);
+pub const SUMMARY_LIST_SCROLL_ID: ComponentId = ComponentId(729);
+pub const SUMMARY_LIST_ID: ComponentId = ComponentId(730);
+pub const SUMMARY_ACTIONS_ROW_ID: ComponentId = ComponentId(740);
+pub const SUMMARY_OPEN_ARTIFACT_BTN_ID: ComponentId = ComponentId(741);
+pub const SUMMARY_OPEN_SUBAGENT_BTN_ID: ComponentId = ComponentId(742);
+pub const SUMMARY_OPEN_SIDECHAT_BTN_ID: ComponentId = ComponentId(743);
+pub const SUMMARY_HOST_SECTIONS_ID: ComponentId = ComponentId(750);
+pub const SUMMARY_ROW_BASE: u64 = 20_000;
+pub const SUMMARY_KV_BASE: u64 = 21_000;
+
+/// Replace all dynamic children of a mutable `StackContent` container while keeping `ComponentHost` IDs clean.
+pub fn replace_stack_children(
+    host: &mut tekes_ui_controls::composition::ContentHost,
+    parent: ComponentId,
+    new_children: Vec<tekes_ui_controls::composition::Content>,
+) {
+    let existing_ids: Vec<ComponentId> = host
+        .get(parent)
+        .and_then(|node| node.component::<tekes_ui_controls::composition::StackContent>())
+        .map(|stack| stack.children.iter().map(|c| c.id()).collect())
+        .unwrap_or_default();
+    for id in existing_ids {
+        let _ = host.remove(id);
+    }
+    for child in new_children {
+        let _ = host.insert(parent, child);
+    }
+}

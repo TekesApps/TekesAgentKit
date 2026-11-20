@@ -2,13 +2,13 @@
 //! Enforces zero-sibling-borrow coordination across `nav_bar`, `focus`, and `others`.
 
 use std::cell::{Cell, RefCell};
-use std::collections::VecDeque;
+use std::collections::{BTreeMap, VecDeque};
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 use tekes_agent_contract::SessionAddress;
 use tekes_agent_ui_bindings::{
-    ArtifactOpenRequest, ChildRunOpenRequest, ComposerQuoteRequest, SideChatOpenRequest,
-    UiWakeNotifier, WorkbenchCommand,
+    ArtifactOpenRequest, ChildRunOpenRequest, ComposerQuoteRequest, RunWorkbenchBinding,
+    SideChatOpenRequest, UiWakeNotifier, WorkbenchCommand,
 };
 use tekes_ui_app_host::navigation;
 use tekes_ui_platform_macos::{WakeResult, WindowWake};
@@ -41,31 +41,39 @@ impl UiWakeNotifier for AppHostWakeHub {
     }
 }
 
-#[derive(Debug)]
 struct WorkbenchInner {
     revision: u64,
     active_session: Option<SessionAddress>,
     active_workspace_id: Option<String>,
+    run: Option<Arc<RunWorkbenchBinding>>,
     pending_navigation: VecDeque<navigation::Entry>,
     pending_commands: VecDeque<WorkbenchCommand>,
     pending_quotes: VecDeque<ComposerQuoteRequest>,
     pending_artifacts: VecDeque<ArtifactOpenRequest>,
     pending_child_runs: VecDeque<ChildRunOpenRequest>,
     pending_sidechats: VecDeque<SideChatOpenRequest>,
-    background_text_updates: BTreeMapString,
+    background_text_updates: BTreeMap<String, String>,
 }
-
-type BTreeMapString = std::collections::BTreeMap<String, String>;
 
 /// Shared UI-thread coordinator passed into all AgentKit `AppHost` containers in a window.
 /// Callers must never hold a `SharedAgentWorkbench` borrow while calling into a sibling `ContentHost`.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct SharedAgentWorkbench {
     inner: Rc<RefCell<WorkbenchInner>>,
     wake_hub: Arc<AppHostWakeHub>,
     background_revision: Arc<std::sync::atomic::AtomicU64>,
     background_note: Arc<Mutex<Option<String>>>,
     last_observed_bg_revision: Rc<Cell<u64>>,
+    last_observed_run_revision: Rc<Cell<u64>>,
+}
+
+impl std::fmt::Debug for SharedAgentWorkbench {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SharedAgentWorkbench")
+            .field("revision", &self.revision())
+            .field("has_run", &self.inner.borrow().run.is_some())
+            .finish_non_exhaustive()
+    }
 }
 
 impl Default for SharedAgentWorkbench {
@@ -80,19 +88,21 @@ impl SharedAgentWorkbench {
             inner: Rc::new(RefCell::new(WorkbenchInner {
                 revision: 1,
                 active_session: None,
-                active_workspace_id: None,
+                active_workspace_id: Some("ws-main".to_owned()),
+                run: None,
                 pending_navigation: VecDeque::new(),
                 pending_commands: VecDeque::new(),
                 pending_quotes: VecDeque::new(),
                 pending_artifacts: VecDeque::new(),
                 pending_child_runs: VecDeque::new(),
                 pending_sidechats: VecDeque::new(),
-                background_text_updates: BTreeMapString::new(),
+                background_text_updates: BTreeMap::new(),
             })),
             wake_hub: AppHostWakeHub::new(),
             background_revision: Arc::new(std::sync::atomic::AtomicU64::new(0)),
             background_note: Arc::new(Mutex::new(None)),
             last_observed_bg_revision: Rc::new(Cell::new(0)),
+            last_observed_run_revision: Rc::new(Cell::new(0)),
         }
     }
 
@@ -108,28 +118,87 @@ impl SharedAgentWorkbench {
         self.wake_hub.wake();
     }
 
-    /// Reconcile any background-published state into UI revision counter without blocking callers.
+    pub fn attach_run_binding(&self, binding: Arc<RunWorkbenchBinding>) {
+        let scope = binding.current_scope();
+        let rev = binding.ui_revision();
+        self.last_observed_run_revision.set(rev);
+        {
+            let mut inner = self.inner.borrow_mut();
+            if let Some(s) = scope {
+                inner.active_session = Some(s.address());
+            }
+            inner.run = Some(binding);
+            inner.revision = inner.revision.saturating_add(1);
+        }
+        self.notify_wakes();
+    }
+
+    pub fn run_binding(&self) -> Option<Arc<RunWorkbenchBinding>> {
+        self.inner.borrow().run.clone()
+    }
+
+    /// Reconcile any background-published state or async `RunController` snapshot changes into UI revision.
     pub fn sync_background_revision(&self) -> u64 {
         let bg_rev = self
             .background_revision
             .load(std::sync::atomic::Ordering::Acquire);
-        if bg_rev != self.last_observed_bg_revision.get() {
+        let run_opt = self.inner.borrow().run.clone();
+        let run_rev = run_opt.as_ref().map_or(0, |r| r.ui_revision());
+
+        let bg_changed = bg_rev != self.last_observed_bg_revision.get();
+        let run_changed = run_rev != self.last_observed_run_revision.get();
+
+        if bg_changed || run_changed {
             self.last_observed_bg_revision.set(bg_rev);
+            self.last_observed_run_revision.set(run_rev);
             let mut inner = self.inner.borrow_mut();
             inner.revision = inner.revision.saturating_add(1);
-            if let Some(note) = self
-                .background_note
-                .lock()
-                .expect("background note lock")
-                .clone()
+            if bg_changed
+                && let Some(note) = self
+                    .background_note
+                    .lock()
+                    .expect("background note lock")
+                    .clone()
             {
                 inner
                     .background_text_updates
                     .insert("background_status".to_owned(), note);
             }
+            if let Some(scope_addr) = run_opt.as_ref().and_then(|r| r.active_session_address()) {
+                inner.active_session = Some(scope_addr);
+            }
             return inner.revision;
         }
         self.inner.borrow().revision
+    }
+
+    /// Deliver any pending Composer quotes/attachments into the active `RunWorkbenchBinding`.
+    pub fn pump_composer_requests(&self) {
+        let run = self.run_binding();
+        let (quotes, attachments) = {
+            let mut inner = self.inner.borrow_mut();
+            let quotes: Vec<_> = inner.pending_quotes.drain(..).collect();
+            let mut remaining = VecDeque::new();
+            let mut attachments = Vec::new();
+            for cmd in inner.pending_commands.drain(..) {
+                match cmd {
+                    WorkbenchCommand::AttachFileToComposer { destination, path } => {
+                        attachments.push((destination, path));
+                    }
+                    other => remaining.push_back(other),
+                }
+            }
+            inner.pending_commands = remaining;
+            (quotes, attachments)
+        };
+        if let Some(run) = run {
+            for q in quotes {
+                run.apply_quote(q);
+            }
+            for (dest, path) in attachments {
+                run.attach_file_path(dest, path);
+            }
+        }
     }
 
     /// Publish a status/note from any background thread and wake registered `AppWindow` handlers.

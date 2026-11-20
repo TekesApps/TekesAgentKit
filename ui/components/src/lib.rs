@@ -1,9 +1,19 @@
 //! Agent-owned composition of public TekesUI controls. No endpoint or Run state machine.
+pub mod composer;
+pub mod ids;
 pub mod layout_mode;
 pub mod shell;
+pub mod sidebar;
+pub mod summary;
+pub mod transcript;
 
+pub use composer::{ComposerIntent, ComposerSurface};
+pub use ids::*;
 pub use layout_mode::{COMPACT_WIDTH_BREAKPOINT, ResponsiveWidthMode};
 pub use shell::AgentContainerShell;
+pub use sidebar::{SidebarFilterSelection, SidebarIntent, SidebarRowModel, SidebarSurface};
+pub use summary::{SummaryIntent, SummarySurface};
+pub use transcript::{TranscriptIntent, TranscriptReader, TranscriptSurface};
 
 use std::collections::BTreeMap;
 use tekes_agent_presentation::{ComposerDestination, RunScope, RunSnapshot};

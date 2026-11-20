@@ -2,6 +2,17 @@
 //! and contract services (`SessionRuntime`, `RunController`, `SideChatController`,
 //! `WorkspaceServiceEndpoint`, normalized settings) with desktop hosts.
 
+pub mod fixture_sep;
+pub mod run;
+
+pub use fixture_sep::{
+    CHILD_SUBAGENT_SESSION_ID, DEFAULT_MAIN_SESSION_ID, FixtureSessionEndpoint,
+    SECONDARY_SESSION_ID,
+};
+pub use run::{
+    AVAILABLE_MODELS, AVAILABLE_PRESETS, RunWorkbenchBinding, SidebarFilterMode, SidebarSessionRow,
+};
+
 use tekes_agent_contract::{ArtifactSelectionReference, SessionAddress};
 use tekes_agent_presentation::{ComposerDestination, RunScope};
 
