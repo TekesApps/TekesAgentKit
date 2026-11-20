@@ -1,29 +1,31 @@
-//! Structured Transcript surface over `RunSnapshot`, `TranscriptDocument`, `ReadingController`,
-//! `RichContent`, `DisclosureContent`, and inline `ActionablePrompt` cards.
+//! Structured Tekes-aligned Transcript surface over `RunSnapshot`, `TranscriptDocument`,
+//! `ReadingController`, borderless `TextSurfacePresentation::Content`, per-turn `RichContent`,
+//! subtle footnote icon actions, and rounded `PanelContent` approval cards.
 
 use crate::ResponsiveWidthMode;
 use crate::ids::*;
+use crate::ui_helpers::{card_panel, icon_button, label_text, secondary_text};
 use std::collections::BTreeMap;
 use tekes_agent_presentation::{
-    ActionablePrompt, ConnectionPhase, RunPhase, RunScope, RunSnapshot, TranscriptDocument,
+    ActionablePrompt, ConnectionPhase, RunScope, RunSnapshot, TranscriptDocument,
     TranscriptItemKind, TranscriptToolReportWording, TranscriptToolRowInputs,
     TranscriptToolRowWording,
 };
 use tekes_ui_controls::{
     ButtonTextRenderer, ButtonVariant, ReadingAnchorUpdate, ReadingController,
-    ReadingDocumentVersion, ScrollArea, TextRangeMapping, TextSurface,
+    ReadingDocumentVersion, TextRangeMapping, TextSurface, TextSurfacePresentation,
     composition::{
         AccessibilityAction, Button, Component, ComponentId, Content, ContentActionKind,
         ContentActionPayload, ContentActionRecord, ContentEvent, ContentHost, ContentResponse,
         ContentRole, ContentSemantics, ContentTheme, CurveSubtreeCapability, DisclosureContent,
-        RichContent, RichDocument, ScrollContent, SearchCommandKind, SearchFieldContent,
-        StackContent, TextContent,
+        RichContent, RichDocument, SearchCommandKind, SearchFieldContent, StackContent,
+        TextContent,
     },
     extended::{Axis, Stack},
-    layout::MeasuredChild,
+    layout::{Insets, MeasuredChild},
 };
 use tekes_ui_scene::{Rect, Scene, Size};
-use tekes_ui_tokens::{Spacing, proposal};
+use tekes_ui_tokens::{Spacing, proposal, proposal::layout::MainAxisDistribution};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum TranscriptIntent {
@@ -35,10 +37,16 @@ pub enum TranscriptIntent {
         choice_index: usize,
     },
     OpenLink(String),
+    Reconnect,
+    CopyLatest,
+    FeedbackLatest {
+        positive: bool,
+    },
+    ForkLatest,
 }
 
-/// Scrollable reading surface driven by `ReadingController` so prepend pagination preserves
-/// scroll anchors accurately across AppHost renders and slot swaps.
+/// Borderless scrollable reading surface driven by `ReadingController` so prepend pagination
+/// preserves scroll anchors cleanly across AppHost renders and slot swaps.
 #[derive(Debug)]
 pub struct TranscriptReader {
     pub surface: TextSurface,
@@ -60,10 +68,13 @@ impl Default for TranscriptReader {
 impl TranscriptReader {
     pub fn new() -> Self {
         let mut surface = TextSurface::new("", true, true);
+        surface.set_presentation(TextSurfacePresentation::Content);
         surface.set_role(proposal::TextRole::UiBody);
+        let mut reading = ReadingController::default();
+        reading.follow_latest(&mut surface);
         Self {
             surface,
-            reading: ReadingController::default(),
+            reading,
             doc_key: String::new(),
             doc_revision: 0,
             doc_version: None,
@@ -156,7 +167,11 @@ impl Component for TranscriptReader {
     }
 
     fn measure(&mut self, _: &mut dyn ButtonTextRenderer, available: Size) -> MeasuredChild {
-        MeasuredChild::new(Size::new(available.width, available.height.max(120.0)))
+        if self.doc_text.trim().is_empty() {
+            MeasuredChild::new(Size::new(available.width, 0.0))
+        } else {
+            MeasuredChild::new(Size::new(available.width, available.height.max(120.0)))
+        }
     }
 
     fn arrange(&mut self, text: &mut dyn ButtonTextRenderer, frame: Rect, clip: Rect) {
@@ -215,7 +230,7 @@ impl Component for TranscriptReader {
     }
 
     fn semantics(&self) -> ContentSemantics {
-        ContentSemantics::new(ContentRole::Text, "会话消息流")
+        ContentSemantics::new(ContentRole::Text, "Conversation transcript")
     }
 
     fn accessibility_action(
@@ -224,6 +239,46 @@ impl Component for TranscriptReader {
         _action: &AccessibilityAction,
     ) -> ContentResponse {
         ContentResponse::default()
+    }
+}
+
+#[derive(Debug, Default)]
+struct TranscriptSpacer {
+    fill: bool,
+}
+
+impl Component for TranscriptSpacer {
+    fn curve_subtree_capability(&self) -> CurveSubtreeCapability {
+        CurveSubtreeCapability::Local
+    }
+
+    fn has_stable_hooks(&self) -> bool {
+        true
+    }
+
+    fn supports_prepared_lifecycle(&self) -> bool {
+        true
+    }
+
+    fn ignores_pointer_actions(&self) -> bool {
+        true
+    }
+
+    fn measure(&mut self, _: &mut dyn ButtonTextRenderer, available: Size) -> MeasuredChild {
+        MeasuredChild::new(Size::new(
+            available.width,
+            if self.fill { available.height } else { 0.0 },
+        ))
+    }
+
+    fn paint(
+        &mut self,
+        _: &mut Scene,
+        _: &mut dyn ButtonTextRenderer,
+        _: Rect,
+        _: Rect,
+        _: ContentTheme,
+    ) {
     }
 }
 
@@ -240,11 +295,16 @@ pub struct TranscriptSurface {
     selected_key: String,
     cached_readers: BTreeMap<String, Content>,
     search_query: String,
+    search_open: bool,
     thinking_expanded: bool,
-    tool_expanded: bool,
-    rich_expanded: bool,
+    cached_thinking_disc: Option<Content>,
     rich_doc_revision: u64,
     last_rich_source: String,
+    last_user_bubble: String,
+    last_activity_sig: String,
+    last_notice_sig: String,
+    last_has_earlier: bool,
+    last_following: bool,
     choice_bindings: BTreeMap<ComponentId, ActionableChoiceBinding>,
     rendered_actionables_sig: String,
 }
@@ -261,40 +321,34 @@ impl TranscriptSurface {
             selected_key: String::new(),
             cached_readers: BTreeMap::new(),
             search_query: String::new(),
+            search_open: false,
             thinking_expanded: false,
-            tool_expanded: true,
-            rich_expanded: true,
+            cached_thinking_disc: None,
             rich_doc_revision: 1,
             last_rich_source: String::new(),
+            last_user_bubble: String::new(),
+            last_activity_sig: String::new(),
+            last_notice_sig: String::new(),
+            last_has_earlier: false,
+            last_following: true,
             choice_bindings: BTreeMap::new(),
             rendered_actionables_sig: String::new(),
         }
     }
 
     pub fn build_content() -> Content {
-        let mut earlier_btn = Button::new("更早记录");
-        earlier_btn.variant = ButtonVariant::Quiet;
-        let mut latest_btn = Button::new("回到最新");
-        latest_btn.variant = ButtonVariant::Quiet;
-
         let header = Content::new(
             TRANSCRIPT_HEADER_ID,
             StackContent {
                 model: Stack {
-                    axis: Axis::Horizontal,
-                    gap: Spacing::Tight.value(),
+                    axis: Axis::Vertical,
+                    gap: 0.0,
                 },
-                flexible_child: Some(TRANSCRIPT_STATUS_ID),
-                children: vec![
-                    Content::new(TRANSCRIPT_STATUS_ID, TextContent::new("正在连接…")),
-                    Content::new(TRANSCRIPT_EARLIER_BTN_ID, earlier_btn),
-                    Content::new(TRANSCRIPT_LATEST_BTN_ID, latest_btn),
-                ],
+                flexible_child: None,
+                children: Vec::new(),
             },
         );
 
-        let mut search = SearchFieldContent::new("搜索会话消息", "");
-        search.set_placeholder(Some("过滤消息关键字…".to_owned()));
         let search_row = Content::new(
             TRANSCRIPT_SEARCH_ROW_ID,
             StackContent {
@@ -302,53 +356,86 @@ impl TranscriptSurface {
                     axis: Axis::Horizontal,
                     gap: Spacing::Tight.value(),
                 },
-                flexible_child: Some(TRANSCRIPT_SEARCH_ID),
-                children: vec![Content::new(TRANSCRIPT_SEARCH_ID, search)],
+                flexible_child: None,
+                children: Vec::new(),
             },
         );
 
-        let thinking_disc = Content::new(
+        let user_bubble_slot = Content::new(
+            TRANSCRIPT_LATEST_USER_SLOT_ID,
+            StackContent {
+                model: Stack {
+                    axis: Axis::Vertical,
+                    gap: 0.0,
+                },
+                flexible_child: None,
+                children: Vec::new(),
+            },
+        );
+
+        let rich_doc = RichDocument::from_markdown("");
+        let rich_content = RichContent::new("transcript-rich-latest", 1, rich_doc)
+            .expect("valid initial RichContent");
+
+        let copy_btn = icon_button(TRANSCRIPT_COPY_ICON_ID, "tekes-copy", "Copy");
+        let up_btn = icon_button(TRANSCRIPT_UP_ICON_ID, "tekes-thumbs-up", "Good response");
+        let down_btn = icon_button(TRANSCRIPT_DOWN_ICON_ID, "tekes-thumbs-down", "Bad response");
+        let fork_btn = icon_button(TRANSCRIPT_FORK_ICON_ID, "tekes-fork", "Fork thread");
+
+        let footnote_row = Content::new(
+            TRANSCRIPT_FOOTNOTE_ROW_ID,
+            StackContent {
+                model: Stack {
+                    axis: Axis::Horizontal,
+                    gap: Spacing::Tight.value(),
+                },
+                flexible_child: None,
+                children: vec![
+                    Content::new(TRANSCRIPT_COPY_BTN_ID, copy_btn),
+                    Content::new(TRANSCRIPT_UP_BTN_ID, up_btn),
+                    Content::new(TRANSCRIPT_DOWN_BTN_ID, down_btn),
+                    Content::new(TRANSCRIPT_FORK_BTN_ID, fork_btn),
+                ],
+            },
+        );
+
+        let activity_disc = Content::new(
             TRANSCRIPT_THINKING_DISC_ID,
             DisclosureContent::new(
                 TRANSCRIPT_THINKING_TRIGGER_ID,
-                Content::new(ComponentId(113), TextContent::new("思考过程")),
-                Content::new(TRANSCRIPT_THINKING_BODY_ID, TextContent::new("（暂无）")),
+                Content::new(ComponentId(113), secondary_text("Thought process")),
+                Content::new(TRANSCRIPT_THINKING_BODY_ID, secondary_text("")),
                 false,
             )
             .with_section_header_layout(),
         );
 
-        let tool_disc = Content::new(
-            TRANSCRIPT_TOOL_DISC_ID,
-            DisclosureContent::new(
-                TRANSCRIPT_TOOL_TRIGGER_ID,
-                Content::new(ComponentId(123), TextContent::new("工具执行报告")),
-                Content::new(TRANSCRIPT_TOOL_BODY_ID, TextContent::new("（暂无）")),
-                true,
-            )
-            .with_section_header_layout(),
+        let latest_turn = Content::new(
+            TRANSCRIPT_LATEST_TURN_SLOT_ID,
+            StackContent {
+                model: Stack {
+                    axis: Axis::Vertical,
+                    gap: Spacing::Regular.value(),
+                },
+                flexible_child: None,
+                children: vec![
+                    activity_disc,
+                    Content::new(TRANSCRIPT_RICH_BODY_ID, rich_content),
+                    footnote_row,
+                ],
+            },
         );
 
-        let rich_doc = RichDocument::from_markdown("等待会话消息…");
-        let rich_content = RichContent::new("transcript-rich-latest", 1, rich_doc)
-            .expect("valid initial RichContent");
-        let mut rich_scroll = ScrollContent::new(
-            ScrollArea::default(),
-            Content::new(TRANSCRIPT_RICH_BODY_ID, rich_content),
-        );
-        rich_scroll.viewport_height = Some(130.0);
-        let rich_disc = Content::new(
-            TRANSCRIPT_RICH_DISC_ID,
-            DisclosureContent::new(
-                TRANSCRIPT_RICH_TRIGGER_ID,
-                Content::new(
-                    ComponentId(134),
-                    TextContent::new("最新 Markdown / 代码卡片"),
-                ),
-                Content::new(TRANSCRIPT_RICH_SCROLL_ID, rich_scroll),
-                true,
-            )
-            .with_section_header_layout(),
+        let latest_slot = Content::new(
+            TRANSCRIPT_LATEST_SLOT_ID,
+            StackContent {
+                model: Stack {
+                    axis: Axis::Horizontal,
+                    gap: 0.0,
+                },
+                flexible_child: None,
+                children: Vec::new(),
+            },
         );
 
         let actionables_stack = Content::new(
@@ -356,7 +443,7 @@ impl TranscriptSurface {
             StackContent {
                 model: Stack {
                     axis: Axis::Vertical,
-                    gap: Spacing::Tight.value(),
+                    gap: Spacing::Regular.value(),
                 },
                 flexible_child: None,
                 children: Vec::new(),
@@ -375,13 +462,148 @@ impl TranscriptSurface {
                     header,
                     search_row,
                     Content::new(TRANSCRIPT_READER_ID, TranscriptReader::new()),
-                    thinking_disc,
-                    tool_disc,
-                    rich_disc,
+                    user_bubble_slot,
+                    latest_turn,
+                    latest_slot,
                     actionables_stack,
+                    Content::new(TRANSCRIPT_SPACER_ID, TranscriptSpacer { fill: true }),
                 ],
             },
         )
+    }
+
+    pub fn set_search_open(&mut self, host: &mut ContentHost, open: bool) {
+        self.search_open = open;
+        let mounted = host.get(TRANSCRIPT_SEARCH_ID).is_some();
+        if open && !mounted {
+            let mut search = SearchFieldContent::new("Search messages", &self.search_query);
+            search.set_placeholder(Some("Find in conversation…".to_owned()));
+            if let Some(row) = host
+                .get_mut(TRANSCRIPT_SEARCH_ROW_ID)
+                .and_then(|c| c.component_mut::<StackContent>())
+            {
+                row.flexible_child = Some(TRANSCRIPT_SEARCH_ID);
+            }
+            replace_stack_children(
+                host,
+                TRANSCRIPT_SEARCH_ROW_ID,
+                vec![Content::new(TRANSCRIPT_SEARCH_ID, search)],
+            );
+            let _ = host.focus(Some(TRANSCRIPT_SEARCH_ID), true);
+        } else if !open && mounted {
+            if let Some(row) = host
+                .get_mut(TRANSCRIPT_SEARCH_ROW_ID)
+                .and_then(|c| c.component_mut::<StackContent>())
+            {
+                row.flexible_child = None;
+            }
+            replace_stack_children(host, TRANSCRIPT_SEARCH_ROW_ID, Vec::new());
+        }
+    }
+
+    fn sync_header_slot(&mut self, host: &mut ContentHost, snapshot: &RunSnapshot) {
+        let notice_text = match snapshot.connection.phase {
+            ConnectionPhase::Failed => Some("Connection lost. Messages could not be synced."),
+            ConnectionPhase::Degraded => Some("Connection degraded (read-only)."),
+            ConnectionPhase::Reconnecting => Some("Reconnecting to runtime…"),
+            ConnectionPhase::Stopped => Some("Session connection stopped."),
+            ConnectionPhase::Connecting | ConnectionPhase::Connected => None,
+        };
+        let has_earlier = snapshot.transcript.has_more_before;
+        let sig = format!("{notice_text:?}:{has_earlier}");
+        if sig == self.last_notice_sig {
+            return;
+        }
+        self.last_notice_sig = sig;
+        self.last_has_earlier = has_earlier;
+
+        let mut children = Vec::new();
+        if let Some(msg) = notice_text {
+            let mut reconnect_btn = Button::new("Reconnect");
+            reconnect_btn.variant = ButtonVariant::Panel;
+            let row = StackContent {
+                model: Stack {
+                    axis: Axis::Horizontal,
+                    gap: Spacing::Tight.value(),
+                },
+                flexible_child: Some(TRANSCRIPT_NOTICE_TEXT_ID),
+                children: vec![
+                    Content::new(TRANSCRIPT_NOTICE_TEXT_ID, secondary_text(msg)),
+                    Content::new(TRANSCRIPT_RECONNECT_BTN_ID, reconnect_btn),
+                ],
+            }
+            .into_content_with_distribution(ComponentId(116), MainAxisDistribution::SpaceBetween);
+            children.push(card_panel(
+                TRANSCRIPT_NOTICE_PANEL_ID,
+                row,
+                Insets::new(8.0, 12.0, 8.0, 12.0),
+            ));
+        }
+
+        if has_earlier {
+            let mut earlier_btn = Button::new("↑ Load earlier messages");
+            earlier_btn.variant = ButtonVariant::Quiet;
+            earlier_btn.set_transparent_chrome(true);
+            children.push(Content::new(TRANSCRIPT_EARLIER_BTN_ID, earlier_btn));
+        }
+
+        replace_stack_children(host, TRANSCRIPT_HEADER_ID, children);
+    }
+
+    fn sync_user_bubble(&mut self, host: &mut ContentHost, latest_user: &str) {
+        if latest_user == self.last_user_bubble {
+            return;
+        }
+        self.last_user_bubble = latest_user.to_owned();
+        if latest_user.trim().is_empty() {
+            replace_stack_children(host, TRANSCRIPT_LATEST_USER_SLOT_ID, Vec::new());
+            return;
+        }
+        let bubble = card_panel(
+            TRANSCRIPT_USER_BUBBLE_PANEL_ID,
+            Content::new(
+                TRANSCRIPT_USER_BUBBLE_TEXT_ID,
+                TextContent::new(latest_user),
+            ),
+            Insets::new(8.0, 14.0, 8.0, 14.0),
+        );
+        let aligned = StackContent {
+            model: Stack {
+                axis: Axis::Horizontal,
+                gap: 0.0,
+            },
+            flexible_child: None,
+            children: vec![bubble],
+        }
+        .into_content_with_distribution(TRANSCRIPT_USER_BUBBLE_ROW_ID, MainAxisDistribution::End);
+        replace_stack_children(host, TRANSCRIPT_LATEST_USER_SLOT_ID, vec![aligned]);
+    }
+
+    fn sync_jump_pill(&mut self, host: &mut ContentHost) {
+        let following = Self::is_following_latest(host).unwrap_or(true);
+        if following == self.last_following {
+            return;
+        }
+        self.last_following = following;
+        if following {
+            replace_stack_children(host, TRANSCRIPT_LATEST_SLOT_ID, Vec::new());
+        } else {
+            let btn = icon_button(
+                TRANSCRIPT_LATEST_ICON_ID,
+                "tekes-jump-bottom",
+                "Jump to latest",
+            );
+            let aligned = StackContent {
+                model: Stack {
+                    axis: Axis::Horizontal,
+                    gap: 0.0,
+                },
+                flexible_child: None,
+                children: vec![Content::new(TRANSCRIPT_LATEST_BTN_ID, btn)],
+            }
+            .into_content_with_distribution(ComponentId(139), MainAxisDistribution::End);
+            replace_stack_children(host, TRANSCRIPT_LATEST_SLOT_ID, vec![aligned]);
+        }
     }
 
     pub fn sync(
@@ -414,10 +636,11 @@ impl TranscriptSurface {
                     TRANSCRIPT_HEADER_ID,
                     TRANSCRIPT_SEARCH_ROW_ID,
                     TRANSCRIPT_READER_ID,
-                    TRANSCRIPT_THINKING_DISC_ID,
-                    TRANSCRIPT_TOOL_DISC_ID,
-                    TRANSCRIPT_RICH_DISC_ID,
+                    TRANSCRIPT_LATEST_USER_SLOT_ID,
+                    TRANSCRIPT_LATEST_TURN_SLOT_ID,
+                    TRANSCRIPT_LATEST_SLOT_ID,
                     TRANSCRIPT_ACTIONABLES_STACK_ID,
+                    TRANSCRIPT_SPACER_ID,
                 ],
             );
             self.selected_key = dest_key.clone();
@@ -430,105 +653,91 @@ impl TranscriptSurface {
             self.search_query = search.query().to_owned();
         }
 
-        let phase_label = match snapshot.connection.phase {
-            ConnectionPhase::Connecting => "连接中",
-            ConnectionPhase::Connected => "已连接",
-            ConnectionPhase::Reconnecting => "重连中",
-            ConnectionPhase::Degraded => "降级只读",
-            ConnectionPhase::Failed => "连接失败",
-            ConnectionPhase::Stopped => "已停止",
-        };
-        let run_label = match snapshot.run.as_ref().map(|r| &r.phase) {
-            Some(RunPhase::Running) => "运行中",
-            Some(RunPhase::WaitingForInput) => "等待确认",
-            Some(RunPhase::Idle) => "就绪",
-            Some(RunPhase::Loading) => "加载中",
-            Some(RunPhase::Interrupted) => "已中断",
-            Some(RunPhase::Archived) => "已归档",
-            _ => "未启动",
-        };
-        let session_label = snapshot
-            .selection
-            .as_ref()
-            .map(|s| {
-                s.destination.endpoint_id().to_owned()
-                    + " · "
-                    + match &s.destination {
-                        tekes_agent_presentation::ComposerDestination::Run { scope } => {
-                            scope.session_id.as_str()
-                        }
-                        _ => "新对话",
-                    }
-            })
-            .unwrap_or_else(|| "未选择会话".to_owned());
+        self.sync_header_slot(host, snapshot);
 
-        if let Some(status) = host
-            .get_mut(TRANSCRIPT_STATUS_ID)
-            .and_then(|c| c.component_mut::<TextContent>())
-        {
-            let stale_mark = if snapshot.transcript.is_stale {
-                " · 历史待刷新"
-            } else {
-                ""
-            };
-            status.text = format!("{phase_label} | {run_label} | {session_label}{stale_mark}");
-        }
-
-        if let Some(earlier) = host
-            .get_mut(TRANSCRIPT_EARLIER_BTN_ID)
-            .and_then(|c| c.component_mut::<Button>())
-        {
-            earlier.button.state.disabled = !snapshot.transcript.has_more_before;
-        }
-
-        let (formatted_doc, latest_thinking, latest_tool_text, latest_rich_md) =
-            format_transcript(snapshot, &self.search_query);
+        let parts = split_transcript_parts(snapshot, &self.search_query);
 
         let reader_key = format!("transcript:{dest_key}:filter:{}", self.search_query);
         if let Some(reader) = host
             .get_mut(TRANSCRIPT_READER_ID)
             .and_then(|c| c.component_mut::<TranscriptReader>())
         {
-            reader.set_or_update(&reader_key, &formatted_doc);
+            reader.set_or_update(&reader_key, &parts.history_text);
+        }
+        let empty_history = parts.history_text.trim().is_empty();
+        if let Some(spacer) = host
+            .get_mut(TRANSCRIPT_SPACER_ID)
+            .and_then(|c| c.component_mut::<TranscriptSpacer>())
+        {
+            spacer.fill = empty_history;
+        }
+        if let Some(root) = host
+            .get_mut(TRANSCRIPT_ROOT_ID)
+            .and_then(|c| c.component_mut::<StackContent>())
+        {
+            root.flexible_child = Some(if empty_history {
+                TRANSCRIPT_SPACER_ID
+            } else {
+                TRANSCRIPT_READER_ID
+            });
         }
 
-        if let Some(body) = host
-            .get_mut(TRANSCRIPT_THINKING_BODY_ID)
-            .and_then(|c| c.component_mut::<TextContent>())
+        self.sync_user_bubble(host, &parts.latest_user);
+
+        let has_activity = !parts.activity_detail.trim().is_empty();
+        if has_activity {
+            if host.get(TRANSCRIPT_THINKING_DISC_ID).is_none()
+                && let Some(disc) = self.cached_thinking_disc.take()
+            {
+                let _ = host.insert(TRANSCRIPT_LATEST_TURN_SLOT_ID, disc);
+                let _ = host.reorder(
+                    TRANSCRIPT_LATEST_TURN_SLOT_ID,
+                    &[
+                        TRANSCRIPT_THINKING_DISC_ID,
+                        TRANSCRIPT_RICH_BODY_ID,
+                        TRANSCRIPT_FOOTNOTE_ROW_ID,
+                    ],
+                );
+            }
+        } else if host.get(TRANSCRIPT_THINKING_DISC_ID).is_some()
+            && let Ok(disc) = host.remove(TRANSCRIPT_THINKING_DISC_ID)
         {
-            body.text = if latest_thinking.is_empty() {
-                "当前轮次无思考推理文本。".to_owned()
-            } else {
-                latest_thinking
-            };
+            self.cached_thinking_disc = Some(disc);
+        }
+
+        let activity_sig = format!(
+            "{}:{}:{}",
+            parts.activity_title, parts.activity_detail, parts.has_latest_assistant
+        );
+        if activity_sig != self.last_activity_sig {
+            self.last_activity_sig = activity_sig;
+            if let Some(label) = host
+                .get_mut(ComponentId(113))
+                .and_then(|c| c.component_mut::<TextContent>())
+            {
+                label.text = if parts.activity_title.is_empty() {
+                    "Thought process".to_owned()
+                } else {
+                    parts.activity_title.clone()
+                };
+            }
+            if let Some(body) = host
+                .get_mut(TRANSCRIPT_THINKING_BODY_ID)
+                .and_then(|c| c.component_mut::<TextContent>())
+            {
+                body.text = parts.activity_detail.clone();
+            }
         }
         if let Some(disc) = host
             .get_mut(TRANSCRIPT_THINKING_DISC_ID)
             .and_then(|c| c.component_mut::<DisclosureContent>())
         {
-            disc.set_expanded(self.thinking_expanded);
+            disc.set_expanded(self.thinking_expanded && !parts.activity_detail.is_empty());
         }
 
-        if let Some(body) = host
-            .get_mut(TRANSCRIPT_TOOL_BODY_ID)
-            .and_then(|c| c.component_mut::<TextContent>())
-        {
-            body.text = if latest_tool_text.is_empty() {
-                "当前轮次无工具调用记录。".to_owned()
-            } else {
-                latest_tool_text
-            };
-        }
-        if let Some(disc) = host
-            .get_mut(TRANSCRIPT_TOOL_DISC_ID)
-            .and_then(|c| c.component_mut::<DisclosureContent>())
-        {
-            disc.set_expanded(self.tool_expanded);
-        }
-
-        if self.last_rich_source != latest_rich_md {
+        if self.last_rich_source != parts.latest_markdown {
             let next_rev = self.rich_doc_revision.saturating_add(1).max(1);
-            let doc = RichDocument::from_markdown(&latest_rich_md);
+            let doc = RichDocument::from_markdown(&parts.latest_markdown);
             if let Some(rich) = host
                 .get_mut(TRANSCRIPT_RICH_BODY_ID)
                 .and_then(|c| c.component_mut::<RichContent>())
@@ -536,17 +745,12 @@ impl TranscriptSurface {
                 let expected = rich.version();
                 if rich.update(&expected, next_rev, doc).is_ok() {
                     self.rich_doc_revision = next_rev;
-                    self.last_rich_source = latest_rich_md;
+                    self.last_rich_source = parts.latest_markdown;
                 }
             }
         }
-        if let Some(disc) = host
-            .get_mut(TRANSCRIPT_RICH_DISC_ID)
-            .and_then(|c| c.component_mut::<DisclosureContent>())
-        {
-            disc.set_expanded(self.rich_expanded);
-        }
 
+        self.sync_jump_pill(host);
         self.sync_actionables(host, actionables);
     }
 
@@ -576,6 +780,7 @@ impl TranscriptSurface {
             let title_id = alloc_id();
             let detail_id = alloc_id();
             let buttons_row_id = alloc_id();
+            let stack_id = alloc_id();
             let card_id = alloc_id();
 
             let mut buttons = Vec::new();
@@ -591,45 +796,45 @@ impl TranscriptSurface {
                     },
                 );
                 let mut btn = Button::new(choice.label.clone());
-                if choice.id == "allow" || choice.id == "option-0" {
-                    btn.variant = ButtonVariant::Primary;
-                }
+                btn.variant = if choice.id == "allow" || choice.id == "option-0" {
+                    ButtonVariant::Primary
+                } else {
+                    ButtonVariant::Panel
+                };
                 buttons.push(Content::new(btn_id, btn));
             }
 
-            let detail_str = if prompt.detail.trim().is_empty() {
-                format!("待确认请求 #{}", prompt.id())
-            } else {
-                prompt.detail.clone()
-            };
+            let mut card_children = vec![Content::new(title_id, label_text(&prompt.title))];
+            if !prompt.detail.trim().is_empty() {
+                card_children.push(Content::new(detail_id, secondary_text(&prompt.detail)));
+            }
+            card_children.push(Content::new(
+                buttons_row_id,
+                StackContent {
+                    model: Stack {
+                        axis: Axis::Horizontal,
+                        gap: Spacing::Tight.value(),
+                    },
+                    flexible_child: None,
+                    children: buttons,
+                },
+            ));
 
-            cards.push(Content::new(
-                card_id,
+            let body = Content::new(
+                stack_id,
                 StackContent {
                     model: Stack {
                         axis: Axis::Vertical,
-                        gap: Spacing::Micro.value(),
+                        gap: Spacing::Tight.value(),
                     },
                     flexible_child: None,
-                    children: vec![
-                        Content::new(
-                            title_id,
-                            TextContent::new(format!("[待确认] {}", prompt.title)),
-                        ),
-                        Content::new(detail_id, TextContent::new(detail_str)),
-                        Content::new(
-                            buttons_row_id,
-                            StackContent {
-                                model: Stack {
-                                    axis: Axis::Horizontal,
-                                    gap: Spacing::Tight.value(),
-                                },
-                                flexible_child: None,
-                                children: buttons,
-                            },
-                        ),
-                    ],
+                    children: card_children,
                 },
+            );
+            cards.push(card_panel(
+                card_id,
+                body,
+                Insets::new(12.0, 14.0, 12.0, 14.0),
             ));
         }
 
@@ -662,17 +867,8 @@ impl TranscriptSurface {
                 {
                     let _ = disc.confirm(intent, true);
                 }
-                match record.action.target {
-                    id if id == TRANSCRIPT_THINKING_DISC_ID => {
-                        self.thinking_expanded = intent.expanded();
-                    }
-                    id if id == TRANSCRIPT_TOOL_DISC_ID => {
-                        self.tool_expanded = intent.expanded();
-                    }
-                    id if id == TRANSCRIPT_RICH_DISC_ID => {
-                        self.rich_expanded = intent.expanded();
-                    }
-                    _ => {}
+                if record.action.target == TRANSCRIPT_THINKING_DISC_ID {
+                    self.thinking_expanded = intent.expanded();
                 }
                 continue;
             }
@@ -685,27 +881,36 @@ impl TranscriptSurface {
                 };
                 continue;
             }
-            match record.action.target {
-                id if id == TRANSCRIPT_EARLIER_BTN_ID
-                    && matches!(record.action.kind, ContentActionKind::Activate) =>
-                {
-                    if let Some(tekes_agent_presentation::ComposerDestination::Run { scope }) =
-                        snapshot.selection.as_ref().map(|s| &s.destination)
-                    {
-                        out.push(TranscriptIntent::LoadEarlier(scope.clone()));
+            if matches!(record.action.kind, ContentActionKind::Activate) {
+                match record.action.target {
+                    id if id == TRANSCRIPT_EARLIER_BTN_ID => {
+                        if let Some(tekes_agent_presentation::ComposerDestination::Run { scope }) =
+                            snapshot.selection.as_ref().map(|s| &s.destination)
+                        {
+                            out.push(TranscriptIntent::LoadEarlier(scope.clone()));
+                        }
                     }
-                }
-                id if id == TRANSCRIPT_LATEST_BTN_ID
-                    && matches!(record.action.kind, ContentActionKind::Activate) =>
-                {
-                    if let Some(reader) = host
-                        .get_mut(TRANSCRIPT_READER_ID)
-                        .and_then(|c| c.component_mut::<TranscriptReader>())
-                    {
-                        reader.follow_latest();
+                    id if id == TRANSCRIPT_LATEST_BTN_ID => {
+                        if let Some(reader) = host
+                            .get_mut(TRANSCRIPT_READER_ID)
+                            .and_then(|c| c.component_mut::<TranscriptReader>())
+                        {
+                            reader.follow_latest();
+                        }
                     }
+                    id if id == TRANSCRIPT_RECONNECT_BTN_ID => {
+                        out.push(TranscriptIntent::Reconnect)
+                    }
+                    id if id == TRANSCRIPT_COPY_BTN_ID => out.push(TranscriptIntent::CopyLatest),
+                    id if id == TRANSCRIPT_UP_BTN_ID => {
+                        out.push(TranscriptIntent::FeedbackLatest { positive: true });
+                    }
+                    id if id == TRANSCRIPT_DOWN_BTN_ID => {
+                        out.push(TranscriptIntent::FeedbackLatest { positive: false });
+                    }
+                    id if id == TRANSCRIPT_FORK_BTN_ID => out.push(TranscriptIntent::ForkLatest),
+                    _ => {}
                 }
-                _ => {}
             }
         }
 
@@ -736,7 +941,7 @@ impl TranscriptSurface {
 fn tool_wording<'a>(label: &'a str) -> TranscriptToolRowWording<'a> {
     TranscriptToolRowWording {
         label,
-        stopped: "已停止",
+        stopped: "Stopped",
         title_hint: None,
         detail: None,
         progress: None,
@@ -754,14 +959,31 @@ fn report_wording() -> TranscriptToolReportWording {
     }
 }
 
-pub(crate) fn format_transcript_body(snapshot: &RunSnapshot) -> String {
-    format_transcript(snapshot, "").0
+struct TranscriptRenderParts {
+    history_text: String,
+    latest_user: String,
+    latest_markdown: String,
+    activity_title: String,
+    activity_detail: String,
+    has_latest_assistant: bool,
 }
 
-fn format_transcript(
-    snapshot: &RunSnapshot,
-    search_query: &str,
-) -> (String, String, String, String) {
+pub(crate) fn format_transcript_body(snapshot: &RunSnapshot) -> String {
+    let parts = split_transcript_parts(snapshot, "");
+    let mut chunks = Vec::new();
+    if !parts.history_text.is_empty() {
+        chunks.push(parts.history_text);
+    }
+    if !parts.latest_user.is_empty() {
+        chunks.push(format!("You\n{}", parts.latest_user));
+    }
+    if !parts.latest_markdown.is_empty() {
+        chunks.push(parts.latest_markdown);
+    }
+    chunks.join("\n\n")
+}
+
+fn split_transcript_parts(snapshot: &RunSnapshot, search_query: &str) -> TranscriptRenderParts {
     let query = search_query.trim().to_lowercase();
     let matches_query = |text: &str| query.is_empty() || text.to_lowercase().contains(&query);
 
@@ -771,106 +993,129 @@ fn format_transcript(
             .items
             .iter()
             .filter(|i| i.is_visible && matches_query(&i.text))
-            .map(|i| {
-                let role = match i.kind {
-                    TranscriptItemKind::User => "你",
-                    TranscriptItemKind::Assistant => "Agent",
-                    TranscriptItemKind::Error => "错误",
-                    _ => "系统",
-                };
-                format!("{role}\n{}", i.text)
+            .map(|i| match i.kind {
+                TranscriptItemKind::User => format!("> {}", i.text),
+                TranscriptItemKind::Error => format!("Error: {}", i.text),
+                _ => i.text.clone(),
             })
             .collect::<Vec<_>>()
             .join("\n\n");
-        return (
-            fallback,
-            String::new(),
-            String::new(),
-            "无结构化消息".to_owned(),
-        );
+        return TranscriptRenderParts {
+            history_text: fallback,
+            latest_user: String::new(),
+            latest_markdown: String::new(),
+            activity_title: String::new(),
+            activity_detail: String::new(),
+            has_latest_assistant: false,
+        };
     };
 
-    let mut lines = Vec::new();
-    let mut latest_thinking = String::new();
-    let mut latest_tool_lines = Vec::new();
-    let mut latest_markdown = String::new();
+    let section_count = doc.sections.len();
+    let split_idx = if query.is_empty() && section_count > 0 {
+        section_count - 1
+    } else {
+        section_count
+    };
 
+    let mut history_lines = Vec::new();
     for notice in &doc.session_notices {
         if matches_query(&notice.item.text) {
-            lines.push(format!("[通知] {}", notice.item.text));
+            history_lines.push(notice.item.text.clone());
         }
     }
 
-    for section in &doc.sections {
+    for section in &doc.sections[..split_idx] {
         for input in &section.inputs {
             if matches_query(&input.item.text) {
-                lines.push(format!("你 · #{}\n{}", section.id, input.item.text));
+                history_lines.push(input.item.text.clone());
             }
         }
-        for tool in &section.tools {
+        for output in &section.outputs {
+            if !output.item.text.trim().is_empty() && matches_query(&output.item.text) {
+                history_lines.push(output.item.text.clone());
+            }
+        }
+    }
+
+    let mut latest_user = String::new();
+    let mut latest_markdown = String::new();
+    let mut tool_headers = Vec::new();
+    let mut thinking_parts = Vec::new();
+
+    if let Some(last) = doc.sections.get(split_idx) {
+        latest_user = last
+            .inputs
+            .iter()
+            .map(|i| i.item.text.trim())
+            .filter(|s| !s.is_empty())
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        for tool in &last.tools {
             let header = tool.presentation_header(
                 tool_wording(&tool.name),
                 &TranscriptToolRowInputs::default(),
                 report_wording(),
             );
-            latest_tool_lines.push(header.text.clone());
-            if matches_query(&header.text) {
-                lines.push(format!("[工具] {}", header.text));
-            }
+            tool_headers.push(header.text);
         }
-        for output in &section.outputs {
+
+        let mut assistant_chunks = Vec::new();
+        for output in &last.outputs {
             if !output.item.reasoning.trim().is_empty() {
-                latest_thinking = output.item.reasoning.clone();
+                thinking_parts.push(output.item.reasoning.trim().to_owned());
             }
             if !output.item.text.trim().is_empty() {
-                if output.item.kind == TranscriptItemKind::Assistant {
-                    latest_markdown = output.item.text.clone();
-                }
-                if matches_query(&output.item.text) {
-                    let prefix = match output.item.kind {
-                        TranscriptItemKind::Assistant => "Agent",
-                        TranscriptItemKind::Error => "错误",
-                        _ => "系统",
-                    };
-                    lines.push(format!("{prefix}\n{}", output.item.text));
-                }
+                assistant_chunks.push(output.item.text.clone());
             }
         }
-        if let Some(turn) = section.output_footnote()
-            && (turn.usage.input_tokens > 0 || turn.usage.output_tokens > 0)
-        {
-            lines.push(format!(
-                "[轮次 {} · {} · tokens: in={} / out={}]",
-                turn.id, turn.status, turn.usage.input_tokens, turn.usage.output_tokens
-            ));
-        }
+        latest_markdown = assistant_chunks.join("\n\n");
     }
 
-    let doc_text = if lines.is_empty() {
+    let has_latest_assistant = !latest_markdown.is_empty();
+    let mut activity_parts = Vec::new();
+    if !thinking_parts.is_empty() {
+        activity_parts.push(thinking_parts.join("\n"));
+    }
+    if !tool_headers.is_empty() {
+        activity_parts.push(tool_headers.join("\n"));
+    }
+    let activity_detail = activity_parts.join("\n\n");
+
+    let activity_title = if !tool_headers.is_empty() && !thinking_parts.is_empty() {
+        format!(
+            "Thought process · {} tool{}",
+            tool_headers.len(),
+            if tool_headers.len() == 1 { "" } else { "s" }
+        )
+    } else if !tool_headers.is_empty() {
+        format!(
+            "Used {} tool{}",
+            tool_headers.len(),
+            if tool_headers.len() == 1 { "" } else { "s" }
+        )
+    } else if !thinking_parts.is_empty() {
+        "Thought process".to_owned()
+    } else {
+        String::new()
+    };
+
+    let history_text = if history_lines.is_empty() {
         if query.is_empty() {
-            "暂无消息记录，请在下方输入框发起对话。".to_owned()
+            String::new()
         } else {
-            format!("未找到匹配“{search_query}”的消息。")
+            format!("No messages matching \"{search_query}\".")
         }
     } else {
-        lines.join("\n\n")
+        history_lines.join("\n\n")
     };
 
-    let rich_md = if latest_markdown.is_empty() {
-        "暂无最新助手 Markdown 输出。".to_owned()
-    } else {
-        latest_markdown
-    };
-
-    let tools_summary = latest_tool_lines
-        .into_iter()
-        .rev()
-        .take(4)
-        .collect::<Vec<_>>()
-        .into_iter()
-        .rev()
-        .collect::<Vec<_>>()
-        .join("\n");
-
-    (doc_text, latest_thinking, tools_summary, rich_md)
+    TranscriptRenderParts {
+        history_text,
+        latest_user,
+        latest_markdown,
+        activity_title,
+        activity_detail,
+        has_latest_assistant,
+    }
 }

@@ -1,9 +1,7 @@
 //! `TasksQueueContainer`: supports `OthersTab::List { height }` cards stacked below `SummaryContainer`
 //! as well as full `Tab` presentation, with epoch-fenced queue mutations and `OpenChildRun` intents.
 
-use crate::{
-    AgentContainerAdapter, FOCUS_SWITCH_COMMAND, ManagedAgentContainer, SharedAgentWorkbench,
-};
+use crate::{AgentContainerAdapter, ManagedAgentContainer, SharedAgentWorkbench};
 use anyhow::Result;
 use tekes_agent_components_ui::{
     QueuedPromptViewModel, ResponsiveWidthMode, TASKS_SHELL_ID, TaskRowViewModel, TasksQueueIntent,
@@ -12,10 +10,7 @@ use tekes_agent_components_ui::{
 use tekes_agent_ui_bindings::{
     ChildRunOpenRequest, WorkbenchCommand, project_queued_prompts, project_tasks,
 };
-use tekes_ui_app_host::{
-    ContainerPresentation, ContainerToolbarHost, ContainerToolbarPosition, LocalContainer,
-};
-use tekes_ui_app_protocol::ToolbarItem;
+use tekes_ui_app_host::{ContainerPresentation, LocalContainer};
 use tekes_ui_controls::composition::{ContentActionRecord, ContentHost};
 
 struct TasksQueueAdapter {
@@ -142,7 +137,7 @@ impl TasksQueueContainer {
             false,
         )?;
         Ok(container
-            .title("任务与队列")
+            .title("Tasks & Queue")
             .switcher_icon("tekes-task")
             .list_height(height))
     }
@@ -160,18 +155,8 @@ impl TasksQueueContainer {
             false,
         )?;
         Ok(container
-            .title("任务与队列")
+            .title("Tasks & Queue")
             .switcher_icon("tekes-task")
-            .presentation(ContainerPresentation::Tab)
-            .toolbar_host(ContainerToolbarHost::Container {
-                position: ContainerToolbarPosition::Top,
-            })
-            .toolbar(vec![ToolbarItem {
-                id: FOCUS_SWITCH_COMMAND,
-                title: "Focus 切换".into(),
-                enabled: true,
-                geometry_dependent: false,
-            }])
-            .focus_switch(FOCUS_SWITCH_COMMAND))
+            .presentation(ContainerPresentation::Tab))
     }
 }

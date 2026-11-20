@@ -3,6 +3,7 @@
 
 use crate::ResponsiveWidthMode;
 use crate::ids::*;
+use crate::ui_helpers::{heading_text, icon_row, secondary_text};
 use tekes_agent_presentation::RunScope;
 use tekes_ui_controls::{
     ButtonVariant, DraftRevision, ExternalSelection, ExternalUndo, ScrollArea,
@@ -78,21 +79,8 @@ impl TasksQueueSurface {
     }
 
     pub fn build_content() -> Content {
-        let header = Content::new(
-            TASKS_HEADER_ID,
-            TextContent::new("排队消息与任务 · 等待运行快照..."),
-        );
-        let error = Content::new(TASKS_ERROR_ID, TextContent::new(""));
-
-        let mut edit_field = TextFieldContent::new("修改排队消息", "");
-        edit_field.show_metadata = false;
-        let edit_input = Content::new(TASKS_QUEUE_EDIT_INPUT_ID, edit_field);
-        let mut apply_btn = Button::new("更新排队项");
-        apply_btn.variant = ButtonVariant::Primary;
-        let apply = Content::new(TASKS_QUEUE_APPLY_BTN_ID, apply_btn);
-        let mut rm_btn = Button::new("移除");
-        rm_btn.variant = ButtonVariant::Quiet;
-        let remove = Content::new(TASKS_QUEUE_REMOVE_BTN_ID, rm_btn);
+        let header = Content::new(TASKS_HEADER_ID, heading_text("队列 0 · 任务 0"));
+        let error = Content::new(TASKS_ERROR_ID, secondary_text(""));
 
         let edit_row = Content::new(
             TASKS_QUEUE_EDIT_ROW_ID,
@@ -101,8 +89,8 @@ impl TasksQueueSurface {
                     axis: Axis::Horizontal,
                     gap: Spacing::Tight.value(),
                 },
-                flexible_child: Some(TASKS_QUEUE_EDIT_INPUT_ID),
-                children: vec![edit_input, apply, remove],
+                flexible_child: None,
+                children: Vec::new(),
             },
         );
 
@@ -138,7 +126,7 @@ impl TasksQueueSurface {
                     StackContent {
                         model: Stack {
                             axis: Axis::Vertical,
-                            gap: Spacing::Tight.value(),
+                            gap: Spacing::Regular.value(),
                         },
                         flexible_child: None,
                         children: vec![queue_section, jobs_section],
@@ -152,12 +140,55 @@ impl TasksQueueSurface {
             StackContent {
                 model: Stack {
                     axis: Axis::Vertical,
-                    gap: Spacing::Tight.value(),
+                    gap: Spacing::Regular.value(),
                 },
                 flexible_child: Some(TASKS_SCROLL_ID),
                 children: vec![header, error, edit_row, scroll],
             },
         )
+    }
+
+    fn make_edit_row_children() -> Vec<Content> {
+        let mut edit_field = TextFieldContent::new("Edit queued prompt", "");
+        edit_field.show_metadata = false;
+        edit_field.set_placeholder(Some("Edit queued prompt…".to_owned()));
+        let edit_input = Content::new(TASKS_QUEUE_EDIT_INPUT_ID, edit_field);
+
+        let mut apply_btn = Button::new("Update");
+        apply_btn.variant = ButtonVariant::Primary;
+        let apply = Content::new(TASKS_QUEUE_APPLY_BTN_ID, apply_btn);
+
+        let mut rm_btn = Button::new("Remove");
+        rm_btn.variant = ButtonVariant::Quiet;
+        rm_btn.set_transparent_chrome(true);
+        let remove = Content::new(TASKS_QUEUE_REMOVE_BTN_ID, rm_btn);
+
+        vec![edit_input, apply, remove]
+    }
+
+    fn sync_edit_row_visibility(&self, host: &mut ContentHost, has_queued: bool) {
+        let currently_mounted = host.get(TASKS_QUEUE_EDIT_INPUT_ID).is_some();
+        if has_queued && !currently_mounted {
+            if let Some(row) = host
+                .get_mut(TASKS_QUEUE_EDIT_ROW_ID)
+                .and_then(|n| n.component_mut::<StackContent>())
+            {
+                row.flexible_child = Some(TASKS_QUEUE_EDIT_INPUT_ID);
+            }
+            replace_stack_children(
+                host,
+                TASKS_QUEUE_EDIT_ROW_ID,
+                Self::make_edit_row_children(),
+            );
+        } else if !has_queued && currently_mounted {
+            if let Some(row) = host
+                .get_mut(TASKS_QUEUE_EDIT_ROW_ID)
+                .and_then(|n| n.component_mut::<StackContent>())
+            {
+                row.flexible_child = None;
+            }
+            replace_stack_children(host, TASKS_QUEUE_EDIT_ROW_ID, Vec::new());
+        }
     }
 
     fn set_external_editor_value(
@@ -190,18 +221,9 @@ impl TasksQueueSurface {
         &mut self,
         host: &mut ContentHost,
         model: &TasksQueueViewModel,
-        mode: ResponsiveWidthMode,
+        _mode: ResponsiveWidthMode,
     ) {
-        let mode_str = match mode {
-            ResponsiveWidthMode::Compact => "Compact",
-            ResponsiveWidthMode::Expanded => "Expanded",
-        };
-        let header_text = format!(
-            "队列 {} · 任务 {} ({mode_str} · epoch {})",
-            model.queued.len(),
-            model.tasks.len(),
-            model.epoch
-        );
+        let header_text = format!("队列 {} · 任务 {}", model.queued.len(), model.tasks.len());
         if let Some(node) = host.get_mut(TASKS_HEADER_ID)
             && let Some(txt) = node.component_mut::<TextContent>()
             && txt.text != header_text
@@ -225,12 +247,13 @@ impl TasksQueueSurface {
             .and_then(|id| model.queued.iter().find(|q| q.item_id == id))
             .or(first_queued);
 
+        self.sync_edit_row_visibility(host, active_item.is_some());
+
         if let Some(item) = active_item.cloned() {
             self.selected_queue_item_id = Some(item.item_id.clone());
             self.set_external_editor_value(host, &item.item_id, &item.text);
         } else {
             self.selected_queue_item_id = None;
-            self.set_external_editor_value(host, "empty", "");
         }
 
         let can_mutate = active_item.is_some_and(|q| q.can_mutate);
@@ -252,13 +275,13 @@ impl TasksQueueSurface {
         if model.queued.is_empty() {
             queue_children.push(Content::new(
                 ComponentId(TASKS_QUEUE_ROW_BASE),
-                TextContent::new("排队消息: 暂无等待发送项"),
+                secondary_text("No queued prompts"),
             ));
         } else {
             for (idx, q) in model.queued.iter().enumerate() {
                 queue_children.push(Content::new(
                     ComponentId(TASKS_QUEUE_ROW_BASE + idx as u64),
-                    TextContent::new(format!("[{}] {}", q.item_id, q.text)),
+                    TextContent::new(q.text.clone()),
                 ));
             }
         }
@@ -269,24 +292,34 @@ impl TasksQueueSurface {
         if model.tasks.is_empty() {
             task_children.push(Content::new(
                 ComponentId(TASKS_TASK_ROW_BASE),
-                TextContent::new("后台任务 / 子代理: 暂无记录"),
+                secondary_text("No background tasks"),
             ));
         } else {
             for (idx, task) in model.tasks.iter().enumerate() {
-                let row_id = ComponentId(TASKS_TASK_ROW_BASE + idx as u64);
-                let text_id = ComponentId(TASKS_TASK_ROW_BASE + 250 + idx as u64);
-                let text = Content::new(
+                let idx_u64 = idx as u64;
+                let row_id = ComponentId(TASKS_TASK_ROW_BASE + idx_u64);
+                let content_id = ComponentId(TASKS_TASK_CONTENT_BASE + idx_u64);
+                let icon_id = ComponentId(TASKS_TASK_ICON_BASE + idx_u64);
+                let text_id = ComponentId(TASKS_TASK_ROW_BASE + 250 + idx_u64);
+
+                let icon_name = if task.canonical_status.eq_ignore_ascii_case("completed") {
+                    "tekes-goal-completed"
+                } else {
+                    "tekes-pending-task"
+                };
+                let row_content = icon_row(
+                    content_id,
+                    icon_id,
                     text_id,
-                    TextContent::new(format!(
-                        "[{} · {}] {}",
-                        task.canonical_status, task.kind, task.title
-                    )),
+                    icon_name,
+                    format!("{} · {}", task.title, task.canonical_status),
                 );
-                let mut row_children = vec![text];
+                let mut row_children = vec![row_content];
                 if task.child_session_id.is_some() {
-                    let btn_id = ComponentId(TASKS_TASK_OPEN_BTN_BASE + idx as u64);
-                    let mut btn = Button::new("查看子代理");
+                    let btn_id = ComponentId(TASKS_TASK_OPEN_BTN_BASE + idx_u64);
+                    let mut btn = Button::new("Open Trace");
                     btn.variant = ButtonVariant::Quiet;
+                    btn.set_transparent_chrome(true);
                     row_children.push(Content::new(btn_id, btn));
                     self.open_targets.push((btn_id, task.clone()));
                 }
@@ -297,7 +330,7 @@ impl TasksQueueSurface {
                             axis: Axis::Horizontal,
                             gap: Spacing::Tight.value(),
                         },
-                        flexible_child: Some(text_id),
+                        flexible_child: Some(content_id),
                         children: row_children,
                     },
                 ));

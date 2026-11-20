@@ -1,6 +1,6 @@
 //! Topology A (`tekes-agent-ui-demo`) integration acceptance tests:
-//! verifies 3-column AppHost assembly, `OthersTab::List` stacked cards, focus swap, and
-//! light/dark Metal GPU offscreen PNG output.
+//! verifies 3-column AppHost assembly, Tekes-aligned `Others` tabs, focus swap, and
+//! light/dark Metal GPU 2x Retina offscreen PNG output.
 
 #![cfg(target_os = "macos")]
 
@@ -35,7 +35,21 @@ fn topology_a_assembles_nav_focus_others_list_swap_and_gpu_pngs() {
         state.navigation_toolbar_presenter_id(),
         Some("agent-sidebar")
     );
-    assert!(state.tabs().contains(&OthersTab::List));
+    assert!(
+        state
+            .tabs()
+            .contains(&OthersTab::Container("agent-summary".to_owned()))
+    );
+    assert!(
+        state
+            .tabs()
+            .contains(&OthersTab::Container("workspace-files".to_owned()))
+    );
+    assert!(
+        state
+            .tabs()
+            .contains(&OthersTab::Container("workspace-changes".to_owned()))
+    );
     state.promote("workspace-files").unwrap();
     assert_eq!(state.focus_id(), "workspace-files");
     state.promote("agent-run").unwrap();

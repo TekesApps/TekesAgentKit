@@ -2,9 +2,7 @@
 //! `ImageContent` resource upload in `prepare_resources`, UTF-16 `ArtifactSelectionReference`
 //! quote capture/resolution, and pluggable host `ArtifactViewerProvider`.
 
-use crate::{
-    AgentContainerAdapter, FOCUS_SWITCH_COMMAND, ManagedAgentContainer, SharedAgentWorkbench,
-};
+use crate::{AgentContainerAdapter, ManagedAgentContainer, SharedAgentWorkbench};
 use anyhow::Result;
 use std::sync::Arc;
 use tekes_agent_components_ui::{
@@ -18,10 +16,8 @@ use tekes_agent_ui_bindings::{
     ComposerQuoteRequest, LoadedArtifact, LoadedArtifactContent, WorkbenchCommand, WorkspaceBinding,
 };
 use tekes_ui_app_host::{
-    ContainerFactory, ContainerMultiplicity, ContainerRenderContext, ContainerToolbarHost,
-    ContainerToolbarPosition, LocalContainer,
+    ContainerFactory, ContainerMultiplicity, ContainerRenderContext, LocalContainer,
 };
-use tekes_ui_app_protocol::ToolbarItem;
 use tekes_ui_controls::composition::{Content, ContentActionRecord, ContentHost, ImageLoadOutcome};
 use tekes_ui_scene::Size;
 
@@ -368,19 +364,7 @@ impl ArtifactViewerContainer {
             adapter,
             false,
         )?;
-        Ok(container
-            .title("产物预览")
-            .switcher_icon("tekes-file-code")
-            .toolbar_host(ContainerToolbarHost::Container {
-                position: ContainerToolbarPosition::Top,
-            })
-            .toolbar(vec![ToolbarItem {
-                id: FOCUS_SWITCH_COMMAND,
-                title: "Focus 切换".into(),
-                enabled: true,
-                geometry_dependent: false,
-            }])
-            .focus_switch(FOCUS_SWITCH_COMMAND))
+        Ok(container.title("Artifact").switcher_icon("tekes-file-code"))
     }
 
     /// Registers a `ContainerMultiplicity::Multiple` factory for dynamic artifact tabs/inspectors.
@@ -393,7 +377,7 @@ impl ArtifactViewerContainer {
         let factory_id = id.into();
         ContainerFactory::local(
             factory_id,
-            "产物查看",
+            "Artifact",
             ContainerMultiplicity::Multiple,
             move |instance_id| Self::build(instance_id, workbench.clone(), provider.clone()),
         )

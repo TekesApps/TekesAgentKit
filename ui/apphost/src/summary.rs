@@ -110,8 +110,9 @@ impl SummaryContainer {
             false,
         )?;
         Ok(container
-            .title("运行摘要")
+            .title("Summary")
             .switcher_icon("tekes-tab-summary")
+            .content_padding(0.0)
             .presentation(ContainerPresentation::Tab))
     }
 
@@ -129,8 +130,9 @@ impl SummaryContainer {
             false,
         )?;
         Ok(container
-            .title("运行摘要")
+            .title("Summary")
             .switcher_icon("tekes-tab-summary")
+            .content_padding(0.0)
             .list_height(height))
     }
 }

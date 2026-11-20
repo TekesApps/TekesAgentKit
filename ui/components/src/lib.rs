@@ -453,3 +453,120 @@ impl RunSurface {
         self.tree.render(s, t, f, c, p)
     }
 }
+
+pub(crate) mod ui_helpers {
+    use tekes_ui_controls::{
+        ButtonVariant,
+        composition::{
+            Button, ComponentId, Content, IconContent, PanelContent, StackContent, TextContent,
+        },
+        extended::{Axis, Stack},
+        layout::Insets,
+    };
+    use tekes_ui_tokens::{Spacing, proposal::TextRole};
+
+    pub(crate) fn heading_text(text: impl Into<String>) -> TextContent {
+        TextContent {
+            text: text.into(),
+            role: TextRole::UiHeading,
+        }
+    }
+
+    pub(crate) fn label_text(text: impl Into<String>) -> TextContent {
+        TextContent {
+            text: text.into(),
+            role: TextRole::UiLabel,
+        }
+    }
+
+    pub(crate) fn caption_text(text: impl Into<String>) -> TextContent {
+        TextContent {
+            text: text.into(),
+            role: TextRole::UiCaption,
+        }
+    }
+
+    pub(crate) fn secondary_text(text: impl Into<String>) -> TextContent {
+        TextContent {
+            text: text.into(),
+            role: TextRole::UiCaption,
+        }
+    }
+
+    pub(crate) fn plain_icon(id: ComponentId, icon_name: &str) -> Content {
+        let icon = IconContent::new(icon_name)
+            .unwrap_or_else(|_| IconContent::new("tekes-file-generic").expect("fallback icon"));
+        Content::new(id, icon)
+    }
+
+    pub(crate) fn icon_button(
+        icon_id: ComponentId,
+        icon_name: &str,
+        accessible_name: &str,
+    ) -> Button {
+        let mut btn =
+            Button::new(plain_icon(icon_id, icon_name)).with_accessible_name(accessible_name);
+        btn.variant = ButtonVariant::Quiet;
+        btn.set_transparent_chrome(true);
+        btn.set_toolbar_icon_slot(true);
+        btn
+    }
+
+    pub(crate) fn icon_text_button(
+        stack_id: ComponentId,
+        icon_id: ComponentId,
+        text_id: ComponentId,
+        icon_name: &str,
+        label: impl Into<String>,
+    ) -> Button {
+        let text_str = label.into();
+        let row = Content::new(
+            stack_id,
+            StackContent {
+                model: Stack {
+                    axis: Axis::Horizontal,
+                    gap: Spacing::Tight.value(),
+                },
+                flexible_child: None,
+                children: vec![
+                    plain_icon(icon_id, icon_name),
+                    Content::new(text_id, label_text(text_str.clone())),
+                ],
+            },
+        );
+        let mut btn = Button::new(row).with_accessible_name(text_str);
+        btn.variant = ButtonVariant::Quiet;
+        btn.content_alignment = tekes_ui_tokens::proposal::layout::MainAxisDistribution::Start;
+        btn
+    }
+
+    pub(crate) fn icon_row(
+        row_id: ComponentId,
+        icon_id: ComponentId,
+        text_id: ComponentId,
+        icon_name: &str,
+        label: impl Into<String>,
+    ) -> Content {
+        Content::new(
+            row_id,
+            StackContent {
+                model: Stack {
+                    axis: Axis::Horizontal,
+                    gap: Spacing::Tight.value(),
+                },
+                flexible_child: Some(text_id),
+                children: vec![
+                    plain_icon(icon_id, icon_name),
+                    Content::new(text_id, TextContent::new(label)),
+                ],
+            },
+        )
+    }
+
+    pub(crate) fn card_panel(id: ComponentId, child: Content, padding: Insets) -> Content {
+        let mut panel =
+            PanelContent::new(child).expect("PanelContent children must satisfy curve rules");
+        let _ = panel.set_padding(Some(padding));
+        Content::new(id, panel)
+    }
+}

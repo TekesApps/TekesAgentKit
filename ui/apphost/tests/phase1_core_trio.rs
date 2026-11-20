@@ -99,6 +99,30 @@ impl tekes_ui_controls::ButtonTextRenderer for TestTextBackend {
     fn text_surface_host(&mut self) -> Option<&mut dyn tekes_ui_controls::TextSurfaceHost> {
         Some(self)
     }
+
+    fn icon_renderer(&mut self) -> Option<&mut dyn tekes_ui_controls::layout_view::IconRenderer> {
+        Some(self)
+    }
+}
+
+impl tekes_ui_controls::layout_view::IconRenderer for TestTextBackend {
+    fn draw_icon(&mut self, _: &mut Scene, _: &str, _: Rect, _: tekes_ui_tokens::Rgba) {}
+
+    fn prepare_icon(
+        &mut self,
+        _: &str,
+        _: f32,
+        _: f32,
+        _: tekes_ui_tokens::Rgba,
+    ) -> Result<
+        tekes_ui_controls::composition::IconImage,
+        tekes_ui_controls::composition::IconRenderError,
+    > {
+        Ok(tekes_ui_controls::composition::IconImage::new(
+            tekes_ui_scene::ImageId(1),
+            std::rc::Rc::new(()),
+        ))
+    }
 }
 
 fn setup_workbench() -> (

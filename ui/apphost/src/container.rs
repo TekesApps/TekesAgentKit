@@ -142,7 +142,6 @@ impl<A: AgentContainerAdapter + 'static> ManagedAgentContainer<A> {
         let cmd_adapter = adapter_rc;
 
         Ok(LocalContainer::from_source(id, source)
-            .content_padding(0.0)
             .on_action(move |host, records| {
                 action_adapter
                     .borrow_mut()

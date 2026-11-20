@@ -1,22 +1,23 @@
-//! Run Summary surface projecting `SummaryFacts` (Usage, Tasks/Todos, Subagents, Artifacts)
-//! and optional Host custom key-value sections across both `OthersTab::List` card and `Tab` modes.
+//! Run Summary surface aligned with Tekes (`SummaryFacts`: usage caption, status-icon Tasks,
+//! SubAgents/Artifacts clickable navigation list, and optional host metadata sections).
 
 use crate::ResponsiveWidthMode;
 use crate::ids::*;
+use crate::ui_helpers::{caption_text, heading_text, icon_row, secondary_text};
 use std::collections::BTreeMap;
 use tekes_agent_presentation::{RunScope, SummaryAction, SummaryFacts};
 use tekes_ui_controls::{
-    ButtonVariant, ScrollArea,
+    ScrollArea,
     composition::{
-        Button, ComponentId, Content, ContentActionKind, ContentActionPayload, ContentActionRecord,
-        ContentHost, DisclosureContent, KeyValueTableContent, ListDisplayUpdate, ListIntentKind,
-        ListRowDisplay, ScrollContent, SelectableListContent, StackContent, TextContent,
+        ComponentId, Content, ContentActionPayload, ContentActionRecord, ContentHost,
+        ListDisplayUpdate, ListIntentKind, ListRowDisplay, ScrollContent, SelectableListContent,
+        StackContent, TextContent,
     },
     extended::{
         Axis, KeyedListItem, KeyedListSnapshot, ListBudget, ListDatasetKey, ListItemKey, Stack,
     },
 };
-use tekes_ui_tokens::Spacing;
+use tekes_ui_tokens::{Spacing, proposal::layout::MainAxisDistribution};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum SummaryIntent {
@@ -50,14 +51,13 @@ enum SummaryTarget {
 
 #[derive(Debug)]
 pub struct SummarySurface {
-    usage_expanded: bool,
-    tasks_expanded: bool,
     next_key: u64,
     key_map: BTreeMap<String, ListItemKey>,
     targets: BTreeMap<ListItemKey, SummaryTarget>,
     selected_key: Option<ListItemKey>,
     last_list_sig: String,
     last_tasks_sig: String,
+    last_usage_sig: String,
     last_host_sig: String,
     current_scope: Option<RunScope>,
 }
@@ -71,14 +71,13 @@ impl Default for SummarySurface {
 impl SummarySurface {
     pub fn new() -> Self {
         Self {
-            usage_expanded: true,
-            tasks_expanded: true,
             next_key: 1,
             key_map: BTreeMap::new(),
             targets: BTreeMap::new(),
             selected_key: None,
             last_list_sig: String::new(),
             last_tasks_sig: String::new(),
+            last_usage_sig: String::new(),
             last_host_sig: String::new(),
             current_scope: None,
         }
@@ -94,57 +93,23 @@ impl SummarySurface {
     }
 
     pub fn build_content() -> Content {
-        let usage_rows = [
-            ("总 Token", "unavailable", 10),
-            ("输入", "unavailable", 12),
-            ("输出", "unavailable", 14),
-            ("缓存命中", "unavailable", 16),
-            ("命中率", "unavailable", 18),
-            ("已知费用", "unavailable", 20),
-        ]
-        .into_iter()
-        .map(|(k, v, offset)| {
-            (
-                Content::new(ComponentId(SUMMARY_KV_BASE + offset), TextContent::new(k)),
-                Content::new(
-                    ComponentId(SUMMARY_KV_BASE + offset + 1),
-                    TextContent::new(v),
-                ),
-            )
-        });
-        let usage_disc = Content::new(
-            SUMMARY_USAGE_DISC_ID,
-            DisclosureContent::new(
-                SUMMARY_USAGE_TRIGGER_ID,
-                Content::new(ComponentId(713), TextContent::new("用量统计 (Usage)")),
-                Content::new(
-                    SUMMARY_USAGE_TABLE_ID,
-                    KeyValueTableContent::new(usage_rows),
-                ),
-                true,
-            )
-            .with_section_header_layout(),
+        let header = Content::new(SUMMARY_HEADER_ID, heading_text("Summary"));
+        let usage_caption = Content::new(SUMMARY_USAGE_CAPTION_ID, caption_text(""));
+
+        let tasks_header = Content::new(SUMMARY_TASKS_HEADER_ID, caption_text("Tasks"));
+        let tasks_stack = Content::new(
+            SUMMARY_TASKS_STACK_ID,
+            StackContent {
+                model: Stack {
+                    axis: Axis::Vertical,
+                    gap: Spacing::Tight.value(),
+                },
+                flexible_child: None,
+                children: Vec::new(),
+            },
         );
 
-        let tasks_disc = Content::new(
-            SUMMARY_TASKS_DISC_ID,
-            DisclosureContent::new(
-                SUMMARY_TASKS_TRIGGER_ID,
-                Content::new(ComponentId(723), TextContent::new("任务与子代理清单")),
-                Content::new(
-                    SUMMARY_TASKS_TABLE_ID,
-                    KeyValueTableContent::new([(
-                        Content::new(ComponentId(SUMMARY_KV_BASE + 100), TextContent::new("状态")),
-                        Content::new(
-                            ComponentId(SUMMARY_KV_BASE + 101),
-                            TextContent::new("暂无任务"),
-                        ),
-                    )]),
-                ),
-                true,
-            )
-            .with_section_header_layout(),
-        );
+        let nav_header = Content::new(SUMMARY_NAV_HEADER_ID, caption_text("SubAgents & Artifacts"));
 
         let initial_snap = KeyedListSnapshot {
             dataset: ListDatasetKey(2),
@@ -152,43 +117,22 @@ impl SummarySurface {
             display_items: Vec::new(),
         };
         let mut initial_rows = Vec::new();
-        let nav_list = SelectableListContent::keyed(
-            "产物与子代理导航",
+        let mut nav_list = SelectableListContent::keyed(
+            "SubAgents and Artifacts",
             &initial_snap,
             &mut initial_rows,
             Self::budget(),
         )
         .expect("empty summary list");
-
-        let mut open_artifact = Button::new("查看产物");
-        open_artifact.button.state.disabled = true;
-        let mut open_subagent = Button::new("打开子代理轨迹");
-        open_subagent.button.state.disabled = true;
-        let mut open_sidechat = Button::new("发起 SideChat");
-        open_sidechat.variant = ButtonVariant::Quiet;
-
-        let actions_row = Content::new(
-            SUMMARY_ACTIONS_ROW_ID,
-            StackContent {
-                model: Stack {
-                    axis: Axis::Horizontal,
-                    gap: Spacing::Tight.value(),
-                },
-                flexible_child: None,
-                children: vec![
-                    Content::new(SUMMARY_OPEN_ARTIFACT_BTN_ID, open_artifact),
-                    Content::new(SUMMARY_OPEN_SUBAGENT_BTN_ID, open_subagent),
-                    Content::new(SUMMARY_OPEN_SIDECHAT_BTN_ID, open_sidechat),
-                ],
-            },
-        );
+        nav_list.set_navigation_layout(true);
+        nav_list.set_navigation_selection_fill_only(true);
 
         let host_sections = Content::new(
             SUMMARY_HOST_SECTIONS_ID,
             StackContent {
                 model: Stack {
                     axis: Axis::Vertical,
-                    gap: Spacing::Tight.value(),
+                    gap: Spacing::Regular.value(),
                 },
                 flexible_child: None,
                 children: Vec::new(),
@@ -200,15 +144,16 @@ impl SummarySurface {
             StackContent {
                 model: Stack {
                     axis: Axis::Vertical,
-                    gap: Spacing::Tight.value(),
+                    gap: Spacing::Relaxed.value(),
                 },
                 flexible_child: None,
                 children: vec![
-                    Content::new(SUMMARY_HEADER_ID, TextContent::new("会话摘要 · 等待数据")),
-                    usage_disc,
-                    tasks_disc,
+                    header,
+                    usage_caption,
+                    tasks_header,
+                    tasks_stack,
+                    nav_header,
                     Content::new(SUMMARY_LIST_ID, nav_list),
-                    actions_row,
                     host_sections,
                 ],
             },
@@ -216,7 +161,9 @@ impl SummarySurface {
 
         Content::new(
             SUMMARY_SCROLL_ID,
-            ScrollContent::new(ScrollArea::default(), stack),
+            ScrollContent::new(ScrollArea::default(), stack)
+                .scrollbar(true)
+                .content_padding(Spacing::Loose.value()),
         )
     }
 
@@ -239,107 +186,66 @@ impl SummarySurface {
     ) {
         self.current_scope = facts.map(|f| f.scope.clone());
 
-        if let Some(header) = host
-            .get_mut(SUMMARY_HEADER_ID)
-            .and_then(|c| c.component_mut::<TextContent>())
-        {
-            header.text = match facts {
-                Some(f) => format!(
-                    "摘要 · {} · 任务 {} / 子代理 {} / 产物 {}",
-                    f.scope.session_id,
-                    f.tasks.len(),
-                    f.subagents.len(),
-                    f.artifacts.len()
-                ),
-                None => "摘要 · 暂无当前会话摘要".to_owned(),
-            };
-        }
-
-        // Update 6 usage value cells cleanly in place.
-        let usage_vals: [String; 6] = if let Some(u) = facts.and_then(|f| f.usage.as_ref()) {
-            let hit = u
-                .cache_hit_rate()
-                .map(|r| format!("{:.1}%", r * 100.0))
-                .unwrap_or_else(|| "unavailable".to_owned());
-            let cost = u
-                .known_cost_usd()
-                .map(|c| format!("${c:.4}"))
-                .unwrap_or_else(|| "unavailable".to_owned());
-            [
-                u.total_tokens().to_string(),
-                u.input_tokens.to_string(),
-                u.output_tokens.to_string(),
-                u.cached_input_tokens.to_string(),
-                hit,
-                cost,
-            ]
-        } else {
-            [
-                "unavailable".into(),
-                "unavailable".into(),
-                "unavailable".into(),
-                "unavailable".into(),
-                "unavailable".into(),
-                "unavailable".into(),
-            ]
-        };
-
-        for (i, val) in usage_vals.into_iter().enumerate() {
-            let cell_id = ComponentId(SUMMARY_KV_BASE + 10 + (i as u64) * 2 + 1);
-            if let Some(cell) = host
-                .get_mut(cell_id)
-                .and_then(|c| c.component_mut::<TextContent>())
-            {
-                cell.text = val;
-            }
-        }
-        if let Some(disc) = host
-            .get_mut(SUMMARY_USAGE_DISC_ID)
-            .and_then(|c| c.component_mut::<DisclosureContent>())
-        {
-            disc.set_expanded(self.usage_expanded);
-        }
-
-        let tasks_text = if let Some(f) = facts {
-            if f.tasks.is_empty() && f.subagents.is_empty() {
-                "暂无任务或子代理".to_owned()
+        let usage_text = if let Some(u) = facts.and_then(|f| f.usage.as_ref()) {
+            let total = u.total_tokens();
+            if let Some(rate) = u.cache_hit_rate() {
+                format!("{total} tokens · {:.0}% cache hit", rate * 100.0)
+            } else if total > 0 {
+                format!("{total} tokens")
             } else {
-                let mut parts = Vec::new();
-                for t in &f.tasks {
-                    parts.push(format!("{} [{}]", t.name, t.canonical_status()));
-                }
-                for s in &f.subagents {
-                    let st = if s.status.is_empty() {
-                        "known"
-                    } else {
-                        s.status.as_str()
-                    };
-                    parts.push(format!("子代理: {} [{}]", s.title, st));
-                }
-                parts.join(" · ")
+                String::new()
             }
         } else {
-            "等待选择会话".to_owned()
+            String::new()
         };
-        if tasks_text != self.last_tasks_sig {
-            self.last_tasks_sig = tasks_text.clone();
-            if let Some(cell) = host
-                .get_mut(ComponentId(SUMMARY_KV_BASE + 101))
+        if usage_text != self.last_usage_sig {
+            self.last_usage_sig = usage_text.clone();
+            if let Some(caption) = host
+                .get_mut(SUMMARY_USAGE_CAPTION_ID)
                 .and_then(|c| c.component_mut::<TextContent>())
             {
-                cell.text = tasks_text;
+                caption.text = usage_text;
             }
         }
-        if let Some(disc) = host
-            .get_mut(SUMMARY_TASKS_DISC_ID)
-            .and_then(|c| c.component_mut::<DisclosureContent>())
-        {
-            disc.set_expanded(self.tasks_expanded);
-        }
 
+        self.sync_tasks_section(host, facts);
         self.sync_nav_list(host, facts);
-        self.sync_action_buttons(host);
         self.sync_host_sections(host, host_sections);
+    }
+
+    fn sync_tasks_section(&mut self, host: &mut ContentHost, facts: Option<&SummaryFacts>) {
+        let mut sig = String::new();
+        let mut rows = Vec::new();
+        if let Some(f) = facts {
+            for (idx, t) in f.tasks.iter().enumerate() {
+                let status = t.canonical_status();
+                sig.push_str(&format!("{}:{}:{}|", idx, status, t.name));
+                let icon_name = match status {
+                    "completed" => "tekes-goal-completed",
+                    "failed" => "tekes-error",
+                    _ => "tekes-pending-task",
+                };
+                let base = SUMMARY_TASK_ROW_BASE + (idx as u64) * 4;
+                rows.push(icon_row(
+                    ComponentId(base),
+                    ComponentId(base + 1),
+                    ComponentId(base + 2),
+                    icon_name,
+                    &t.name,
+                ));
+            }
+        }
+        if rows.is_empty() {
+            sig = "empty".to_owned();
+            rows.push(Content::new(
+                ComponentId(SUMMARY_TASK_ROW_BASE),
+                secondary_text("No active tasks"),
+            ));
+        }
+        if sig != self.last_tasks_sig {
+            self.last_tasks_sig = sig;
+            replace_stack_children(host, SUMMARY_TASKS_STACK_ID, rows);
+        }
     }
 
     fn sync_nav_list(&mut self, host: &mut ContentHost, facts: Option<&SummaryFacts>) {
@@ -355,15 +261,17 @@ impl SummarySurface {
                     let Some(action) = row.action else {
                         continue;
                     };
-                    let (token, label, target) = match action {
+                    let (token, icon_name, label, target) = match action {
                         SummaryAction::OpenArtifact { scope, path } => (
                             format!("artifact:{path}"),
-                            format!("[产物] {path}"),
+                            "tekes-file-code",
+                            path.clone(),
                             SummaryTarget::Artifact { scope, path },
                         ),
                         SummaryAction::OpenSubagent { parent, child_id } => (
                             format!("subagent:{child_id}"),
-                            format!("[子代理] {} ({})", row.title, row.value),
+                            "tekes-task",
+                            row.title.clone(),
                             SummaryTarget::Subagent {
                                 parent,
                                 child_id,
@@ -372,7 +280,8 @@ impl SummarySurface {
                         ),
                         SummaryAction::OpenTask { task_id, scope } => (
                             format!("task:{task_id}"),
-                            format!("[任务] {}", row.title),
+                            "tekes-task",
+                            row.title.clone(),
                             SummaryTarget::Subagent {
                                 parent: scope.clone(),
                                 child_id: scope.session_id,
@@ -382,18 +291,40 @@ impl SummarySurface {
                     };
                     let key = self.key_for(&token);
                     next_targets.insert(key, target);
-                    sig.push_str(&format!("{}:{}|", key.0, label));
-                    items.push(KeyedListItem { key, name: label });
+                    sig.push_str(&format!("{}:{icon_name}:{label}|", key.0));
+                    items.push(KeyedListItem {
+                        key,
+                        name: label.clone(),
+                    });
                     display_items.push(key);
+                    let decor_base = SUMMARY_ROW_DECOR_BASE + key.0 * 4;
                     rows.push(ListRowDisplay {
                         key,
                         row_id: ComponentId(SUMMARY_ROW_BASE + key.0),
-                        display: ListDisplayUpdate::DefaultLabel,
+                        display: ListDisplayUpdate::Replace(icon_row(
+                            ComponentId(decor_base),
+                            ComponentId(decor_base + 1),
+                            ComponentId(decor_base + 2),
+                            icon_name,
+                            label,
+                        )),
                     });
                 }
             }
         }
         self.targets = next_targets;
+        let nav_title = if items.is_empty() {
+            ""
+        } else {
+            "SubAgents & Artifacts"
+        };
+        if let Some(hdr) = host
+            .get_mut(SUMMARY_NAV_HEADER_ID)
+            .and_then(|c| c.component_mut::<TextContent>())
+            && hdr.text != nav_title
+        {
+            hdr.text = nav_title.to_owned();
+        }
 
         if sig != self.last_list_sig {
             let snap = KeyedListSnapshot {
@@ -407,30 +338,6 @@ impl SummarySurface {
             {
                 self.last_list_sig = sig;
             }
-        }
-    }
-
-    fn sync_action_buttons(&mut self, host: &mut ContentHost) {
-        let selected_target = self.selected_key.and_then(|k| self.targets.get(&k));
-        let is_artifact = matches!(selected_target, Some(SummaryTarget::Artifact { .. }));
-        let is_subagent = matches!(selected_target, Some(SummaryTarget::Subagent { .. }));
-        if let Some(btn) = host
-            .get_mut(SUMMARY_OPEN_ARTIFACT_BTN_ID)
-            .and_then(|c| c.component_mut::<Button>())
-        {
-            btn.button.state.disabled = !is_artifact;
-        }
-        if let Some(btn) = host
-            .get_mut(SUMMARY_OPEN_SUBAGENT_BTN_ID)
-            .and_then(|c| c.component_mut::<Button>())
-        {
-            btn.button.state.disabled = !is_subagent;
-        }
-        if let Some(btn) = host
-            .get_mut(SUMMARY_OPEN_SIDECHAT_BTN_ID)
-            .and_then(|c| c.component_mut::<Button>())
-        {
-            btn.button.state.disabled = self.current_scope.is_none();
         }
     }
 
@@ -464,77 +371,44 @@ impl SummarySurface {
         let mut children = Vec::new();
         for (title, pairs) in host_sections {
             let header_id = alloc();
-            let table_id = alloc();
-            let rows = pairs.iter().map(|(k, v)| {
-                (
-                    Content::new(alloc(), TextContent::new(k.clone())),
-                    Content::new(alloc(), TextContent::new(v.clone())),
-                )
-            });
-            children.push(Content::new(header_id, TextContent::new(title.clone())));
-            children.push(Content::new(table_id, KeyValueTableContent::new(rows)));
+            children.push(Content::new(header_id, caption_text(title.clone())));
+            for (k, v) in pairs {
+                let row_id = alloc();
+                let key_id = alloc();
+                let val_id = alloc();
+                let row = StackContent {
+                    model: Stack {
+                        axis: Axis::Horizontal,
+                        gap: Spacing::Tight.value(),
+                    },
+                    flexible_child: Some(key_id),
+                    children: vec![
+                        Content::new(key_id, secondary_text(k.clone())),
+                        Content::new(val_id, TextContent::new(v.clone())),
+                    ],
+                }
+                .into_content_with_distribution(row_id, MainAxisDistribution::SpaceBetween);
+                children.push(row);
+            }
         }
         replace_stack_children(host, SUMMARY_HOST_SECTIONS_ID, children);
     }
 
     pub fn handle_actions(
         &mut self,
-        host: &mut ContentHost,
+        _host: &mut ContentHost,
         records: &[ContentActionRecord],
     ) -> Vec<SummaryIntent> {
         let mut out = Vec::new();
         for record in records {
-            if let Some(ContentActionPayload::DisclosureExpansion(intent)) = &record.payload {
-                if let Some(disc) = host
-                    .get_mut(record.action.target)
-                    .and_then(|c| c.component_mut::<DisclosureContent>())
-                {
-                    let _ = disc.confirm(intent, true);
-                }
-                match record.action.target {
-                    id if id == SUMMARY_USAGE_DISC_ID => self.usage_expanded = intent.expanded(),
-                    id if id == SUMMARY_TASKS_DISC_ID => self.tasks_expanded = intent.expanded(),
-                    _ => {}
-                }
-                continue;
-            }
             if let Some(ContentActionPayload::ListIntent(list)) = &record.payload
                 && record.action.target == SUMMARY_LIST_ID
             {
                 self.selected_key = Some(list.key);
-                self.sync_action_buttons(host);
                 if matches!(list.kind, ListIntentKind::Activated)
                     && let Some(target) = self.targets.get(&list.key)
                 {
                     out.push(target_to_intent(target));
-                }
-                continue;
-            }
-            if matches!(record.action.kind, ContentActionKind::Activate) {
-                match record.action.target {
-                    id if id == SUMMARY_OPEN_ARTIFACT_BTN_ID => {
-                        if let Some(target @ SummaryTarget::Artifact { .. }) =
-                            self.selected_key.and_then(|k| self.targets.get(&k))
-                        {
-                            out.push(target_to_intent(target));
-                        }
-                    }
-                    id if id == SUMMARY_OPEN_SUBAGENT_BTN_ID => {
-                        if let Some(target @ SummaryTarget::Subagent { .. }) =
-                            self.selected_key.and_then(|k| self.targets.get(&k))
-                        {
-                            out.push(target_to_intent(target));
-                        }
-                    }
-                    id if id == SUMMARY_OPEN_SIDECHAT_BTN_ID => {
-                        if let Some(scope) = &self.current_scope {
-                            out.push(SummaryIntent::OpenSideChat {
-                                parent: scope.clone(),
-                                title: format!("SideChat · {}", scope.session_id),
-                            });
-                        }
-                    }
-                    _ => {}
                 }
             }
         }

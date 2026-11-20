@@ -31,10 +31,60 @@ use tekes_ui_app_host::{
     OthersTab, PresentationOptions, PresentationState,
 };
 use tekes_ui_controls::composition::{
-    Component, ComponentId, ContentEvent, ContentHost, StackContent, TextContent, TextFieldContent,
+    Component, ComponentId, Content, ContentEvent, ContentHost, IconImage, IconRenderError,
+    StackContent, TextContent, TextFieldContent, WithIconRenderer,
 };
+use tekes_ui_controls::extended::{Axis, Stack};
+use tekes_ui_controls::layout_view::IconRenderer;
 use tekes_ui_render::Renderer;
-use tekes_ui_scene::Rect;
+use tekes_ui_scene::{Rect, Scene};
+use tekes_ui_tokens::{Palette, Rgba, Theme};
+
+struct TestIcons;
+impl IconRenderer for TestIcons {
+    fn draw_icon(&mut self, _: &mut Scene, _: &str, _: Rect, _: Rgba) {}
+    fn prepare_icon(
+        &mut self,
+        _: &str,
+        _: f32,
+        _: f32,
+        _: Rgba,
+    ) -> Result<IconImage, IconRenderError> {
+        Ok(IconImage::new(
+            tekes_ui_scene::ImageId(1),
+            std::rc::Rc::new(()),
+        ))
+    }
+}
+
+fn layout_host_for_focus(host: &mut ContentHost) {
+    let dummy_root = Content::new(
+        ComponentId(1),
+        StackContent {
+            model: Stack {
+                axis: Axis::Vertical,
+                gap: 0.0,
+            },
+            flexible_child: None,
+            children: Vec::new(),
+        },
+    );
+    let dummy = tekes_ui_app_host::LocalContainer::new("dummy", dummy_root).unwrap();
+    let app =
+        AppWindow::from_containers(vec![dummy.into()], PresentationOptions::new("dummy")).unwrap();
+    let (_menus, mut hosted) = app.into_window_handler().unwrap();
+    let mut icons = TestIcons;
+    let mut renderer = WithIconRenderer::new(hosted.text_host_mut(), &mut icons);
+    let area = Rect::new(0.0, 0.0, 480.0, 720.0);
+    host.render(
+        &mut Scene::new(),
+        &mut renderer,
+        area,
+        area,
+        Palette::from(Theme::LIGHT),
+    )
+    .unwrap();
+}
 
 fn settle(rt: &tokio::runtime::Runtime, ms: u64) {
     rt.block_on(async {
@@ -302,6 +352,7 @@ fn phase3_sidechat_isolation_ime_preedit_and_settings_cas_masking() {
 
     // Inject synthetic CJK Preedit into SideChat editor via ContentHost::event.
     side_container.with_host(&mut |h| {
+        layout_host_for_focus(h);
         assert!(host_contains_text(h, SIDECHAT_ACCESS_BADGE_ID, "Available"));
         assert!(host_contains_text(h, SIDECHAT_HEADER_ID, "SideChat"));
         assert!(h.get(SIDECHAT_RICH_ID).is_some());

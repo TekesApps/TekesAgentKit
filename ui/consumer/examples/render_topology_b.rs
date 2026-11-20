@@ -29,15 +29,26 @@ fn main() -> anyhow::Result<()> {
         Ok(())
     };
 
+    let scale: u32 = 2;
     let app_domain = tekes_agent_ui_consumer_check::studio::build_topology_b_app(&rt, false)?;
-    let rgba_domain =
-        tekes_agent_ui_consumer_check::studio::render_app_to_rgba8(app_domain, 1440, 900)?;
-    write_png(&domain_focus_png, &rgba_domain, 1440, 900)?;
+    let rgba_domain = tekes_agent_ui_consumer_check::studio::render_app_to_rgba8_scaled(
+        app_domain, 1440, 900, scale,
+    )?;
+    write_png(&domain_focus_png, &rgba_domain, 1440 * scale, 900 * scale)?;
 
     let app_promoted = tekes_agent_ui_consumer_check::studio::build_topology_b_app(&rt, true)?;
-    let rgba_promoted =
-        tekes_agent_ui_consumer_check::studio::render_app_to_rgba8(app_promoted, 1440, 900)?;
-    write_png(&agent_promoted_png, &rgba_promoted, 1440, 900)?;
+    let rgba_promoted = tekes_agent_ui_consumer_check::studio::render_app_to_rgba8_scaled(
+        app_promoted,
+        1440,
+        900,
+        scale,
+    )?;
+    write_png(
+        &agent_promoted_png,
+        &rgba_promoted,
+        1440 * scale,
+        900 * scale,
+    )?;
 
     let _ = std::fs::remove_dir_all(&data_dir);
     Ok(())

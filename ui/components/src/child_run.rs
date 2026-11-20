@@ -4,6 +4,7 @@
 use crate::ResponsiveWidthMode;
 use crate::ids::*;
 use crate::transcript::{TranscriptReader, format_transcript_body};
+use crate::ui_helpers::{caption_text, icon_button, label_text};
 use tekes_agent_presentation::{RunScope, RunSnapshot};
 use tekes_ui_controls::{
     ButtonVariant,
@@ -13,7 +14,7 @@ use tekes_ui_controls::{
     },
     extended::{Axis, Stack},
 };
-use tekes_ui_tokens::Spacing;
+use tekes_ui_tokens::{Spacing, proposal::layout::MainAxisDistribution};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ChildRunSurfaceStatus {
@@ -40,20 +41,19 @@ impl ChildRunSurface {
     }
 
     pub fn build_content() -> Content {
-        let header = Content::new(
-            CHILD_RUN_HEADER_ID,
-            TextContent::new("只读子代理轨迹 (无写权限 / Read-Only)"),
-        );
-        let status = Content::new(CHILD_RUN_STATUS_ID, TextContent::new("加载中..."));
+        let header = Content::new(CHILD_RUN_HEADER_ID, label_text("Subagent trace"));
+        let status = Content::new(CHILD_RUN_STATUS_ID, caption_text("Loading…"));
 
-        let mut earlier_btn = Button::new("加载更早轨迹");
+        let mut earlier_btn = Button::new("↑ Earlier");
         earlier_btn.variant = ButtonVariant::Quiet;
+        earlier_btn.set_transparent_chrome(true);
         earlier_btn.button.state.disabled = true;
         let earlier = Content::new(CHILD_RUN_EARLIER_BTN_ID, earlier_btn);
 
-        let mut refresh_btn = Button::new("刷新子代理");
-        refresh_btn.variant = ButtonVariant::Quiet;
-        let refresh = Content::new(CHILD_RUN_REFRESH_BTN_ID, refresh_btn);
+        let refresh = Content::new(
+            CHILD_RUN_REFRESH_BTN_ID,
+            icon_button(CHILD_RUN_REFRESH_ICON_ID, "tekes-refresh", "Refresh trace"),
+        );
 
         let actions_row = Content::new(
             CHILD_RUN_ACTIONS_ROW_ID,
@@ -67,6 +67,19 @@ impl ChildRunSurface {
             },
         );
 
+        let header_row = StackContent {
+            model: Stack {
+                axis: Axis::Horizontal,
+                gap: Spacing::Tight.value(),
+            },
+            flexible_child: Some(CHILD_RUN_HEADER_ID),
+            children: vec![header, actions_row],
+        }
+        .into_content_with_distribution(
+            CHILD_RUN_HEADER_ROW_ID,
+            MainAxisDistribution::SpaceBetween,
+        );
+
         let reader = Content::new(CHILD_RUN_READER_ID, TranscriptReader::new());
 
         Content::new(
@@ -74,10 +87,10 @@ impl ChildRunSurface {
             StackContent {
                 model: Stack {
                     axis: Axis::Vertical,
-                    gap: Spacing::Tight.value(),
+                    gap: Spacing::Regular.value(),
                 },
                 flexible_child: Some(CHILD_RUN_READER_ID),
-                children: vec![header, actions_row, status, reader],
+                children: vec![header_row, status, reader],
             },
         )
     }
@@ -89,17 +102,9 @@ impl ChildRunSurface {
         status: &ChildRunSurfaceStatus,
         snapshot: &RunSnapshot,
         can_load_earlier: bool,
-        mode: ResponsiveWidthMode,
+        _mode: ResponsiveWidthMode,
     ) {
-        let mode_label = match mode {
-            ResponsiveWidthMode::Compact => "Compact",
-            ResponsiveWidthMode::Expanded => "Expanded",
-        };
-        let header_text = format!(
-            "只读子代理 · {} ({mode_label} · {} turns)",
-            child_scope.session_id,
-            snapshot.transcript.turns.len()
-        );
+        let header_text = format!("Subagent · {}", child_scope.session_id);
         if self.last_header != header_text {
             self.last_header = header_text.clone();
             if let Some(node) = host.get_mut(CHILD_RUN_HEADER_ID)
@@ -110,11 +115,8 @@ impl ChildRunSurface {
         }
 
         let status_text = match status {
-            ChildRunSurfaceStatus::Loading => "状态: 正在读取子代理历史...".to_owned(),
-            ChildRunSurfaceStatus::Ready => format!(
-                "状态: 只读轨迹已就绪 (hasMore={})",
-                if can_load_earlier { "是" } else { "否" }
-            ),
+            ChildRunSurfaceStatus::Loading => "Loading subagent trace…".to_owned(),
+            ChildRunSurfaceStatus::Ready => "只读轨迹已就绪 · Read-only".to_owned(),
             ChildRunSurfaceStatus::Missing(reason) => format!("Missing · {reason}"),
         };
         if self.last_status != status_text {
@@ -135,10 +137,10 @@ impl ChildRunSurface {
 
         let body = match status {
             ChildRunSurfaceStatus::Missing(reason) => {
-                format!("子代理轨迹缺失 (Missing):\n{reason}")
+                format!("Subagent trace unavailable:\n{reason}")
             }
             ChildRunSurfaceStatus::Loading if snapshot.transcript.turns.is_empty() => {
-                "正在获取子代理执行历史...".to_owned()
+                "Loading subagent execution history…".to_owned()
             }
             _ => format_transcript_body(snapshot),
         };

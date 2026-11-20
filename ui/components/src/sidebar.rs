@@ -1,22 +1,25 @@
-//! Session Sidebar surface using `SearchFieldContent`, `SegmentedControlContent`,
-//! passive `KeyedSelectableListContent` session rows, and an action toolbar (New/Pin/Rename/Archive).
+//! Session Sidebar surface aligned with Tekes: navigation list with icons, minimal icon
+//! header actions (`+` new thread & collapsible Search), macOS context menu (`Pin`, `Rename`,
+//! `Archive`), and bottom `Settings` action.
 
 use crate::ResponsiveWidthMode;
 use crate::ids::*;
+use crate::ui_helpers::{caption_text, heading_text, icon_button, icon_row, icon_text_button};
 use std::collections::BTreeMap;
 use tekes_ui_controls::{
     ButtonVariant, ScrollArea,
     composition::{
         Button, ComponentId, Content, ContentActionKind, ContentActionPayload, ContentActionRecord,
         ContentHost, KeyedSelectableListContent, ListDisplayUpdate, ListIntentKind, ListRowDisplay,
-        ScrollContent, SearchCommandKind, SearchFieldContent, SegmentedControlContent,
-        SelectableListContent, StackContent, TextFieldContent,
+        MenuContent, MenuEntry, ScrollContent, SearchCommandKind, SearchFieldContent,
+        SelectableListContent, StackContent, TextFieldContent, TextSubmitPolicy,
     },
     extended::{
         Axis, KeyedListItem, KeyedListSnapshot, ListBudget, ListDatasetKey, ListItemKey, Stack,
     },
+    layout::Insets,
 };
-use tekes_ui_tokens::Spacing;
+use tekes_ui_tokens::{Spacing, proposal::layout::MainAxisDistribution};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum SidebarFilterSelection {
@@ -45,6 +48,7 @@ pub enum SidebarIntent {
     TogglePin(String),
     RenameSession { session_id: String, title: String },
     ArchiveSession(String),
+    OpenSettings,
 }
 
 #[derive(Debug)]
@@ -56,6 +60,8 @@ pub struct SidebarSurface {
     last_selected_session: Option<String>,
     last_mode: ResponsiveWidthMode,
     search_query: String,
+    search_open: bool,
+    renaming_session_id: Option<String>,
 }
 
 impl Default for SidebarSurface {
@@ -74,6 +80,8 @@ impl SidebarSurface {
             last_selected_session: None,
             last_mode: ResponsiveWidthMode::Expanded,
             search_query: String::new(),
+            search_open: false,
+            renaming_session_id: None,
         }
     }
 
@@ -87,31 +95,50 @@ impl SidebarSurface {
     }
 
     pub fn build_content() -> Content {
-        let mut new_btn = Button::new("新建对话");
-        new_btn.variant = ButtonVariant::Primary;
-        let pin_btn = Button::new("置顶");
-        let archive_btn = Button::new("归档");
+        let new_btn = icon_button(SIDEBAR_NEW_ICON_ID, "tekes-new", "New thread");
+        let search_toggle = icon_button(SIDEBAR_SEARCH_ICON_ID, "tekes-search", "Search threads");
 
-        let top_bar = Content::new(
-            SIDEBAR_TOP_BAR_ID,
+        let top_actions = Content::new(
+            SIDEBAR_TOP_ACTIONS_ID,
             StackContent {
                 model: Stack {
                     axis: Axis::Horizontal,
-                    gap: Spacing::Tight.value(),
+                    gap: Spacing::Micro.value(),
                 },
                 flexible_child: None,
                 children: vec![
                     Content::new(SIDEBAR_NEW_BTN_ID, new_btn),
-                    Content::new(SIDEBAR_PIN_BTN_ID, pin_btn),
-                    Content::new(SIDEBAR_ARCHIVE_BTN_ID, archive_btn),
+                    Content::new(SIDEBAR_SEARCH_TOGGLE_BTN_ID, search_toggle),
                 ],
             },
         );
 
-        let filter = SegmentedControlContent::new("会话筛选", vec!["全部".into(), "置顶".into()]);
+        let top_bar = StackContent {
+            model: Stack {
+                axis: Axis::Horizontal,
+                gap: Spacing::Tight.value(),
+            },
+            flexible_child: None,
+            children: vec![
+                Content::new(SIDEBAR_BRAND_LABEL_ID, heading_text("Tekes")),
+                top_actions,
+            ],
+        }
+        .into_content_with_distribution(SIDEBAR_TOP_BAR_ID, MainAxisDistribution::SpaceBetween);
 
-        let mut search = SearchFieldContent::new("搜索会话", "");
-        search.set_placeholder(Some("搜索会话标题 / 目录…".to_owned()));
+        let search_slot = Content::new(
+            SIDEBAR_SEARCH_SLOT_ID,
+            StackContent {
+                model: Stack {
+                    axis: Axis::Vertical,
+                    gap: 0.0,
+                },
+                flexible_child: None,
+                children: Vec::new(),
+            },
+        );
+
+        let section_caption = Content::new(SIDEBAR_SECTION_CAPTION_ID, caption_text("Projects"));
 
         let initial_snap = KeyedListSnapshot {
             dataset: ListDatasetKey(1),
@@ -119,53 +146,74 @@ impl SidebarSurface {
             display_items: Vec::new(),
         };
         let mut initial_rows = Vec::new();
-        let list = SelectableListContent::keyed(
-            "会话列表",
+        let mut list = SelectableListContent::keyed(
+            "Sessions",
             &initial_snap,
             &mut initial_rows,
             Self::budget(),
         )
         .expect("initial empty keyed list");
+        list.set_navigation_layout(true);
+        list.set_navigation_selection_fill_only(true);
 
         let list_scroll =
-            ScrollContent::new(ScrollArea::default(), Content::new(SIDEBAR_LIST_ID, list));
+            ScrollContent::new(ScrollArea::default(), Content::new(SIDEBAR_LIST_ID, list))
+                .scrollbar(true);
 
-        let mut rename_input = TextFieldContent::new("会话名称", "");
-        rename_input.show_metadata = false;
-        rename_input.set_placeholder(Some("输入新名称…".to_owned()));
-        let rename_btn = Button::new("重命名");
-        let rename_row = Content::new(
+        let rename_slot = Content::new(
             SIDEBAR_RENAME_ROW_ID,
             StackContent {
                 model: Stack {
                     axis: Axis::Horizontal,
                     gap: Spacing::Tight.value(),
                 },
-                flexible_child: Some(SIDEBAR_RENAME_INPUT_ID),
-                children: vec![
-                    Content::new(SIDEBAR_RENAME_INPUT_ID, rename_input),
-                    Content::new(SIDEBAR_RENAME_BTN_ID, rename_btn),
-                ],
+                flexible_child: None,
+                children: Vec::new(),
             },
         );
 
-        Content::new(
-            SIDEBAR_ROOT_ID,
-            StackContent {
-                model: Stack {
-                    axis: Axis::Vertical,
-                    gap: Spacing::Tight.value(),
-                },
-                flexible_child: Some(SIDEBAR_LIST_SCROLL_ID),
-                children: vec![
-                    top_bar,
-                    Content::new(SIDEBAR_FILTER_ID, filter),
-                    Content::new(SIDEBAR_SEARCH_ID, search),
-                    Content::new(SIDEBAR_LIST_SCROLL_ID, list_scroll),
-                    rename_row,
+        let settings_btn = icon_text_button(
+            ComponentId(624),
+            SIDEBAR_SETTINGS_ICON_ID,
+            ComponentId(625),
+            "tekes-settings",
+            "Settings",
+        );
+
+        let context_menu = Content::new(
+            SIDEBAR_CONTEXT_MENU_ID,
+            MenuContent::context_menu(
+                "Thread actions",
+                vec![
+                    MenuEntry::item("pin", "Pin / Unpin"),
+                    MenuEntry::item("rename", "Rename"),
+                    MenuEntry::item("archive", "Archive"),
                 ],
+            )
+            .expect("valid sidebar context menu entries"),
+        );
+
+        StackContent {
+            model: Stack {
+                axis: Axis::Vertical,
+                gap: Spacing::Regular.value(),
             },
-        )
+            flexible_child: Some(SIDEBAR_LIST_SCROLL_ID),
+            children: vec![
+                top_bar,
+                search_slot,
+                section_caption,
+                Content::new(SIDEBAR_LIST_SCROLL_ID, list_scroll),
+                rename_slot,
+                Content::new(SIDEBAR_SETTINGS_BTN_ID, settings_btn),
+                context_menu,
+            ],
+        }
+        .into_content_with_padding(SIDEBAR_ROOT_ID, Insets::new(12.0, 12.0, 12.0, 12.0))
+    }
+
+    pub fn bind_context_menu(host: &mut ContentHost) {
+        let _ = host.bind_context_menu(SIDEBAR_LIST_ID, SIDEBAR_CONTEXT_MENU_ID);
     }
 
     fn key_for(&mut self, session_id: &str) -> ListItemKey {
@@ -179,26 +227,71 @@ impl SidebarSurface {
         key
     }
 
+    fn set_search_visible(&self, host: &mut ContentHost, visible: bool) {
+        let is_mounted = host.get(SIDEBAR_SEARCH_ID).is_some();
+        if visible && !is_mounted {
+            let mut search = SearchFieldContent::new("Search threads", &self.search_query);
+            search.set_placeholder(Some("Search threads…".to_owned()));
+            replace_stack_children(
+                host,
+                SIDEBAR_SEARCH_SLOT_ID,
+                vec![Content::new(SIDEBAR_SEARCH_ID, search)],
+            );
+        } else if !visible && is_mounted {
+            replace_stack_children(host, SIDEBAR_SEARCH_SLOT_ID, Vec::new());
+        }
+    }
+
+    fn set_rename_visible(&self, host: &mut ContentHost, visible: bool, initial_title: &str) {
+        let is_mounted = host.get(SIDEBAR_RENAME_INPUT_ID).is_some();
+        if visible && !is_mounted {
+            let mut input = TextFieldContent::new("Thread name", initial_title);
+            input.show_metadata = false;
+            input.submit_policy = TextSubmitPolicy::Enter;
+            input.set_placeholder(Some("Rename thread…".to_owned()));
+            let mut save_btn = Button::new("Save");
+            save_btn.variant = ButtonVariant::Primary;
+            let mut cancel_btn = Button::new("×").with_accessible_name("Cancel rename");
+            cancel_btn.variant = ButtonVariant::Quiet;
+            if let Some(slot) = host
+                .get_mut(SIDEBAR_RENAME_ROW_ID)
+                .and_then(|c| c.component_mut::<StackContent>())
+            {
+                slot.flexible_child = Some(SIDEBAR_RENAME_INPUT_ID);
+            }
+            replace_stack_children(
+                host,
+                SIDEBAR_RENAME_ROW_ID,
+                vec![
+                    Content::new(SIDEBAR_RENAME_INPUT_ID, input),
+                    Content::new(SIDEBAR_RENAME_BTN_ID, save_btn),
+                    Content::new(SIDEBAR_RENAME_CANCEL_BTN_ID, cancel_btn),
+                ],
+            );
+            let _ = host.focus(Some(SIDEBAR_RENAME_INPUT_ID), true);
+        } else if !visible && is_mounted {
+            if let Some(slot) = host
+                .get_mut(SIDEBAR_RENAME_ROW_ID)
+                .and_then(|c| c.component_mut::<StackContent>())
+            {
+                slot.flexible_child = None;
+            }
+            replace_stack_children(host, SIDEBAR_RENAME_ROW_ID, Vec::new());
+        }
+    }
+
     pub fn sync(
         &mut self,
         host: &mut ContentHost,
         rows: &[SidebarRowModel],
         selected_session_id: Option<&str>,
-        filter: SidebarFilterSelection,
+        _filter: SidebarFilterSelection,
         width_mode: ResponsiveWidthMode,
     ) {
         self.last_mode = width_mode;
 
-        if let Some(seg) = host
-            .get_mut(SIDEBAR_FILTER_ID)
-            .and_then(|c| c.component_mut::<SegmentedControlContent>())
-        {
-            let target_idx = match filter {
-                SidebarFilterSelection::All => 0,
-                SidebarFilterSelection::Pinned => 1,
-            };
-            let _ = seg.set_selected(target_idx);
-        }
+        let show_search = self.search_open || !self.search_query.is_empty();
+        self.set_search_visible(host, show_search);
 
         let mut sig = String::new();
         let mut list_items = Vec::with_capacity(rows.len());
@@ -207,23 +300,37 @@ impl SidebarSurface {
 
         for row in rows {
             let key = self.key_for(&row.session_id);
-            let pin_tag = if row.pinned { "★ " } else { "" };
-            let arch_tag = if row.archived { "[已归档] " } else { "" };
-            let act_tag = if row.running {
-                "[运行中] "
-            } else if row.activity == "waiting" {
-                "[待确认] "
+            let icon_name = if row.running {
+                "tekes-progress"
+            } else if row.pinned {
+                "tekes-pinned"
+            } else if row.archived {
+                "tekes-archive"
             } else {
-                ""
+                "tekes-side-chat"
             };
-            let label = format!("{pin_tag}{arch_tag}{act_tag}{} · {}", row.title, row.folder);
-            sig.push_str(&format!("{}:{}|", key.0, label));
-            list_items.push(KeyedListItem { key, name: label });
+            let title = if row.archived {
+                format!("{} (Archived)", row.title)
+            } else {
+                row.title.clone()
+            };
+            sig.push_str(&format!("{}:{}:{icon_name}:{}|", key.0, row.folder, title));
+            list_items.push(KeyedListItem {
+                key,
+                name: title.clone(),
+            });
             display_items.push(key);
+            let decor_base = SIDEBAR_ROW_DECOR_BASE + key.0 * 4;
             display_rows.push(ListRowDisplay {
                 key,
                 row_id: ComponentId(SIDEBAR_ROW_BASE + key.0),
-                display: ListDisplayUpdate::DefaultLabel,
+                display: ListDisplayUpdate::Replace(icon_row(
+                    ComponentId(decor_base),
+                    ComponentId(decor_base + 1),
+                    ComponentId(decor_base + 2),
+                    icon_name,
+                    title,
+                )),
             });
         }
 
@@ -249,25 +356,11 @@ impl SidebarSurface {
             let _ = host.set_keyed_list_selection(SIDEBAR_LIST_ID, key);
             self.last_selected_session = sel_owned;
         }
-
-        let has_selection = selected_session_id.is_some();
-        for btn_id in [
-            SIDEBAR_PIN_BTN_ID,
-            SIDEBAR_ARCHIVE_BTN_ID,
-            SIDEBAR_RENAME_BTN_ID,
-        ] {
-            if let Some(btn) = host
-                .get_mut(btn_id)
-                .and_then(|c| c.component_mut::<Button>())
-            {
-                btn.button.state.disabled = !has_selection;
-            }
-        }
     }
 
     pub fn handle_actions(
         &mut self,
-        host: &ContentHost,
+        host: &mut ContentHost,
         selected_session_id: Option<&str>,
         records: &[ContentActionRecord],
     ) -> Vec<SidebarIntent> {
@@ -292,17 +385,10 @@ impl SidebarSurface {
                     SearchCommandKind::Clear => String::new(),
                 };
                 self.search_query = q.clone();
+                if q.is_empty() {
+                    self.search_open = false;
+                }
                 out.push(SidebarIntent::SearchChanged(q));
-                continue;
-            }
-            if let Some(ContentActionPayload::SegmentSelection(seg)) = &record.payload
-                && record.action.target == SIDEBAR_FILTER_ID
-            {
-                out.push(SidebarIntent::FilterChanged(if seg.index() == 1 {
-                    SidebarFilterSelection::Pinned
-                } else {
-                    SidebarFilterSelection::All
-                }));
                 continue;
             }
             if let Some(ContentActionPayload::ListIntent(list)) = &record.payload
@@ -317,21 +403,59 @@ impl SidebarSurface {
                 }
                 continue;
             }
+            if let Some(ContentActionPayload::MenuSelection(sel)) = &record.payload
+                && record.action.target == SIDEBAR_CONTEXT_MENU_ID
+            {
+                if let Some(sid) = selected_session_id {
+                    match sel.index() {
+                        0 => out.push(SidebarIntent::TogglePin(sid.to_owned())),
+                        1 => {
+                            self.renaming_session_id = Some(sid.to_owned());
+                            self.set_rename_visible(host, true, "");
+                        }
+                        2 => out.push(SidebarIntent::ArchiveSession(sid.to_owned())),
+                        _ => {}
+                    }
+                }
+                continue;
+            }
+            if record.action.target == SIDEBAR_RENAME_INPUT_ID
+                && matches!(record.action.kind, ContentActionKind::Submit)
+            {
+                if let Some(sid) = self.renaming_session_id.as_deref().or(selected_session_id)
+                    && let Some(field) = host
+                        .get(SIDEBAR_RENAME_INPUT_ID)
+                        .and_then(|c| c.component::<TextFieldContent>())
+                {
+                    let title = field.text().trim().to_owned();
+                    if !title.is_empty() {
+                        out.push(SidebarIntent::RenameSession {
+                            session_id: sid.to_owned(),
+                            title,
+                        });
+                    }
+                }
+                self.renaming_session_id = None;
+                self.set_rename_visible(host, false, "");
+                continue;
+            }
             if matches!(record.action.kind, ContentActionKind::Activate) {
                 match record.action.target {
                     id if id == SIDEBAR_NEW_BTN_ID => out.push(SidebarIntent::CreateSession),
-                    id if id == SIDEBAR_PIN_BTN_ID => {
-                        if let Some(sid) = selected_session_id {
-                            out.push(SidebarIntent::TogglePin(sid.to_owned()));
+                    id if id == SIDEBAR_SEARCH_TOGGLE_BTN_ID => {
+                        self.search_open = !self.search_open;
+                        if !self.search_open && !self.search_query.is_empty() {
+                            self.search_query.clear();
+                            out.push(SidebarIntent::SearchChanged(String::new()));
                         }
-                    }
-                    id if id == SIDEBAR_ARCHIVE_BTN_ID => {
-                        if let Some(sid) = selected_session_id {
-                            out.push(SidebarIntent::ArchiveSession(sid.to_owned()));
+                        self.set_search_visible(host, self.search_open);
+                        if self.search_open {
+                            let _ = host.focus(Some(SIDEBAR_SEARCH_ID), true);
                         }
                     }
                     id if id == SIDEBAR_RENAME_BTN_ID => {
-                        if let Some(sid) = selected_session_id
+                        if let Some(sid) =
+                            self.renaming_session_id.as_deref().or(selected_session_id)
                             && let Some(field) = host
                                 .get(SIDEBAR_RENAME_INPUT_ID)
                                 .and_then(|c| c.component::<TextFieldContent>())
@@ -344,7 +468,14 @@ impl SidebarSurface {
                                 });
                             }
                         }
+                        self.renaming_session_id = None;
+                        self.set_rename_visible(host, false, "");
                     }
+                    id if id == SIDEBAR_RENAME_CANCEL_BTN_ID => {
+                        self.renaming_session_id = None;
+                        self.set_rename_visible(host, false, "");
+                    }
+                    id if id == SIDEBAR_SETTINGS_BTN_ID => out.push(SidebarIntent::OpenSettings),
                     _ => {}
                 }
             }

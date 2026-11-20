@@ -1,18 +1,21 @@
-//! Workspace Files tree & search surface backed by passive `TreeContent` and `SearchFieldContent`.
+//! Workspace Files tree & search surface aligned with Tekes: search box, clean header
+//! with icon refresh action, SVG file/folder icons in `TreeContent`, direct click-to-open,
+//! and right-click context menu (`Open in Viewer` / `Attach to Conversation`).
 
 use crate::ResponsiveWidthMode;
 use crate::ids::*;
+use crate::ui_helpers::{icon_button, icon_row, label_text};
 use std::collections::BTreeMap;
 use tekes_ui_controls::{
-    ButtonVariant, ScrollArea,
+    ScrollArea,
     composition::{
-        Button, ComponentId, Content, ContentActionKind, ContentActionPayload, ContentActionRecord,
-        ContentHost, ScrollContent, SearchCommandKind, SearchFieldContent, StackContent,
-        TextContent, TreeContent, TreeContentNode, TreeDisplayUpdate, TreeIntentKind,
+        ComponentId, Content, ContentActionKind, ContentActionPayload, ContentActionRecord,
+        ContentHost, MenuContent, MenuEntry, ScrollContent, SearchCommandKind, SearchFieldContent,
+        StackContent, TextContent, TreeContent, TreeContentNode, TreeDisplayUpdate, TreeIntentKind,
     },
     extended::{Axis, KeyedTreeNode, Stack, TreeDatasetKey, TreeNodeKey},
 };
-use tekes_ui_tokens::Spacing;
+use tekes_ui_tokens::{Spacing, proposal::layout::MainAxisDistribution};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FileTreeRowModel {
@@ -62,34 +65,39 @@ impl WorkspaceFilesSurface {
     }
 
     pub fn build_content() -> Content {
-        let mut search = SearchFieldContent::new("搜索工作区文件", "");
-        search.set_placeholder(Some("按路径或文件名过滤…".to_owned()));
+        let mut search = SearchFieldContent::new("Search workspace", "");
+        search.set_placeholder(Some("Search workspace paths".to_owned()));
 
-        let tree = TreeContent::new("工作区目录树", TreeDatasetKey(1), Vec::new())
+        let refresh_btn = icon_button(FILES_REFRESH_ICON_ID, "tekes-refresh", "Refresh files");
+        let header_row = StackContent {
+            model: Stack {
+                axis: Axis::Horizontal,
+                gap: Spacing::Tight.value(),
+            },
+            flexible_child: Some(FILES_HEADER_ID),
+            children: vec![
+                Content::new(FILES_HEADER_ID, label_text("Workspace")),
+                Content::new(FILES_REFRESH_BTN_ID, refresh_btn),
+            ],
+        }
+        .into_content_with_distribution(FILES_HEADER_ROW_ID, MainAxisDistribution::SpaceBetween);
+
+        let tree = TreeContent::new("Workspace tree", TreeDatasetKey(1), Vec::new())
             .expect("empty TreeContent valid");
         let tree_scroll =
-            ScrollContent::new(ScrollArea::default(), Content::new(FILES_TREE_ID, tree));
+            ScrollContent::new(ScrollArea::default(), Content::new(FILES_TREE_ID, tree))
+                .scrollbar(true);
 
-        let mut open_btn = Button::new("在 Viewer 打开");
-        open_btn.variant = ButtonVariant::Primary;
-        let attach_btn = Button::new("附加到对话");
-        let mut refresh_btn = Button::new("刷新");
-        refresh_btn.variant = ButtonVariant::Quiet;
-
-        let actions = Content::new(
-            FILES_ACTIONS_ROW_ID,
-            StackContent {
-                model: Stack {
-                    axis: Axis::Horizontal,
-                    gap: Spacing::Tight.value(),
-                },
-                flexible_child: None,
-                children: vec![
-                    Content::new(FILES_OPEN_BTN_ID, open_btn),
-                    Content::new(FILES_ATTACH_BTN_ID, attach_btn),
-                    Content::new(FILES_REFRESH_BTN_ID, refresh_btn),
+        let context_menu = Content::new(
+            FILES_CONTEXT_MENU_ID,
+            MenuContent::context_menu(
+                "File actions",
+                vec![
+                    MenuEntry::item("open", "Open in Viewer"),
+                    MenuEntry::item("attach", "Attach to Conversation"),
                 ],
-            },
+            )
+            .expect("valid files context menu"),
         );
 
         Content::new(
@@ -97,17 +105,21 @@ impl WorkspaceFilesSurface {
             StackContent {
                 model: Stack {
                     axis: Axis::Vertical,
-                    gap: Spacing::Tight.value(),
+                    gap: Spacing::Regular.value(),
                 },
                 flexible_child: Some(FILES_TREE_SCROLL_ID),
                 children: vec![
-                    Content::new(FILES_HEADER_ID, TextContent::new("工作区文件")),
                     Content::new(FILES_SEARCH_ID, search),
+                    header_row,
                     Content::new(FILES_TREE_SCROLL_ID, tree_scroll),
-                    actions,
+                    context_menu,
                 ],
             },
         )
+    }
+
+    pub fn bind_context_menu(host: &mut ContentHost) {
+        let _ = host.bind_context_menu(FILES_TREE_ID, FILES_CONTEXT_MENU_ID);
     }
 
     fn key_for(&mut self, path: &str) -> TreeNodeKey {
@@ -119,6 +131,33 @@ impl WorkspaceFilesSurface {
         self.path_to_key.insert(path.to_owned(), k);
         self.key_to_path.insert(k, path.to_owned());
         k
+    }
+
+    fn file_icon(item: &FileTreeRowModel) -> &'static str {
+        if item.is_dir {
+            return "tekes-folder";
+        }
+        if item.name.ends_with(".rs")
+            || item.name.ends_with(".ts")
+            || item.name.ends_with(".tsx")
+            || item.name.ends_with(".cadspec")
+            || item.name.ends_with(".py")
+        {
+            "tekes-file-code"
+        } else if item.name.ends_with(".md")
+            || item.name.ends_with(".toml")
+            || item.name.ends_with(".json")
+            || item.name.ends_with(".txt")
+        {
+            "tekes-file-text"
+        } else if item.name.ends_with(".png")
+            || item.name.ends_with(".jpg")
+            || item.name.ends_with(".gif")
+        {
+            "tekes-image"
+        } else {
+            "tekes-file-generic"
+        }
     }
 
     pub fn sync(
@@ -135,7 +174,14 @@ impl WorkspaceFilesSurface {
             .get_mut(FILES_HEADER_ID)
             .and_then(|c| c.component_mut::<TextContent>())
         {
-            header.text = format!("工作区文件 ({}) · {} 项", workspace_id, items.len());
+            let next_title = if workspace_id.is_empty() {
+                "Workspace".to_owned()
+            } else {
+                workspace_id.to_owned()
+            };
+            if header.text != next_title {
+                header.text = next_title;
+            }
         }
 
         let mut sig = String::new();
@@ -146,22 +192,28 @@ impl WorkspaceFilesSurface {
             let key = self.key_for(&item.path);
             let parent = item.parent_path.as_deref().map(|p| self.key_for(p));
             self.key_is_dir.insert(key, item.is_dir);
-            let label = if item.is_dir {
-                format!("▸ {}/", item.name)
-            } else {
-                item.name.clone()
-            };
-            sig.push_str(&format!("{}:{:?}:{}|", key.0, parent, label));
+            let icon_name = Self::file_icon(item);
+            sig.push_str(&format!(
+                "{}:{:?}:{icon_name}:{}|",
+                key.0, parent, item.name
+            ));
+            let decor = FILES_ROW_DECOR_BASE + key.0 * 4;
             tree_nodes.push(TreeContentNode {
                 row_id: ComponentId(FILES_ROW_BASE + key.0),
                 node: KeyedTreeNode {
                     key,
                     parent,
-                    label,
+                    label: item.name.clone(),
                     disabled: false,
                     initially_expanded: true,
                 },
-                display: TreeDisplayUpdate::DefaultLabel,
+                display: TreeDisplayUpdate::Replace(icon_row(
+                    ComponentId(decor),
+                    ComponentId(decor + 1),
+                    ComponentId(decor + 2),
+                    icon_name,
+                    item.name.clone(),
+                )),
             });
         }
 
@@ -180,16 +232,6 @@ impl WorkspaceFilesSurface {
                 .and_then(|c| c.component_mut::<TreeContent>())
         {
             tree.select_key(key);
-        }
-
-        let selected_is_file = selected_path
-            .and_then(|p| self.path_to_key.get(p))
-            .is_some_and(|k| !self.key_is_dir.get(k).copied().unwrap_or(false));
-
-        for id in [FILES_OPEN_BTN_ID, FILES_ATTACH_BTN_ID] {
-            if let Some(btn) = host.get_mut(id).and_then(|c| c.component_mut::<Button>()) {
-                btn.button.state.disabled = !selected_is_file;
-            }
         }
     }
 
@@ -249,23 +291,29 @@ impl WorkspaceFilesSurface {
                 }
                 continue;
             }
-            if matches!(record.action.kind, ContentActionKind::Activate) {
-                match record.action.target {
-                    id if id == FILES_OPEN_BTN_ID => {
-                        if let Some(p) = selected_path {
-                            out.push(FilesIntent::OpenFile(p.to_owned()));
-                        }
+            if let Some(ContentActionPayload::MenuSelection(sel)) = &record.payload
+                && record.action.target == FILES_CONTEXT_MENU_ID
+            {
+                if let Some(path) = selected_path
+                    && !self
+                        .path_to_key
+                        .get(path)
+                        .and_then(|k| self.key_is_dir.get(k))
+                        .copied()
+                        .unwrap_or(false)
+                {
+                    match sel.index() {
+                        0 => out.push(FilesIntent::OpenFile(path.to_owned())),
+                        1 => out.push(FilesIntent::AttachFile(path.to_owned())),
+                        _ => {}
                     }
-                    id if id == FILES_ATTACH_BTN_ID => {
-                        if let Some(p) = selected_path {
-                            out.push(FilesIntent::AttachFile(p.to_owned()));
-                        }
-                    }
-                    id if id == FILES_REFRESH_BTN_ID => {
-                        out.push(FilesIntent::Refresh);
-                    }
-                    _ => {}
                 }
+                continue;
+            }
+            if record.action.target == FILES_REFRESH_BTN_ID
+                && matches!(record.action.kind, ContentActionKind::Activate)
+            {
+                out.push(FilesIntent::Refresh);
             }
         }
         out

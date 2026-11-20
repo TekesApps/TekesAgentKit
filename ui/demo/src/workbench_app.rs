@@ -9,10 +9,9 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 use tekes_agent_apphost::{
-    AgentRunContainer, ArtifactViewerContainer, ChildRunContainer, HarnessSettingsContainer,
-    SessionSidebarContainer, SharedAgentWorkbench, SideChatContainer, SummaryContainer,
-    TasksQueueContainer, WorkspaceChangesContainer, WorkspaceFilesContainer,
-    build_agent_settings_owner,
+    AgentRunContainer, ArtifactViewerContainer, ChildRunContainer, SessionSidebarContainer,
+    SharedAgentWorkbench, SideChatContainer, SummaryContainer, WorkspaceChangesContainer,
+    WorkspaceFilesContainer, build_agent_settings_owner,
 };
 use tekes_agent_contract::{EndpointConnector, WorkspaceServiceEndpoint};
 use tekes_agent_endpoint_kernel::KernelConnector;
@@ -292,20 +291,16 @@ pub fn build_topology_a_containers_and_options(
     let sidebar = SessionSidebarContainer::build("agent-sidebar", wb.clone())?
         .toolbar_host(ContainerToolbarHost::Window);
     let run_container = AgentRunContainer::build("agent-run", wb.clone())?;
-    let summary_card = SummaryContainer::build_list_card("agent-summary", 280.0, wb.clone())?;
-    let tasks_card = TasksQueueContainer::build_list_card("agent-tasks", 220.0, wb.clone())?;
+    let summary_tab = SummaryContainer::build_tab("agent-summary", wb.clone())?;
     let files_tab = WorkspaceFilesContainer::build("workspace-files", wb.clone())?;
     let changes_tab = WorkspaceChangesContainer::build("workspace-changes", wb.clone())?;
-    let settings_tab = HarnessSettingsContainer::build_tab("harness-settings", wb.clone())?;
 
     let containers: Vec<Container> = vec![
         sidebar.into(),
         run_container.into(),
-        summary_card.into(),
-        tasks_card.into(),
+        summary_tab.into(),
         files_tab.into(),
         changes_tab.into(),
-        settings_tab.into(),
     ];
 
     let (focus_id, others_ids, selected_tab) = if swap_focus {
@@ -314,9 +309,7 @@ pub fn build_topology_a_containers_and_options(
             vec![
                 "agent-run".to_owned(),
                 "agent-summary".to_owned(),
-                "agent-tasks".to_owned(),
                 "workspace-changes".to_owned(),
-                "harness-settings".to_owned(),
             ],
             OthersTab::Container("agent-run".to_owned()),
         )
@@ -325,23 +318,23 @@ pub fn build_topology_a_containers_and_options(
             "agent-run",
             vec![
                 "agent-summary".to_owned(),
-                "agent-tasks".to_owned(),
                 "workspace-files".to_owned(),
                 "workspace-changes".to_owned(),
-                "harness-settings".to_owned(),
             ],
-            OthersTab::List,
+            OthersTab::Container("agent-summary".to_owned()),
         )
     };
 
     let mut others_opts = OthersOptions::new(others_ids);
     others_opts.selected = Some(selected_tab);
 
-    let presentation = PresentationOptions::new(focus_id)
+    let mut presentation = PresentationOptions::new(focus_id)
         .nav_bar("agent-sidebar")
         .navigation_toolbar("agent-sidebar")
         .workspace_switch(true)
         .others(others_opts);
+    presentation.nav_width = 236.0;
+    presentation.focus_fraction = 0.62;
 
     let factories = vec![
         ArtifactViewerContainer::factory("artifact-viewer", wb.clone(), None),
@@ -403,9 +396,10 @@ pub fn render_topology_a_offscreen_png(
     }
     let (_menus, mut hosted) = app.into_window_handler()?;
     let mut gpu = Renderer::new_headless()?;
-    let rgba = hosted.render_headless_rgba8(&mut gpu, (width, height), 1)?;
+    let scale: u32 = 2;
+    let rgba = hosted.render_headless_rgba8(&mut gpu, (width, height), scale)?;
     let file = std::fs::File::create(path)?;
-    let mut encoder = png::Encoder::new(file, width, height);
+    let mut encoder = png::Encoder::new(file, width * scale, height * scale);
     encoder.set_color(png::ColorType::Rgba);
     encoder.set_depth(png::BitDepth::Eight);
     encoder.write_header()?.write_image_data(&rgba)?;

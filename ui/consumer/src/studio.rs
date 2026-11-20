@@ -8,8 +8,8 @@ use std::sync::Arc;
 use std::time::Duration;
 use tekes_agent_apphost::{
     AgentRunContainer, ArtifactViewerContainer, ArtifactViewerProvider, ChildRunContainer,
-    SharedAgentWorkbench, SideChatContainer, SummaryContainer, TasksQueueContainer,
-    WorkspaceChangesContainer, WorkspaceFilesContainer, build_agent_settings_owner,
+    SharedAgentWorkbench, SideChatContainer, SummaryContainer, WorkspaceChangesContainer,
+    WorkspaceFilesContainer, build_agent_settings_owner,
 };
 use tekes_agent_contract::{
     ArtifactSelectionReference, EndpointConnector, Utf16SelectionRange, WorkspaceServiceEndpoint,
@@ -22,27 +22,28 @@ use tekes_agent_ui_bindings::{
     UiWakeNotifier, WorkbenchCommand, WorkspaceBinding, sha256_prefixed,
 };
 use tekes_ui_app_host::{
-    AppWindow, Container, ContainerFactory, ContainerToolbarHost, ContainerToolbarPosition,
-    LocalContainer, NavigationOptions, OthersOptions, OthersTab, PresentationOptions,
-    PresentationState, navigation,
+    AppWindow, Container, ContainerFactory, ContainerToolbarHost, LocalContainer,
+    NavigationOptions, OthersOptions, OthersTab, PresentationOptions, PresentationState,
+    navigation,
 };
-use tekes_ui_app_protocol::ToolbarItem;
 use tekes_ui_controls::{
     ButtonVariant, ScrollArea,
     composition::{
         Button, ComponentId, Content, ContentActionKind, ContentActionRecord, ContentHost,
-        RichContent, RichDocument, ScrollContent, StackContent, TextContent, TreeContent,
-        TreeContentNode, TreeDisplayUpdate,
+        IconContent, PanelContent, RichContent, RichDocument, ScrollContent, StackContent,
+        TextContent, TreeContent, TreeContentNode, TreeDisplayUpdate,
     },
     extended::{Axis, KeyedTreeNode, Stack, TreeDatasetKey, TreeNodeKey},
+    layout::Insets,
 };
 use tekes_ui_render::Renderer;
-use tekes_ui_tokens::{Spacing, Theme};
+use tekes_ui_tokens::{Spacing, Theme, proposal::TextRole};
 
 pub const DOMAIN_OUTLINER_SHELL_ID: ComponentId = ComponentId(2000);
 pub const DOMAIN_OUTLINER_HEADER_ID: ComponentId = ComponentId(2001);
 pub const DOMAIN_OUTLINER_TREE_SCROLL_ID: ComponentId = ComponentId(2002);
 pub const DOMAIN_OUTLINER_TREE_ID: ComponentId = ComponentId(2003);
+pub const DOMAIN_OUTLINER_CAPTION_ID: ComponentId = ComponentId(2004);
 
 pub const DOMAIN_CANVAS_SHELL_ID: ComponentId = ComponentId(2050);
 pub const DOMAIN_CANVAS_HEADER_ID: ComponentId = ComponentId(2051);
@@ -51,6 +52,7 @@ pub const DOMAIN_CANVAS_SPEC_RICH_ID: ComponentId = ComponentId(2053);
 pub const DOMAIN_CANVAS_QUOTE_BTN_ID: ComponentId = ComponentId(2054);
 pub const DOMAIN_CANVAS_OPEN_SPEC_BTN_ID: ComponentId = ComponentId(2055);
 pub const DOMAIN_CANVAS_ACTIONS_ROW_ID: ComponentId = ComponentId(2056);
+pub const DOMAIN_CANVAS_SPEC_PANEL_ID: ComponentId = ComponentId(2057);
 
 pub const DOMAIN_CAD_CUSTOM_SLOT_ID: ComponentId = ComponentId(1401);
 pub const DOMAIN_FOCUS_CMD: u64 = 20_001;
@@ -151,6 +153,26 @@ impl DomainStudioRuntime {
     }
 }
 
+fn domain_tree_row(base_id: u64, icon_name: &str, label: &str) -> TreeDisplayUpdate {
+    let icon = IconContent::new(icon_name)
+        .unwrap_or_else(|_| IconContent::new("tekes-file-generic").expect("fallback icon"));
+    let text_id = ComponentId(base_id + 2);
+    TreeDisplayUpdate::Replace(Content::new(
+        ComponentId(base_id),
+        StackContent {
+            model: Stack {
+                axis: Axis::Horizontal,
+                gap: Spacing::Tight.value(),
+            },
+            flexible_child: Some(text_id),
+            children: vec![
+                Content::new(ComponentId(base_id + 1), icon),
+                Content::new(text_id, TextContent::new(label)),
+            ],
+        },
+    ))
+}
+
 pub fn build_domain_outliner() -> Result<LocalContainer> {
     let nodes = vec![
         TreeContentNode {
@@ -158,47 +180,47 @@ pub fn build_domain_outliner() -> Result<LocalContainer> {
             node: KeyedTreeNode {
                 key: TreeNodeKey(1),
                 parent: None,
-                label: "Chassis-MK4 总装模型".to_owned(),
+                label: "Chassis-MK4 Assembly".to_owned(),
                 disabled: false,
                 initially_expanded: true,
             },
-            display: TreeDisplayUpdate::DefaultLabel,
+            display: domain_tree_row(2100, "tekes-folder", "Chassis-MK4 Assembly"),
         },
         TreeContentNode {
             row_id: ComponentId(2011),
             node: KeyedTreeNode {
                 key: TreeNodeKey(2),
                 parent: Some(TreeNodeKey(1)),
-                label: "主车架 · specs/chassis.cadspec".to_owned(),
+                label: "specs/chassis.cadspec".to_owned(),
                 disabled: false,
                 initially_expanded: false,
             },
-            display: TreeDisplayUpdate::DefaultLabel,
+            display: domain_tree_row(2110, "tekes-file-code", "specs/chassis.cadspec"),
         },
         TreeContentNode {
             row_id: ComponentId(2012),
             node: KeyedTreeNode {
                 key: TreeNodeKey(3),
                 parent: Some(TreeNodeKey(1)),
-                label: "悬架摇臂总成 (Al-7075-T6)".to_owned(),
+                label: "Rocker Arm · Al-7075-T6".to_owned(),
                 disabled: false,
                 initially_expanded: false,
             },
-            display: TreeDisplayUpdate::DefaultLabel,
+            display: domain_tree_row(2120, "tekes-file-generic", "Rocker Arm · Al-7075-T6"),
         },
         TreeContentNode {
             row_id: ComponentId(2013),
             node: KeyedTreeNode {
                 key: TreeNodeKey(4),
                 parent: Some(TreeNodeKey(1)),
-                label: "热管导流罩 (CFRP)".to_owned(),
+                label: "Thermal Shroud · CFRP".to_owned(),
                 disabled: false,
                 initially_expanded: false,
             },
-            display: TreeDisplayUpdate::DefaultLabel,
+            display: domain_tree_row(2130, "tekes-file-generic", "Thermal Shroud · CFRP"),
         },
     ];
-    let tree = TreeContent::new("CAD 结构树", TreeDatasetKey(201), nodes)
+    let tree = TreeContent::new("CAD Assembly", TreeDatasetKey(201), nodes)
         .map_err(|err| anyhow::anyhow!("CAD outliner tree invalid: {err:?}"))?;
     let scroll = Content::new(
         DOMAIN_OUTLINER_TREE_SCROLL_ID,
@@ -207,25 +229,36 @@ pub fn build_domain_outliner() -> Result<LocalContainer> {
             Content::new(DOMAIN_OUTLINER_TREE_ID, tree),
         ),
     );
+    let caption = Content::new(
+        DOMAIN_OUTLINER_CAPTION_ID,
+        TextContent {
+            text: "ASSEMBLY".into(),
+            role: TextRole::UiCaption,
+        },
+    );
     let root = Content::new(
         DOMAIN_OUTLINER_SHELL_ID,
         StackContent {
             model: Stack {
                 axis: Axis::Vertical,
-                gap: Spacing::Tight.value(),
+                gap: Spacing::Regular.value(),
             },
             flexible_child: Some(DOMAIN_OUTLINER_TREE_SCROLL_ID),
             children: vec![
                 Content::new(
                     DOMAIN_OUTLINER_HEADER_ID,
-                    TextContent::new("CAD 部件大纲 · Topology B"),
+                    TextContent {
+                        text: "Chassis-MK4".into(),
+                        role: TextRole::UiHeading,
+                    },
                 ),
+                caption,
                 scroll,
             ],
         },
     );
     Ok(LocalContainer::new("domain-outliner", root)?
-        .title("领域模型大纲")
+        .title("Explorer")
         .switcher_icon("tekes-files")
         .toolbar_host(ContainerToolbarHost::Window))
 }
@@ -233,13 +266,17 @@ pub fn build_domain_outliner() -> Result<LocalContainer> {
 pub fn build_domain_canvas(workbench: SharedAgentWorkbench) -> Result<LocalContainer> {
     let header = Content::new(
         DOMAIN_CANVAS_HEADER_ID,
-        TextContent::new("CAD 参数化主视口 · Chassis-MK4 (Domain Focus)"),
+        TextContent {
+            text: "Chassis-MK4".into(),
+            role: TextRole::UiHeading,
+        },
     );
     let metrics = Content::new(
         DOMAIN_CANVAS_METRICS_ID,
-        TextContent::new(
-            "壁厚: 4.20 mm | 安全系数: 2.85 | 关键约束: ±0.05 mm | 目标协作者: AgentRun",
-        ),
+        TextContent {
+            text: "Al-7075-T6 · 4.20 mm wall · SF 2.85 · ISO 2768-mK".into(),
+            role: TextRole::UiCaption,
+        },
     );
     let spec_rich = Content::new(
         DOMAIN_CANVAS_SPEC_RICH_ID,
@@ -247,15 +284,20 @@ pub fn build_domain_canvas(workbench: SharedAgentWorkbench) -> Result<LocalConta
             "domain-cad-preview",
             1,
             RichDocument::from_markdown(
-                "### 参数化装配约束预览\n\n- **主材**: `Al-7075-T6`（阳极氧化）\n- **关联规范**: `specs/chassis.cadspec`\n- **形态 B 说明**: 领域主视口占据 `Focus`，Agent 作为副栏协同，可随时零重建互换。",
+                "### Assembly Parameters\n\n- Material: Al-7075-T6 anodized\n- Spec: specs/chassis.cadspec\n- Tolerance: ±0.05 mm critical mounting bosses\n- Thermal shroud: CFRP layup with 1.8 mm clearance",
             ),
         )
         .map_err(|err| anyhow::anyhow!("domain canvas RichContent invalid: {err:?}"))?,
     );
+    let mut spec_panel = PanelContent::new(spec_rich)
+        .map_err(|err| anyhow::anyhow!("domain spec panel invalid: {err:?}"))?;
+    let _ = spec_panel.set_padding(Some(Insets::new(12.0, 14.0, 12.0, 14.0)));
+    let spec_card = Content::new(DOMAIN_CANVAS_SPEC_PANEL_ID, spec_panel);
 
-    let mut quote_btn = Button::new("将公差规范引用到 Agent");
+    let mut quote_btn = Button::new("Quote Spec to Agent");
     quote_btn.variant = ButtonVariant::Primary;
-    let open_spec_btn = Button::new("在 Viewer 检查 .cadspec");
+    let mut open_spec_btn = Button::new("Inspect .cadspec");
+    open_spec_btn.variant = ButtonVariant::Panel;
     let actions = Content::new(
         DOMAIN_CANVAS_ACTIONS_ROW_ID,
         StackContent {
@@ -276,27 +318,17 @@ pub fn build_domain_canvas(workbench: SharedAgentWorkbench) -> Result<LocalConta
         StackContent {
             model: Stack {
                 axis: Axis::Vertical,
-                gap: Spacing::Tight.value(),
+                gap: Spacing::Relaxed.value(),
             },
-            flexible_child: Some(DOMAIN_CANVAS_SPEC_RICH_ID),
-            children: vec![header, metrics, actions, spec_rich],
+            flexible_child: None,
+            children: vec![header, metrics, actions, spec_card],
         },
     );
 
     let wb_action = workbench;
     Ok(LocalContainer::new("domain-canvas", root)?
-        .title("领域主画布")
+        .title("Chassis-MK4")
         .switcher_icon("tekes-tab-summary")
-        .toolbar_host(ContainerToolbarHost::Container {
-            position: ContainerToolbarPosition::Top,
-        })
-        .toolbar(vec![ToolbarItem {
-            id: DOMAIN_FOCUS_CMD,
-            title: "Focus 切换".into(),
-            enabled: true,
-            geometry_dependent: false,
-        }])
-        .focus_switch(DOMAIN_FOCUS_CMD)
         .on_action(
             move |_host: &mut ContentHost, records: Vec<ContentActionRecord>| {
                 for rec in records {
@@ -345,8 +377,7 @@ pub fn build_topology_b_containers_and_options(
     let outliner = build_domain_outliner()?;
     let canvas = build_domain_canvas(wb.clone())?;
     let agent_run = AgentRunContainer::build("agent-run", wb.clone())?;
-    let summary = SummaryContainer::build_list_card("agent-summary", 260.0, wb.clone())?;
-    let tasks = TasksQueueContainer::build_list_card("agent-tasks", 200.0, wb.clone())?;
+    let summary = SummaryContainer::build_tab("agent-summary", wb.clone())?;
     let files = WorkspaceFilesContainer::build("workspace-files", wb.clone())?;
     let changes = WorkspaceChangesContainer::build("workspace-changes", wb.clone())?;
 
@@ -355,7 +386,6 @@ pub fn build_topology_b_containers_and_options(
         canvas.into(),
         agent_run.into(),
         summary.into(),
-        tasks.into(),
         files.into(),
         changes.into(),
     ];
@@ -366,7 +396,6 @@ pub fn build_topology_b_containers_and_options(
             vec![
                 "domain-canvas".to_owned(),
                 "agent-summary".to_owned(),
-                "agent-tasks".to_owned(),
                 "workspace-files".to_owned(),
                 "workspace-changes".to_owned(),
             ],
@@ -378,7 +407,6 @@ pub fn build_topology_b_containers_and_options(
             vec![
                 "agent-run".to_owned(),
                 "agent-summary".to_owned(),
-                "agent-tasks".to_owned(),
                 "workspace-files".to_owned(),
                 "workspace-changes".to_owned(),
             ],
@@ -389,11 +417,13 @@ pub fn build_topology_b_containers_and_options(
     let mut others = OthersOptions::new(others_ids);
     others.selected = Some(selected_tab);
 
-    let presentation = PresentationOptions::new(focus_id)
+    let mut presentation = PresentationOptions::new(focus_id)
         .nav_bar("domain-outliner")
         .navigation_toolbar("domain-outliner")
         .workspace_switch(true)
         .others(others);
+    presentation.nav_width = 236.0;
+    presentation.focus_fraction = 0.56;
 
     let cad_provider: Arc<dyn ArtifactViewerProvider> = Arc::new(CadSpecViewerProvider);
     let factories = vec![
@@ -439,7 +469,16 @@ pub fn build_topology_b_app(rt: &DomainStudioRuntime, promote_agent: bool) -> Re
 }
 
 pub fn render_app_to_rgba8(app: AppWindow, width: u32, height: u32) -> Result<Vec<u8>> {
+    render_app_to_rgba8_scaled(app, width, height, 1)
+}
+
+pub fn render_app_to_rgba8_scaled(
+    app: AppWindow,
+    width: u32,
+    height: u32,
+    scale: u32,
+) -> Result<Vec<u8>> {
     let (_menus, mut hosted) = app.into_window_handler()?;
     let mut gpu = Renderer::new_headless()?;
-    hosted.render_headless_rgba8(&mut gpu, (width, height), 1)
+    hosted.render_headless_rgba8(&mut gpu, (width, height), scale)
 }

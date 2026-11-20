@@ -52,7 +52,7 @@ struct RunUiState {
 }
 
 pub const AVAILABLE_MODELS: [&str; 3] = ["claude-sonnet-4", "gpt-5", "gemini-2.5-pro"];
-pub const AVAILABLE_PRESETS: [&str; 3] = ["标准均衡", "深度思考", "极速响应"];
+pub const AVAILABLE_PRESETS: [&str; 3] = ["Workspace Write", "Read Only", "Full Access"];
 
 /// Coordinates one `SessionRuntime` + `RunController` with UI containers via `UiWakeNotifier`.
 pub struct RunWorkbenchBinding {

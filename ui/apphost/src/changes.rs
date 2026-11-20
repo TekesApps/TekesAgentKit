@@ -1,9 +1,7 @@
 //! `WorkspaceChangesContainer` (`Working Tree` vs `Turn Changes`) with `(workspace_id, revision)`
 //! fencing, unified diff citations, and capability-gated Git commit.
 
-use crate::{
-    AgentContainerAdapter, FOCUS_SWITCH_COMMAND, ManagedAgentContainer, SharedAgentWorkbench,
-};
+use crate::{AgentContainerAdapter, ManagedAgentContainer, SharedAgentWorkbench};
 use anyhow::Result;
 use tekes_agent_components_ui::{
     CHANGES_SHELL_ID, ChangeRowModel, ChangesIntent, ChangesViewModel, ResponsiveWidthMode,
@@ -13,8 +11,7 @@ use tekes_agent_contract::{ArtifactSelectionReference, Utf16SelectionRange};
 use tekes_agent_ui_bindings::{
     ChangesViewMode, ComposerQuoteRequest, WorkbenchCommand, WorkspaceBinding, sha256_prefixed,
 };
-use tekes_ui_app_host::{ContainerToolbarHost, ContainerToolbarPosition, LocalContainer};
-use tekes_ui_app_protocol::ToolbarItem;
+use tekes_ui_app_host::LocalContainer;
 use tekes_ui_controls::composition::{ContentActionRecord, ContentHost};
 
 struct WorkspaceChangesAdapter {
@@ -187,18 +184,6 @@ impl WorkspaceChangesContainer {
             WorkspaceChangesAdapter::new(),
             false,
         )?;
-        Ok(container
-            .title("变更与 Diff")
-            .switcher_icon("tekes-tab-diffs")
-            .toolbar_host(ContainerToolbarHost::Container {
-                position: ContainerToolbarPosition::Top,
-            })
-            .toolbar(vec![ToolbarItem {
-                id: FOCUS_SWITCH_COMMAND,
-                title: "Focus 切换".into(),
-                enabled: true,
-                geometry_dependent: false,
-            }])
-            .focus_switch(FOCUS_SWITCH_COMMAND))
+        Ok(container.title("Review").switcher_icon("tekes-tab-diffs"))
     }
 }

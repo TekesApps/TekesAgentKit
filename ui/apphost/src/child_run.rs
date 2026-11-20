@@ -1,9 +1,7 @@
 //! Multi-instance read-only `ChildRunContainer` (`ContainerMultiplicity::Multiple`)
 //! projecting bounded/independent subagent traces without mounting a writable `Composer`.
 
-use crate::{
-    AgentContainerAdapter, FOCUS_SWITCH_COMMAND, ManagedAgentContainer, SharedAgentWorkbench,
-};
+use crate::{AgentContainerAdapter, ManagedAgentContainer, SharedAgentWorkbench};
 use anyhow::Result;
 use std::sync::Arc;
 use tekes_agent_components_ui::{
@@ -11,11 +9,7 @@ use tekes_agent_components_ui::{
 };
 use tekes_agent_presentation::RunScope;
 use tekes_agent_ui_bindings::{CHILD_SUBAGENT_SESSION_ID, ChildRunBinding, ChildRunStatus};
-use tekes_ui_app_host::{
-    ContainerFactory, ContainerMultiplicity, ContainerToolbarHost, ContainerToolbarPosition,
-    LocalContainer,
-};
-use tekes_ui_app_protocol::ToolbarItem;
+use tekes_ui_app_host::{ContainerFactory, ContainerMultiplicity, LocalContainer};
 use tekes_ui_controls::composition::{ContentActionRecord, ContentHost};
 
 struct ChildRunAdapter {
@@ -134,19 +128,7 @@ impl ChildRunContainer {
             ChildRunAdapter::new(id),
             false,
         )?;
-        Ok(container
-            .title("子代理轨迹 (只读)")
-            .switcher_icon("tekes-job")
-            .toolbar_host(ContainerToolbarHost::Container {
-                position: ContainerToolbarPosition::Top,
-            })
-            .toolbar(vec![ToolbarItem {
-                id: FOCUS_SWITCH_COMMAND,
-                title: "Focus 切换".into(),
-                enabled: true,
-                geometry_dependent: false,
-            }])
-            .focus_switch(FOCUS_SWITCH_COMMAND))
+        Ok(container.title("Subagent").switcher_icon("tekes-job"))
     }
 
     /// Registers a `ContainerMultiplicity::Multiple` factory for dynamic read-only subagent trace tabs.
@@ -155,7 +137,7 @@ impl ChildRunContainer {
         let factory_id = id.into();
         ContainerFactory::local(
             factory_id,
-            "子代理查看",
+            "Subagent",
             ContainerMultiplicity::Multiple,
             move |instance_id| Self::build(instance_id, workbench.clone()),
         )

@@ -4,17 +4,20 @@
 use crate::ResponsiveWidthMode;
 use crate::ids::*;
 use crate::transcript::format_transcript_body;
+use crate::ui_helpers::{caption_text, card_panel, heading_text, secondary_text};
 use tekes_agent_presentation::RunSnapshot;
 use tekes_ui_controls::{
     ButtonVariant, DraftRevision, ExternalSelection, ExternalUndo, ScrollArea,
+    TextSurfacePresentation,
     composition::{
         Button, Component, Content, ContentActionKind, ContentActionRecord, ContentHost,
         RichContent, RichDocument, ScrollContent, StackContent, TextContent, TextFieldContent,
         TextSubmitPolicy, TextViewport,
     },
     extended::{Axis, Stack},
+    layout::Insets,
 };
-use tekes_ui_tokens::Spacing;
+use tekes_ui_tokens::{Spacing, proposal::layout::MainAxisDistribution};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum SideChatSurfaceAccess {
@@ -53,16 +56,17 @@ impl SideChatSurface {
     }
 
     pub fn build_content() -> Content {
-        let header = Content::new(SIDECHAT_HEADER_ID, TextContent::new("SideChat · 临时分支"));
-        let access_badge =
-            Content::new(SIDECHAT_ACCESS_BADGE_ID, TextContent::new("Access: Ready"));
-        let error = Content::new(SIDECHAT_ERROR_ID, TextContent::new(""));
+        let header = Content::new(SIDECHAT_HEADER_ID, heading_text("SideChat"));
+        let access_badge = Content::new(SIDECHAT_ACCESS_BADGE_ID, caption_text("Available"));
+        let error = Content::new(SIDECHAT_ERROR_ID, secondary_text(""));
 
-        let create_btn = Button::new("开启 SideChat");
+        let mut create_btn = Button::new("New SideChat");
+        create_btn.variant = ButtonVariant::Panel;
         let create = Content::new(SIDECHAT_CREATE_BTN_ID, create_btn);
 
-        let mut close_btn = Button::new("关闭并丢弃");
+        let mut close_btn = Button::new("Close");
         close_btn.variant = ButtonVariant::Quiet;
+        close_btn.set_transparent_chrome(true);
         close_btn.button.state.disabled = true;
         let close = Content::new(SIDECHAT_CLOSE_BTN_ID, close_btn);
 
@@ -78,13 +82,23 @@ impl SideChatSurface {
             },
         );
 
+        let header_row = StackContent {
+            model: Stack {
+                axis: Axis::Horizontal,
+                gap: Spacing::Tight.value(),
+            },
+            flexible_child: Some(SIDECHAT_HEADER_ID),
+            children: vec![header, actions],
+        }
+        .into_content_with_distribution(SIDECHAT_HEADER_ROW_ID, MainAxisDistribution::SpaceBetween);
+
         let rich = Content::new(
             SIDECHAT_RICH_ID,
             RichContent::new(
                 "sidechat-doc",
                 1,
                 RichDocument::from_markdown(
-                    "点击 **开启 SideChat** 创建不影响主运行的临时分支讨论。",
+                    "Start a **SideChat** branch to discuss an aside without touching the main run.",
                 ),
             )
             .expect("valid sidechat RichContent"),
@@ -95,18 +109,19 @@ impl SideChatSurface {
         );
 
         let mut field = TextFieldContent::new("SideChat 独立输入", "");
+        field
+            .surface
+            .set_presentation(TextSurfacePresentation::Content);
         field.show_metadata = false;
         field.viewport = TextViewport::Grow {
-            min: 44.0,
+            min: 40.0,
             max: 140.0,
         };
         field.submit_policy = TextSubmitPolicy::CommandEnter;
-        field.set_placeholder(Some(
-            "独立分支草稿（与主运行 Composer 隔离，支持中文 IME）...".to_owned(),
-        ));
+        field.set_placeholder(Some("Ask a side question…".to_owned()));
         let editor = Content::new(SIDECHAT_EDITOR_ID, field);
 
-        let mut send_btn = Button::new("发送分支消息");
+        let mut send_btn = Button::new("↑").with_accessible_name("Send SideChat prompt");
         send_btn.variant = ButtonVariant::Primary;
         send_btn.button.state.disabled = true;
         let send = Content::new(SIDECHAT_SEND_BTN_ID, send_btn);
@@ -122,16 +137,21 @@ impl SideChatSurface {
                 children: vec![editor, send],
             },
         );
+        let composer_panel = card_panel(
+            SIDECHAT_COMPOSER_PANEL_ID,
+            composer_row,
+            Insets::new(8.0, 12.0, 8.0, 12.0),
+        );
 
         Content::new(
             SIDECHAT_ROOT_ID,
             StackContent {
                 model: Stack {
                     axis: Axis::Vertical,
-                    gap: Spacing::Tight.value(),
+                    gap: Spacing::Regular.value(),
                 },
                 flexible_child: Some(SIDECHAT_SCROLL_ID),
-                children: vec![header, actions, error, scroll, composer_row],
+                children: vec![header_row, error, scroll, composer_panel],
             },
         )
     }
@@ -172,15 +192,12 @@ impl SideChatSurface {
         access: &SideChatSurfaceAccess,
         run_snapshot: Option<&RunSnapshot>,
         error: Option<&str>,
-        mode: ResponsiveWidthMode,
+        _mode: ResponsiveWidthMode,
     ) {
-        let mode_str = match mode {
-            ResponsiveWidthMode::Compact => "Compact",
-            ResponsiveWidthMode::Expanded => "Expanded",
-        };
         let header_text = match (title, session_id) {
-            (Some(t), Some(sid)) => format!("{t} · {sid} ({mode_str})"),
-            _ => format!("SideChat · 临时分支 ({mode_str})"),
+            (Some(t), Some(_)) => t.to_owned(),
+            (Some(t), None) => t.to_owned(),
+            _ => "SideChat".to_owned(),
         };
         if self.last_header != header_text {
             self.last_header = header_text.clone();
@@ -192,13 +209,13 @@ impl SideChatSurface {
         }
 
         let access_label = match access {
-            SideChatSurfaceAccess::Available => "PaneAccess: Available",
-            SideChatSurfaceAccess::Creating => "PaneAccess: Creating",
-            SideChatSurfaceAccess::Closing => "PaneAccess: Closing",
-            SideChatSurfaceAccess::Unsupported => "PaneAccess: Unsupported",
-            SideChatSurfaceAccess::Disconnected => "PaneAccess: Disconnected",
-            SideChatSurfaceAccess::Unknown(_) => "PaneAccess: Unknown",
-            SideChatSurfaceAccess::Closed => "PaneAccess: Closed",
+            SideChatSurfaceAccess::Available => "Available",
+            SideChatSurfaceAccess::Creating => "Creating",
+            SideChatSurfaceAccess::Closing => "Closing",
+            SideChatSurfaceAccess::Unsupported => "Unsupported",
+            SideChatSurfaceAccess::Disconnected => "Disconnected",
+            SideChatSurfaceAccess::Unknown(_) => "Unknown",
+            SideChatSurfaceAccess::Closed => "Closed",
         };
         if self.last_access != access_label {
             self.last_access = access_label.to_owned();
@@ -248,15 +265,18 @@ impl SideChatSurface {
         let md = match (run_snapshot, access) {
             (Some(snap), _) => format_transcript_body(snap),
             (None, SideChatSurfaceAccess::Closed) => {
-                "SideChat 分支已关闭并从服务端丢弃；主运行未受影响。".to_owned()
+                "SideChat closed and discarded from the runtime; main run unaffected.".to_owned()
             }
             (None, SideChatSurfaceAccess::Unsupported) => {
-                "当前 Harness 不支持临时 SideChat Fork。".to_owned()
+                "SideChat is unsupported by the active harness.".to_owned()
             }
             (None, SideChatSurfaceAccess::Disconnected) => {
-                "连接未就绪，暂不可创建临时分支。".to_owned()
+                "Connection unavailable; SideChat disabled.".to_owned()
             }
-            (None, _) => "点击 **开启 SideChat** 创建不影响主运行的临时分支讨论。".to_owned(),
+            (None, _) => {
+                "Start a **SideChat** branch to discuss an aside without touching the main run."
+                    .to_owned()
+            }
         };
         if self.last_body != md {
             let next_rev = self.rich_rev.saturating_add(1).max(2);

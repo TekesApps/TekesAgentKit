@@ -1,9 +1,7 @@
 //! `AgentSettingsOwner` (TekesUI native `SettingsOwner` with display preferences) and
 //! `HarnessSettingsContainer` (epoch & CAS-fenced `settings.describe` / `settings.mutate`).
 
-use crate::{
-    AgentContainerAdapter, FOCUS_SWITCH_COMMAND, ManagedAgentContainer, SharedAgentWorkbench,
-};
+use crate::{AgentContainerAdapter, ManagedAgentContainer, SharedAgentWorkbench};
 use anyhow::Result;
 use serde_json::Value;
 use std::collections::BTreeMap;
@@ -15,10 +13,8 @@ use tekes_agent_components_ui::{
 };
 use tekes_agent_ui_bindings::{HarnessSettingKind, HarnessSettingsBinding};
 use tekes_ui_app_host::{
-    ContainerPresentation, ContainerToolbarHost, ContainerToolbarPosition, LocalContainer,
-    SettingsDisplayMode, SettingsOwner, SettingsWindow,
+    ContainerPresentation, LocalContainer, SettingsDisplayMode, SettingsOwner, SettingsWindow,
 };
-use tekes_ui_app_protocol::ToolbarItem;
 use tekes_ui_controls::composition::{ContentActionRecord, ContentHost};
 
 pub const AGENT_SETTINGS_SCHEMA_TOML: &str = r#"
@@ -194,14 +190,14 @@ impl AgentContainerAdapter for HarnessSettingsAdapter {
 
     fn handle_actions(
         &mut self,
-        _host: &mut ContentHost,
+        host: &mut ContentHost,
         workbench: &SharedAgentWorkbench,
         records: Vec<ContentActionRecord>,
     ) {
         let Some(binding) = workbench.harness_settings_binding() else {
             return;
         };
-        for intent in self.surface.handle_actions(&records) {
+        for intent in self.surface.handle_actions(host, &records) {
             match intent {
                 HarnessSettingsIntent::Refresh => binding.refresh(),
                 HarnessSettingsIntent::CycleEnum { key, next_value } => {
@@ -240,18 +236,8 @@ impl HarnessSettingsContainer {
             false,
         )?;
         Ok(container
-            .title("Harness 设置")
+            .title("Harness Settings")
             .switcher_icon("tekes-settings")
-            .presentation(ContainerPresentation::Tab)
-            .toolbar_host(ContainerToolbarHost::Container {
-                position: ContainerToolbarPosition::Top,
-            })
-            .toolbar(vec![ToolbarItem {
-                id: FOCUS_SWITCH_COMMAND,
-                title: "Focus 切换".into(),
-                enabled: true,
-                geometry_dependent: false,
-            }])
-            .focus_switch(FOCUS_SWITCH_COMMAND))
+            .presentation(ContainerPresentation::Tab))
     }
 }

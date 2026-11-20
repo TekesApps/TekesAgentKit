@@ -1,20 +1,23 @@
-//! IME-safe multi-destination Composer surface with context chips (attachments & quoted
-//! `ArtifactSelectionReference` spans), Model/Preset selectors, and responsive `Compact`/`Expanded` bar.
+//! Unified Tekes-aligned Composer surface: optional queued-prompt strip above a single
+//! rounded `PanelContent` card containing context chips, frameless `TextSurfacePresentation::Content`
+//! IME-safe editor, `+` attach, permission & model `MenuContent` pickers, and Send/Stop button.
 
 use crate::ResponsiveWidthMode;
 use crate::ids::*;
+use crate::ui_helpers::{card_panel, secondary_text};
 use std::collections::BTreeMap;
 use tekes_agent_presentation::{ComposerArtifact, ComposerDestination, RunScope, RunSnapshot};
 use tekes_ui_controls::{
-    ButtonVariant, DraftRevision, ExternalSelection, ExternalUndo,
+    ButtonVariant, DraftRevision, ExternalSelection, ExternalUndo, TextSurfacePresentation,
     composition::{
         Button, Component, ComponentId, Content, ContentActionKind, ContentActionPayload,
-        ContentActionRecord, ContentHost, SelectContent, StackContent, TextContent,
-        TextFieldContent, TextSubmitPolicy, TextViewport,
+        ContentActionRecord, ContentHost, MenuContent, MenuEntry, StackContent, TextFieldContent,
+        TextSubmitPolicy, TextViewport,
     },
     extended::{Axis, Stack},
+    layout::Insets,
 };
-use tekes_ui_tokens::Spacing;
+use tekes_ui_tokens::{Spacing, proposal::layout::MainAxisDistribution};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ComposerIntent {
@@ -42,12 +45,25 @@ pub enum ComposerIntent {
     },
     SelectModel(usize),
     SelectPreset(usize),
+    RemoveQueued {
+        item_id: String,
+        session_id: String,
+        epoch: u64,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum ChipTarget {
     Artifact(String),
     Annotation(String),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct QueuedStripItem {
+    id: String,
+    session_id: String,
+    epoch: u64,
+    text: String,
 }
 
 #[derive(Debug)]
@@ -59,6 +75,12 @@ pub struct ComposerSurface {
     chips_sig: String,
     chip_targets: BTreeMap<ComponentId, ChipTarget>,
     last_mode: ResponsiveWidthMode,
+    models: Vec<String>,
+    presets: Vec<String>,
+    last_model_idx: usize,
+    last_preset_idx: usize,
+    active_queued: Option<QueuedStripItem>,
+    last_queued_sig: String,
 }
 
 impl Default for ComposerSurface {
@@ -77,24 +99,68 @@ impl ComposerSurface {
             chips_sig: String::new(),
             chip_targets: BTreeMap::new(),
             last_mode: ResponsiveWidthMode::Expanded,
+            models: Vec::new(),
+            presets: Vec::new(),
+            last_model_idx: usize::MAX,
+            last_preset_idx: usize::MAX,
+            active_queued: None,
+            last_queued_sig: String::new(),
         }
     }
 
     fn make_editor() -> Content {
         let mut field = TextFieldContent::new("输入消息", "");
+        field
+            .surface
+            .set_presentation(TextSurfacePresentation::Content);
         field.show_metadata = false;
         field.viewport = TextViewport::Grow {
-            min: 44.0,
-            max: 180.0,
+            min: 40.0,
+            max: 140.0,
         };
         field.submit_policy = TextSubmitPolicy::CommandEnter;
-        field.set_placeholder(Some(
-            "输入指令… (Cmd+Enter 发送，Enter 换行；支持中文 IME 组合)".to_owned(),
-        ));
+        field.set_placeholder(Some("Describe what you want Tekes to do...".to_owned()));
         Content::new(COMPOSER_EDITOR_ID, field)
     }
 
+    fn make_menu(labels: &[String], selected_idx: usize) -> MenuContent {
+        let active = selected_idx.min(labels.len().saturating_sub(1));
+        let trigger_label = labels
+            .get(active)
+            .map(|l| format!("{l} ▾"))
+            .unwrap_or_else(|| "Select ▾".to_owned());
+        let mut menu = MenuContent::new(trigger_label, labels.to_vec());
+        let entries: Vec<MenuEntry> = labels
+            .iter()
+            .enumerate()
+            .map(|(i, label)| MenuEntry::Item {
+                value: label.clone(),
+                label: label.clone(),
+                checked: Some(i == active),
+                disabled: false,
+            })
+            .collect();
+        if !entries.is_empty() {
+            let _ = menu.set_entries(entries);
+        }
+        menu.trigger.variant = ButtonVariant::Panel;
+        menu.trigger.set_transparent_chrome(true);
+        menu
+    }
+
     pub fn build_content(models: Vec<String>, presets: Vec<String>) -> Content {
+        let queued_slot = Content::new(
+            COMPOSER_QUEUED_SLOT_ID,
+            StackContent {
+                model: Stack {
+                    axis: Axis::Vertical,
+                    gap: 0.0,
+                },
+                flexible_child: None,
+                children: Vec::new(),
+            },
+        );
+
         let chips_row = Content::new(
             COMPOSER_CHIPS_ROW_ID,
             StackContent {
@@ -107,13 +173,14 @@ impl ComposerSurface {
             },
         );
 
-        let attach_btn = Button::new("附带");
-        let mut reconnect_btn = Button::new("重连");
-        reconnect_btn.variant = ButtonVariant::Quiet;
-        let mut cancel_btn = Button::new("停止");
-        cancel_btn.variant = ButtonVariant::Quiet;
-        let mut send_btn = Button::new("发送");
-        send_btn.variant = ButtonVariant::Primary;
+        let mut attach_btn = Button::new("+").with_accessible_name("Attach context");
+        attach_btn.variant = ButtonVariant::Panel;
+        attach_btn.set_transparent_chrome(true);
+
+        let preset_menu = Self::make_menu(&presets, 0);
+        let model_menu = Self::make_menu(&models, 0);
+
+        let harness_label = Content::new(COMPOSER_HARNESS_LABEL_ID, secondary_text("Tekes"));
 
         let primary_row = Content::new(
             COMPOSER_PRIMARY_ROW_ID,
@@ -124,15 +191,15 @@ impl ComposerSurface {
                 },
                 flexible_child: None,
                 children: vec![
-                    Content::new(COMPOSER_MODEL_SELECT_ID, SelectContent::new("模型", models)),
-                    Content::new(
-                        COMPOSER_PRESET_SELECT_ID,
-                        SelectContent::new("预设", presets),
-                    ),
                     Content::new(COMPOSER_ATTACH_BTN_ID, attach_btn),
+                    Content::new(COMPOSER_PRESET_SELECT_ID, preset_menu),
+                    harness_label,
                 ],
             },
         );
+
+        let mut send_btn = Button::new("↑").with_accessible_name("Send");
+        send_btn.variant = ButtonVariant::Primary;
 
         let secondary_row = Content::new(
             COMPOSER_SECONDARY_ROW_ID,
@@ -143,23 +210,40 @@ impl ComposerSurface {
                 },
                 flexible_child: None,
                 children: vec![
-                    Content::new(COMPOSER_RECONNECT_BTN_ID, reconnect_btn),
-                    Content::new(COMPOSER_CANCEL_BTN_ID, cancel_btn),
+                    Content::new(COMPOSER_MODEL_SELECT_ID, model_menu),
                     Content::new(COMPOSER_SEND_BTN_ID, send_btn),
                 ],
             },
         );
 
-        let controls = Content::new(
+        let controls = StackContent {
+            model: Stack {
+                axis: Axis::Horizontal,
+                gap: Spacing::Tight.value(),
+            },
+            flexible_child: None,
+            children: vec![primary_row, secondary_row],
+        }
+        .into_content_with_distribution(
             COMPOSER_CONTROLS_STACK_ID,
+            MainAxisDistribution::SpaceBetween,
+        );
+
+        let card_body = Content::new(
+            COMPOSER_CARD_STACK_ID,
             StackContent {
                 model: Stack {
-                    axis: Axis::Horizontal,
+                    axis: Axis::Vertical,
                     gap: Spacing::Tight.value(),
                 },
                 flexible_child: None,
-                children: vec![primary_row, secondary_row],
+                children: vec![chips_row, Self::make_editor(), controls],
             },
+        );
+        let card = card_panel(
+            COMPOSER_CARD_ID,
+            card_body,
+            Insets::new(10.0, 14.0, 8.0, 14.0),
         );
 
         Content::new(
@@ -170,7 +254,7 @@ impl ComposerSurface {
                     gap: Spacing::Tight.value(),
                 },
                 flexible_child: None,
-                children: vec![chips_row, Self::make_editor(), controls],
+                children: vec![queued_slot, card],
             },
         )
     }
@@ -181,6 +265,127 @@ impl ComposerSurface {
             .is_some_and(TextFieldContent::composing)
     }
 
+    fn sync_menu_state(
+        host: &mut ContentHost,
+        id: ComponentId,
+        labels: &[String],
+        selected_idx: usize,
+    ) {
+        let Some(menu) = host
+            .get_mut(id)
+            .and_then(|c| c.component_mut::<MenuContent>())
+        else {
+            return;
+        };
+        let active = selected_idx.min(labels.len().saturating_sub(1));
+        if let Some(label) = labels.get(active) {
+            let desired = format!("{label} ▾");
+            if menu.trigger.label != desired {
+                menu.trigger.set_contents(desired);
+            }
+        }
+        let entries: Vec<MenuEntry> = labels
+            .iter()
+            .enumerate()
+            .map(|(i, label)| MenuEntry::Item {
+                value: label.clone(),
+                label: label.clone(),
+                checked: Some(i == active),
+                disabled: false,
+            })
+            .collect();
+        if !entries.is_empty() {
+            let _ = menu.set_entries(entries);
+        }
+    }
+
+    fn sync_queued_strip(&mut self, host: &mut ContentHost, snapshot: &RunSnapshot) {
+        let queued = snapshot.run.as_ref().and_then(|run| {
+            run.queue.first().map(|raw| {
+                let text = raw
+                    .get("text")
+                    .and_then(|v| v.as_str())
+                    .or_else(|| raw.get("label").and_then(|v| v.as_str()))
+                    .unwrap_or("Queued message")
+                    .to_owned();
+                let id = raw
+                    .get("id")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("queue-0")
+                    .to_owned();
+                QueuedStripItem {
+                    id,
+                    session_id: run.scope.session_id.clone(),
+                    epoch: run.connection_epoch,
+                    text,
+                }
+            })
+        });
+
+        let sig = queued
+            .as_ref()
+            .map(|q| format!("{}:{}:{}", q.id, q.epoch, q.text))
+            .unwrap_or_default();
+        if sig == self.last_queued_sig {
+            return;
+        }
+        self.last_queued_sig = sig;
+        self.active_queued = queued.clone();
+
+        if let Some(item) = queued {
+            let preview = if item.text.chars().count() > 54 {
+                let head: String = item.text.chars().take(54).collect();
+                format!("{head}…")
+            } else {
+                item.text
+            };
+            let mut steer_btn = Button::new("Steer");
+            steer_btn.variant = ButtonVariant::Panel;
+            steer_btn.set_transparent_chrome(true);
+            let mut remove_btn = Button::new("×").with_accessible_name("Remove queued prompt");
+            remove_btn.variant = ButtonVariant::Panel;
+            remove_btn.set_transparent_chrome(true);
+
+            let actions = Content::new(
+                ComponentId(421),
+                StackContent {
+                    model: Stack {
+                        axis: Axis::Horizontal,
+                        gap: Spacing::Micro.value(),
+                    },
+                    flexible_child: None,
+                    children: vec![
+                        Content::new(COMPOSER_QUEUED_STEER_BTN_ID, steer_btn),
+                        Content::new(COMPOSER_QUEUED_REMOVE_BTN_ID, remove_btn),
+                    ],
+                },
+            );
+            let row = StackContent {
+                model: Stack {
+                    axis: Axis::Horizontal,
+                    gap: Spacing::Tight.value(),
+                },
+                flexible_child: Some(COMPOSER_QUEUED_TEXT_ID),
+                children: vec![
+                    Content::new(COMPOSER_QUEUED_TEXT_ID, secondary_text(preview)),
+                    actions,
+                ],
+            }
+            .into_content_with_distribution(
+                COMPOSER_QUEUED_ROW_ID,
+                MainAxisDistribution::SpaceBetween,
+            );
+            let panel = card_panel(
+                COMPOSER_QUEUED_PANEL_ID,
+                row,
+                Insets::new(6.0, 12.0, 6.0, 12.0),
+            );
+            replace_stack_children(host, COMPOSER_QUEUED_SLOT_ID, vec![panel]);
+        } else {
+            replace_stack_children(host, COMPOSER_QUEUED_SLOT_ID, Vec::new());
+        }
+    }
+
     pub fn sync(
         &mut self,
         host: &mut ContentHost,
@@ -189,6 +394,21 @@ impl ComposerSurface {
         selected_preset_idx: usize,
         width_mode: ResponsiveWidthMode,
     ) {
+        if self.models.is_empty()
+            && let Some(m) = host
+                .get(COMPOSER_MODEL_SELECT_ID)
+                .and_then(|c| c.component::<MenuContent>())
+        {
+            self.models = m.labels.clone();
+        }
+        if self.presets.is_empty()
+            && let Some(p) = host
+                .get(COMPOSER_PRESET_SELECT_ID)
+                .and_then(|c| c.component::<MenuContent>())
+        {
+            self.presets = p.labels.clone();
+        }
+
         if self.last_mode != width_mode {
             if let Some(controls) = host
                 .get_mut(COMPOSER_CONTROLS_STACK_ID)
@@ -201,6 +421,8 @@ impl ComposerSurface {
             }
             self.last_mode = width_mode;
         }
+
+        self.sync_queued_strip(host, snapshot);
 
         let destination = snapshot.selection.as_ref().map(|s| s.destination.clone());
         let is_composing = Self::composing(host);
@@ -219,9 +441,9 @@ impl ComposerSurface {
                 .editors
                 .remove(&next_key)
                 .unwrap_or_else(Self::make_editor);
-            let _ = host.insert(COMPOSER_ROOT_ID, next_editor);
+            let _ = host.insert(COMPOSER_CARD_STACK_ID, next_editor);
             let _ = host.reorder(
-                COMPOSER_ROOT_ID,
+                COMPOSER_CARD_STACK_ID,
                 &[
                     COMPOSER_CHIPS_ROW_ID,
                     COMPOSER_EDITOR_ID,
@@ -258,17 +480,20 @@ impl ComposerSurface {
 
         self.sync_chips(host, snapshot);
 
-        if let Some(model_sel) = host
-            .get_mut(COMPOSER_MODEL_SELECT_ID)
-            .and_then(|c| c.component_mut::<SelectContent>())
-        {
-            model_sel.set_selected(selected_model_idx);
+        if self.last_model_idx != selected_model_idx {
+            self.last_model_idx = selected_model_idx;
+            let models = self.models.clone();
+            Self::sync_menu_state(host, COMPOSER_MODEL_SELECT_ID, &models, selected_model_idx);
         }
-        if let Some(preset_sel) = host
-            .get_mut(COMPOSER_PRESET_SELECT_ID)
-            .and_then(|c| c.component_mut::<SelectContent>())
-        {
-            preset_sel.set_selected(selected_preset_idx);
+        if self.last_preset_idx != selected_preset_idx {
+            self.last_preset_idx = selected_preset_idx;
+            let presets = self.presets.clone();
+            Self::sync_menu_state(
+                host,
+                COMPOSER_PRESET_SELECT_ID,
+                &presets,
+                selected_preset_idx,
+            );
         }
 
         let composing_now = Self::composing(host);
@@ -277,13 +502,19 @@ impl ComposerSurface {
             .get_mut(COMPOSER_SEND_BTN_ID)
             .and_then(|c| c.component_mut::<Button>())
         {
-            send.button.state.disabled = !snapshot.can_submit || composing_now || can_cancel;
-        }
-        if let Some(cancel) = host
-            .get_mut(COMPOSER_CANCEL_BTN_ID)
-            .and_then(|c| c.component_mut::<Button>())
-        {
-            cancel.button.state.disabled = !can_cancel;
+            if can_cancel {
+                if send.label != "■" {
+                    send.set_contents("■");
+                    send.set_accessible_name(Some("Stop".to_owned()));
+                }
+                send.button.state.disabled = false;
+            } else {
+                if send.label != "↑" {
+                    send.set_contents("↑");
+                    send.set_accessible_name(Some("Send".to_owned()));
+                }
+                send.button.state.disabled = !snapshot.can_submit || composing_now;
+            }
         }
     }
 
@@ -310,19 +541,19 @@ impl ComposerSurface {
         for art in &snapshot.draft.artifacts {
             let label = match art {
                 ComposerArtifact::Reference { path: Some(p), .. } => {
-                    format!("文件: {} ×", p.rsplit('/').next().unwrap_or(p))
+                    format!("{} ×", p.rsplit('/').next().unwrap_or(p))
                 }
-                ComposerArtifact::Attachment { name, .. } => format!("附件: {name} ×"),
+                ComposerArtifact::Attachment { name, .. } => format!("{name} ×"),
                 ComposerArtifact::Command { name, .. } => format!("/{name} ×"),
-                ComposerArtifact::Skill { name, .. } => format!("技能: {name} ×"),
-                ComposerArtifact::Reference { id, .. } => format!("引用: {id} ×"),
+                ComposerArtifact::Skill { name, .. } => format!("{name} ×"),
+                ComposerArtifact::Reference { id, .. } => format!("{id} ×"),
             };
             let id = ComponentId(next_id);
             next_id += 1;
             self.chip_targets
                 .insert(id, ChipTarget::Artifact(art.id().to_owned()));
             let mut btn = Button::new(label);
-            btn.variant = ButtonVariant::Quiet;
+            btn.variant = ButtonVariant::Panel;
             children.push(Content::new(id, btn));
         }
 
@@ -333,24 +564,17 @@ impl ComposerSurface {
                     .rsplit('/')
                     .next()
                     .unwrap_or(&ref_val.artifact_id);
-                format!("摘录: {name}@{} ×", ref_val.revision)
+                format!("{name}@{} ×", ref_val.revision)
             } else {
-                format!("引用: {} ×", ann.source)
+                format!("{} ×", ann.source)
             };
             let id = ComponentId(next_id);
             next_id += 1;
             self.chip_targets
                 .insert(id, ChipTarget::Annotation(ann.id.clone()));
             let mut btn = Button::new(tag);
-            btn.variant = ButtonVariant::Quiet;
+            btn.variant = ButtonVariant::Panel;
             children.push(Content::new(id, btn));
-        }
-
-        if children.is_empty() {
-            children.push(Content::new(
-                ComponentId(next_id),
-                TextContent::new("上下文：可直接引用工作区文件或代码选区"),
-            ));
         }
 
         replace_stack_children(host, COMPOSER_CHIPS_ROW_ID, children);
@@ -380,6 +604,8 @@ impl ComposerSurface {
                 }
             }
         }
+
+        let can_cancel = snapshot.run.as_ref().is_some_and(|r| r.can_cancel);
 
         for record in records {
             if let Some(chip) = self.chip_targets.get(&record.action.target)
@@ -422,10 +648,17 @@ impl ComposerSurface {
                     }
                 }
                 id if id == COMPOSER_SEND_BTN_ID
-                    && matches!(record.action.kind, ContentActionKind::Activate)
-                    && !composing =>
+                    && matches!(record.action.kind, ContentActionKind::Activate) =>
                 {
-                    if let Some(dest) = &self.selected {
+                    if can_cancel {
+                        if let Some(ComposerDestination::Run { scope }) =
+                            snapshot.selection.as_ref().map(|s| &s.destination)
+                        {
+                            out.push(ComposerIntent::Cancel {
+                                scope: scope.clone(),
+                            });
+                        }
+                    } else if !composing && let Some(dest) = &self.selected {
                         out.push(ComposerIntent::Send {
                             destination: dest.clone(),
                         });
@@ -442,10 +675,16 @@ impl ComposerSurface {
                         });
                     }
                 }
-                id if id == COMPOSER_RECONNECT_BTN_ID
+                id if id == COMPOSER_QUEUED_REMOVE_BTN_ID
                     && matches!(record.action.kind, ContentActionKind::Activate) =>
                 {
-                    out.push(ComposerIntent::Reconnect);
+                    if let Some(item) = &self.active_queued {
+                        out.push(ComposerIntent::RemoveQueued {
+                            item_id: item.id.clone(),
+                            session_id: item.session_id.clone(),
+                            epoch: item.epoch,
+                        });
+                    }
                 }
                 id if id == COMPOSER_ATTACH_BTN_ID
                     && matches!(record.action.kind, ContentActionKind::Activate) =>

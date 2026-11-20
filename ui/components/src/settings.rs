@@ -1,17 +1,19 @@
 //! Normalized Harness settings view (`HarnessSettingsSurface`) with CAS revision display,
-//! read-only warning, conflict notice, and strict secret masking (`••••••••`).
+//! read-only warning, conflict notice, native `SwitchContent` toggles, and strict secret masking (`••••••••`).
 
 use crate::ResponsiveWidthMode;
 use crate::ids::*;
+use crate::ui_helpers::{heading_text, icon_button, label_text, secondary_text};
 use tekes_ui_controls::{
     ButtonVariant, ScrollArea,
     composition::{
         Button, ComponentId, Content, ContentActionKind, ContentActionPayload, ContentActionRecord,
-        ContentHost, ScrollContent, SegmentedControlContent, StackContent, TextContent,
+        ContentHost, ScrollContent, SegmentedControlContent, StackContent, SwitchContent,
+        TextContent,
     },
     extended::{Axis, Stack},
 };
-use tekes_ui_tokens::Spacing;
+use tekes_ui_tokens::{Spacing, proposal::layout::MainAxisDistribution};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum SettingFieldKindModel {
@@ -72,38 +74,33 @@ impl HarnessSettingsSurface {
     }
 
     pub fn build_content() -> Content {
-        let header = Content::new(
-            SETTINGS_HEADER_ID,
-            TextContent::new("Harness 策略设置 · 尚未加载"),
+        let header = Content::new(SETTINGS_HEADER_ID, heading_text("Harness Settings"));
+        let refresh = Content::new(
+            SETTINGS_REFRESH_BTN_ID,
+            icon_button(
+                SETTINGS_REFRESH_ICON_ID,
+                "tekes-refresh",
+                "Refresh settings",
+            ),
         );
-        let banner = Content::new(SETTINGS_BANNER_ID, TextContent::new(""));
-
-        let mut refresh_btn = Button::new("刷新策略");
-        refresh_btn.variant = ButtonVariant::Quiet;
-        let refresh = Content::new(SETTINGS_REFRESH_BTN_ID, refresh_btn);
-
-        let mut apply_btn = Button::new("CAS 状态校验");
-        apply_btn.button.state.disabled = true;
-        let apply = Content::new(SETTINGS_APPLY_BTN_ID, apply_btn);
-
-        let actions = Content::new(
-            SETTINGS_ACTIONS_ROW_ID,
-            StackContent {
-                model: Stack {
-                    axis: Axis::Horizontal,
-                    gap: Spacing::Tight.value(),
-                },
-                flexible_child: None,
-                children: vec![refresh, apply],
+        let header_row = StackContent {
+            model: Stack {
+                axis: Axis::Horizontal,
+                gap: Spacing::Tight.value(),
             },
-        );
+            flexible_child: Some(SETTINGS_HEADER_ID),
+            children: vec![header, refresh],
+        }
+        .into_content_with_distribution(SETTINGS_HEADER_ROW_ID, MainAxisDistribution::SpaceBetween);
+
+        let banner = Content::new(SETTINGS_BANNER_ID, secondary_text(""));
 
         let fields_stack = Content::new(
             SETTINGS_FIELDS_STACK_ID,
             StackContent {
                 model: Stack {
                     axis: Axis::Vertical,
-                    gap: Spacing::Tight.value(),
+                    gap: Spacing::Regular.value(),
                 },
                 flexible_child: None,
                 children: Vec::new(),
@@ -119,10 +116,10 @@ impl HarnessSettingsSurface {
             StackContent {
                 model: Stack {
                     axis: Axis::Vertical,
-                    gap: Spacing::Tight.value(),
+                    gap: Spacing::Regular.value(),
                 },
                 flexible_child: Some(SETTINGS_FIELDS_SCROLL_ID),
-                children: vec![header, actions, banner, scroll],
+                children: vec![header_row, banner, scroll],
             },
         )
     }
@@ -131,14 +128,10 @@ impl HarnessSettingsSurface {
         &mut self,
         host: &mut ContentHost,
         model: &HarnessSettingsViewModel,
-        mode: ResponsiveWidthMode,
+        _mode: ResponsiveWidthMode,
     ) {
-        let mode_label = match mode {
-            ResponsiveWidthMode::Compact => "Compact",
-            ResponsiveWidthMode::Expanded => "Expanded",
-        };
         let header_text = format!(
-            "{} · CAS rev {}{} ({mode_label})",
+            "{} · CAS rev {}{}",
             model.namespace_label,
             model.revision,
             if model.read_only { " [只读]" } else { "" }
@@ -153,7 +146,7 @@ impl HarnessSettingsSurface {
         let banner_text = if let Some(err) = &model.error {
             format!("异常 / 冲突: {err}")
         } else if model.read_only {
-            "当前 Harness 配置处于只读模式 (readOnly)，所有修改操作已禁用。".to_owned()
+            "只读模式 · Read-only harness settings".to_owned()
         } else {
             model.status.clone().unwrap_or_default()
         };
@@ -173,26 +166,47 @@ impl HarnessSettingsSurface {
         self.controls.clear();
         let mut children = Vec::new();
         for (idx, field) in model.fields.iter().enumerate() {
-            let row_id = ComponentId(SETTINGS_FIELD_BASE + idx as u64);
-            let label_id = ComponentId(SETTINGS_FIELD_BASE + 500 + idx as u64);
-            let ctrl_id = ComponentId(SETTINGS_CONTROL_BASE + idx as u64);
+            let idx_u64 = idx as u64;
+            let row_id = ComponentId(SETTINGS_FIELD_BASE + idx_u64);
+            let label_id = ComponentId(SETTINGS_FIELD_BASE + 500 + idx_u64);
+            let ctrl_id = ComponentId(SETTINGS_CONTROL_BASE + idx_u64);
 
             if field.is_secret {
-                let row = Content::new(
-                    row_id,
-                    TextContent::new(format!("{}: •••••••• (只读掩码)", field.label)),
-                );
+                let row = StackContent {
+                    model: Stack {
+                        axis: Axis::Horizontal,
+                        gap: Spacing::Tight.value(),
+                    },
+                    flexible_child: Some(label_id),
+                    children: vec![
+                        Content::new(label_id, label_text(&field.label)),
+                        Content::new(ctrl_id, secondary_text("••••••••")),
+                    ],
+                }
+                .into_content_with_distribution(row_id, MainAxisDistribution::SpaceBetween);
                 children.push(row);
                 continue;
             }
 
-            let label = Content::new(
-                label_id,
-                TextContent::new(format!("{} = {}", field.label, field.display_value)),
-            );
             let field_enabled = field.writable && !model.read_only;
-            let control = match &field.kind {
+            match &field.kind {
+                SettingFieldKindModel::Boolean => {
+                    let current = field.display_value == "true";
+                    let mut sw = SwitchContent::new(&field.label, current);
+                    sw.model.disabled = !field_enabled;
+                    if field_enabled {
+                        self.controls.push((
+                            ctrl_id,
+                            ControlTarget::Bool {
+                                key: field.key.clone(),
+                                current,
+                            },
+                        ));
+                    }
+                    children.push(Content::new(ctrl_id, sw));
+                }
                 SettingFieldKindModel::Enum(options) if !options.is_empty() => {
+                    let label = Content::new(label_id, label_text(&field.label));
                     let mut seg = SegmentedControlContent::new(&field.label, options.clone());
                     let active_idx = options
                         .iter()
@@ -208,27 +222,26 @@ impl HarnessSettingsSurface {
                             },
                         ));
                     }
-                    Content::new(ctrl_id, seg)
-                }
-                SettingFieldKindModel::Boolean => {
-                    let current = field.display_value == "true";
-                    let mut btn = Button::new(if current { "已开启" } else { "已关闭" });
-                    btn.button.state.disabled = !field_enabled;
-                    if field_enabled {
-                        self.controls.push((
-                            ctrl_id,
-                            ControlTarget::Bool {
-                                key: field.key.clone(),
-                                current,
+                    children.push(Content::new(
+                        row_id,
+                        StackContent {
+                            model: Stack {
+                                axis: Axis::Vertical,
+                                gap: Spacing::Micro.value(),
                             },
-                        ));
-                    }
-                    Content::new(ctrl_id, btn)
+                            flexible_child: None,
+                            children: vec![label, Content::new(ctrl_id, seg)],
+                        },
+                    ));
                 }
                 SettingFieldKindModel::Integer => {
                     let current: i64 = field.display_value.parse().unwrap_or(0);
+                    let label = Content::new(
+                        label_id,
+                        TextContent::new(format!("{}: {}", field.label, field.display_value)),
+                    );
                     let mut btn = Button::new("+1");
-                    btn.variant = ButtonVariant::Quiet;
+                    btn.variant = ButtonVariant::Panel;
                     btn.button.state.disabled = !field_enabled;
                     if field_enabled {
                         self.controls.push((
@@ -239,41 +252,66 @@ impl HarnessSettingsSurface {
                             },
                         ));
                     }
-                    Content::new(ctrl_id, btn)
+                    let row = StackContent {
+                        model: Stack {
+                            axis: Axis::Horizontal,
+                            gap: Spacing::Tight.value(),
+                        },
+                        flexible_child: Some(label_id),
+                        children: vec![label, Content::new(ctrl_id, btn)],
+                    }
+                    .into_content_with_distribution(row_id, MainAxisDistribution::SpaceBetween);
+                    children.push(row);
                 }
-                _ => Content::new(
-                    ctrl_id,
-                    TextContent::new(if field.writable {
-                        "可写".to_owned()
-                    } else {
-                        "只读".to_owned()
-                    }),
-                ),
-            };
-            children.push(Content::new(
-                row_id,
-                StackContent {
-                    model: Stack {
-                        axis: Axis::Vertical,
-                        gap: Spacing::Tight.value(),
-                    },
-                    flexible_child: None,
-                    children: vec![label, control],
-                },
-            ));
+                _ => {
+                    let row = StackContent {
+                        model: Stack {
+                            axis: Axis::Horizontal,
+                            gap: Spacing::Tight.value(),
+                        },
+                        flexible_child: Some(label_id),
+                        children: vec![
+                            Content::new(label_id, label_text(&field.label)),
+                            Content::new(ctrl_id, secondary_text(&field.display_value)),
+                        ],
+                    }
+                    .into_content_with_distribution(row_id, MainAxisDistribution::SpaceBetween);
+                    children.push(row);
+                }
+            }
         }
 
         if children.is_empty() {
             children.push(Content::new(
                 ComponentId(SETTINGS_FIELD_BASE),
-                TextContent::new("正在读取 Harness 策略项..."),
+                secondary_text("Loading harness settings…"),
             ));
         }
         replace_stack_children(host, SETTINGS_FIELDS_STACK_ID, children);
     }
 
-    pub fn handle_actions(&self, records: &[ContentActionRecord]) -> Vec<HarnessSettingsIntent> {
+    pub fn handle_actions(
+        &mut self,
+        host: &ContentHost,
+        records: &[ContentActionRecord],
+    ) -> Vec<HarnessSettingsIntent> {
         let mut intents = Vec::new();
+        let mut toggled_ids = Vec::new();
+
+        for (id, target) in &mut self.controls {
+            if let ControlTarget::Bool { key, current } = target
+                && let Some(sw) = host.get(*id).and_then(|c| c.component::<SwitchContent>())
+                && sw.model.checked != *current
+            {
+                *current = sw.model.checked;
+                toggled_ids.push(*id);
+                intents.push(HarnessSettingsIntent::ToggleBool {
+                    key: key.clone(),
+                    next_value: sw.model.checked,
+                });
+            }
+        }
+
         for rec in records {
             if rec.action.target == SETTINGS_REFRESH_BTN_ID
                 && matches!(rec.action.kind, ContentActionKind::Activate)
@@ -283,7 +321,7 @@ impl HarnessSettingsSurface {
             }
             if let Some((_, target)) = self
                 .controls
-                .iter()
+                .iter_mut()
                 .find(|(id, _)| *id == rec.action.target)
             {
                 match (target, &rec.action.kind, &rec.payload) {
@@ -299,16 +337,20 @@ impl HarnessSettingsSurface {
                             });
                         }
                     }
-                    (ControlTarget::Bool { key, current }, ContentActionKind::Activate, _) => {
+                    (ControlTarget::Bool { key, current }, ContentActionKind::Activate, _)
+                        if !toggled_ids.contains(&rec.action.target) =>
+                    {
+                        let next = !*current;
+                        *current = next;
                         intents.push(HarnessSettingsIntent::ToggleBool {
                             key: key.clone(),
-                            next_value: !current,
+                            next_value: next,
                         });
                     }
                     (ControlTarget::IntStep { key, current }, ContentActionKind::Activate, _) => {
                         intents.push(HarnessSettingsIntent::IncrementInt {
                             key: key.clone(),
-                            next_value: current + 1,
+                            next_value: *current + 1,
                         });
                     }
                     _ => {}

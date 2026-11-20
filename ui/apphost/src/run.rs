@@ -5,15 +5,13 @@ use crate::{AgentContainerAdapter, ManagedAgentContainer, SharedAgentWorkbench};
 use anyhow::Result;
 use tekes_agent_components_ui::{
     ComposerIntent, ComposerSurface, RUN_CONTAINER_SHELL_ID, RUN_CONTAINER_STACK_ID,
-    ResponsiveWidthMode, TRANSCRIPT_ROOT_ID, TRANSCRIPT_SEARCH_ID, TranscriptIntent,
-    TranscriptSurface,
+    ResponsiveWidthMode, TRANSCRIPT_ROOT_ID, TranscriptIntent, TranscriptSurface,
 };
 use tekes_agent_presentation::ActionablePrompt;
 use tekes_agent_ui_bindings::{
     AVAILABLE_MODELS, AVAILABLE_PRESETS, ArtifactOpenRequest, WorkbenchCommand,
 };
-use tekes_ui_app_host::{ContainerToolbarHost, ContainerToolbarPosition, LocalContainer};
-use tekes_ui_app_protocol::ToolbarItem;
+use tekes_ui_app_host::LocalContainer;
 use tekes_ui_controls::{
     composition::{Content, ContentActionRecord, ContentHost, StackContent},
     extended::{Axis, Stack},
@@ -127,6 +125,12 @@ impl AgentContainerAdapter for AgentRunAdapter {
                             ));
                         }
                     }
+                    TranscriptIntent::Reconnect => run.reconnect(),
+                    TranscriptIntent::CopyLatest
+                    | TranscriptIntent::FeedbackLatest { .. }
+                    | TranscriptIntent::ForkLatest => {
+                        workbench.bump_revision();
+                    }
                 }
             }
         }
@@ -162,6 +166,13 @@ impl AgentContainerAdapter for AgentRunAdapter {
                     }
                     ComposerIntent::SelectModel(idx) => run.set_model(idx),
                     ComposerIntent::SelectPreset(idx) => run.set_preset(idx),
+                    ComposerIntent::RemoveQueued {
+                        item_id,
+                        session_id,
+                        epoch,
+                    } => {
+                        let _ = run.remove_queued_prompt_at_epoch(epoch, &session_id, &item_id);
+                    }
                 }
             }
         }
@@ -179,7 +190,7 @@ impl AgentRunContainer {
             StackContent {
                 model: Stack {
                     axis: Axis::Vertical,
-                    gap: Spacing::Regular.value(),
+                    gap: Spacing::Relaxed.value(),
                 },
                 flexible_child: Some(TRANSCRIPT_ROOT_ID),
                 children: vec![
@@ -197,19 +208,8 @@ impl AgentRunContainer {
             false,
         )?;
         Ok(container
-            .title("Agent 对话")
-            .switcher_icon("tekes-side-chat")
-            .search_entry(TRANSCRIPT_SEARCH_ID)
-            .toolbar_host(ContainerToolbarHost::Container {
-                position: ContainerToolbarPosition::Top,
-            })
-            .toolbar(vec![ToolbarItem {
-                id: FOCUS_SWITCH_COMMAND,
-                title: "Focus 切换".into(),
-                enabled: true,
-                geometry_dependent: false,
-            }])
-            .focus_switch(FOCUS_SWITCH_COMMAND))
+            .title("Conversation")
+            .switcher_icon("tekes-side-chat"))
     }
 
     pub fn follow_latest_in_host(host: &mut ContentHost) {
@@ -235,9 +235,8 @@ impl TranscriptContainer {
             false,
         )?;
         Ok(container
-            .title("会话消息流")
-            .switcher_icon("tekes-side-chat")
-            .search_entry(TRANSCRIPT_SEARCH_ID))
+            .title("Conversation")
+            .switcher_icon("tekes-side-chat"))
     }
 }
 
@@ -255,6 +254,6 @@ impl ComposerContainer {
             AgentRunAdapter::new(false, true),
             false,
         )?;
-        Ok(container.title("输入编辑栏").switcher_icon("tekes-send"))
+        Ok(container.title("Composer").switcher_icon("tekes-send"))
     }
 }

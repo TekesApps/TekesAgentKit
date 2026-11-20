@@ -1,21 +1,23 @@
-//! Artifact Viewer surface supporting Code/Text with UTF-16 selection capture for
-//! `ArtifactSelectionReference`, Markdown (`RichContent`), Bitmap (`ImageContent` + Metal lease),
-//! Loading/Binary/Truncated/Error diagnostics, and pluggable host `Custom` Content providers.
+//! Artifact Viewer surface aligned with Tekes: compact breadcrumb/path header with
+//! transparent icon actions (Quote / Attach / Reload), hairline separator, and borderless
+//! code, Markdown, image, or diagnostic preview.
 
 use crate::ResponsiveWidthMode;
 use crate::ids::*;
+use crate::ui_helpers::{icon_button, label_text, secondary_text};
 use std::ops::Range;
 use tekes_ui_controls::{
-    ButtonVariant, ScrollArea,
+    ScrollArea,
     composition::{
         Button, Content, ContentActionKind, ContentActionRecord, ContentHost, ImageContent,
         ImageLoadOutcome, ImageLoadRequest, ImageLoadStatus, ImageSemantics, RichContent,
-        RichDocument, ScrollContent, StackContent, TextContent, TextFieldContent, TextViewport,
+        RichDocument, ScrollContent, SeparatorContent, StackContent, TextContent, TextFieldContent,
+        TextViewport,
     },
     extended::{Axis, Stack},
 };
 use tekes_ui_scene::Size;
-use tekes_ui_tokens::Spacing;
+use tekes_ui_tokens::{Spacing, proposal::layout::MainAxisDistribution};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum ArtifactViewKind {
@@ -82,18 +84,24 @@ impl ArtifactViewerSurface {
     }
 
     pub fn build_content() -> Content {
-        let mut quote_btn = Button::new("引用选区到对话");
-        quote_btn.variant = ButtonVariant::Primary;
-        let attach_btn = Button::new("附加文件");
-        let mut reload_btn = Button::new("重新加载");
-        reload_btn.variant = ButtonVariant::Quiet;
+        let quote_btn = icon_button(
+            ARTIFACT_QUOTE_ICON_ID,
+            "tekes-quote",
+            "Quote selection to conversation",
+        );
+        let attach_btn = icon_button(
+            ARTIFACT_ATTACH_ICON_ID,
+            "tekes-attach",
+            "Attach file to conversation",
+        );
+        let reload_btn = icon_button(ARTIFACT_RELOAD_ICON_ID, "tekes-refresh", "Reload file");
 
         let actions = Content::new(
             ARTIFACT_ACTIONS_ROW_ID,
             StackContent {
                 model: Stack {
                     axis: Axis::Horizontal,
-                    gap: Spacing::Tight.value(),
+                    gap: Spacing::Micro.value(),
                 },
                 flexible_child: None,
                 children: vec![
@@ -104,19 +112,30 @@ impl ArtifactViewerSurface {
             },
         );
 
+        let header_row = StackContent {
+            model: Stack {
+                axis: Axis::Horizontal,
+                gap: Spacing::Tight.value(),
+            },
+            flexible_child: Some(ARTIFACT_HEADER_ID),
+            children: vec![
+                Content::new(ARTIFACT_HEADER_ID, label_text("Artifact")),
+                actions,
+            ],
+        }
+        .into_content_with_distribution(ARTIFACT_HEADER_ROW_ID, MainAxisDistribution::SpaceBetween);
+
         let body_slot = Content::new(
             ARTIFACT_BODY_SLOT_ID,
             StackContent {
                 model: Stack {
                     axis: Axis::Vertical,
-                    gap: Spacing::Tight.value(),
+                    gap: Spacing::Regular.value(),
                 },
                 flexible_child: Some(ARTIFACT_BODY_SCROLL_ID),
                 children: vec![Content::new(
                     ARTIFACT_DIAG_TEXT_ID,
-                    TextContent::new(
-                        "从 Workspace Files 选择文件或在 Summary 中点击产物打开预览。",
-                    ),
+                    secondary_text("Select a file from Files or Summary to preview."),
                 )],
             },
         );
@@ -126,12 +145,12 @@ impl ArtifactViewerSurface {
             StackContent {
                 model: Stack {
                     axis: Axis::Vertical,
-                    gap: Spacing::Tight.value(),
+                    gap: Spacing::Regular.value(),
                 },
                 flexible_child: Some(ARTIFACT_BODY_SLOT_ID),
                 children: vec![
-                    Content::new(ARTIFACT_HEADER_ID, TextContent::new("产物查看器")),
-                    actions,
+                    header_row,
+                    Content::new(ARTIFACT_SEP_ID, SeparatorContent::default()),
                     body_slot,
                 ],
             },
@@ -155,12 +174,9 @@ impl ArtifactViewerSurface {
                 .map(|b| format!(" · {b}"))
                 .unwrap_or_default();
             if model.path.is_empty() {
-                header.text = "产物查看器 · 未打开文件".to_owned();
+                header.text = "Artifact".to_owned();
             } else {
-                header.text = format!(
-                    "产物 · {} ({} · {}){badge}",
-                    model.path, model.revision, model.workspace_id
-                );
+                header.text = format!("{}{badge}", model.path);
             }
         }
 
@@ -206,22 +222,22 @@ impl ArtifactViewerSurface {
             if let Some(custom) = custom_body {
                 let scroll = Content::new(
                     ARTIFACT_BODY_SCROLL_ID,
-                    ScrollContent::new(ScrollArea::default(), custom),
+                    ScrollContent::new(ScrollArea::default(), custom).scrollbar(true),
                 );
                 replace_stack_children(host, ARTIFACT_BODY_SLOT_ID, vec![scroll]);
             } else {
                 let body_children = match &model.kind {
                     ArtifactViewKind::Empty => vec![Content::new(
                         ARTIFACT_DIAG_TEXT_ID,
-                        TextContent::new("从 Workspace Files 或 Summary 打开文件以预览内容。"),
+                        secondary_text("Select a file from Files or Summary to preview."),
                     )],
                     ArtifactViewKind::Loading => vec![Content::new(
                         ARTIFACT_DIAG_TEXT_ID,
-                        TextContent::new(format!("正在加载 {} …", model.path)),
+                        secondary_text(format!("Loading {}…", model.path)),
                     )],
                     ArtifactViewKind::CodeText { text, .. } => {
                         let mut field = TextFieldContent::read_only_content(
-                            "源码预览",
+                            "Source preview",
                             text,
                             tekes_ui_tokens::proposal::TextRole::Code,
                         );
@@ -232,7 +248,8 @@ impl ArtifactViewerSurface {
                             ScrollContent::new(
                                 ScrollArea::default(),
                                 Content::new(ARTIFACT_CODE_EDITOR_ID, field),
-                            ),
+                            )
+                            .scrollbar(true),
                         )]
                     }
                     ArtifactViewKind::Markdown(md) => {
@@ -244,7 +261,8 @@ impl ArtifactViewerSurface {
                             ScrollContent::new(
                                 ScrollArea::default(),
                                 Content::new(ARTIFACT_MARKDOWN_RICH_ID, rich),
-                            ),
+                            )
+                            .scrollbar(true),
                         )]
                     }
                     ArtifactViewKind::Image { width, height } => {
@@ -252,7 +270,7 @@ impl ArtifactViewerSurface {
                         let h = (*height).max(1) as f32;
                         let mut img = ImageContent::loading(
                             Size::new(w, h),
-                            ImageSemantics::Alternative(format!("图像预览: {}", model.path)),
+                            ImageSemantics::Alternative(format!("Image preview: {}", model.path)),
                         )
                         .expect("valid ImageContent size");
                         self.pending_image_request = img.begin_load().ok();
@@ -266,26 +284,25 @@ impl ArtifactViewerSurface {
                     }
                     ArtifactViewKind::Binary { size } => vec![Content::new(
                         ARTIFACT_DIAG_TEXT_ID,
-                        TextContent::new(format!(
-                            "二进制文件（不可文本预览）\n路径: {}\n大小: {} bytes",
-                            model.path, size
+                        secondary_text(format!(
+                            "Binary file cannot be previewed ({} bytes).",
+                            size
                         )),
                     )],
                     ArtifactViewKind::Truncated { preview_text, size } => vec![Content::new(
                         ARTIFACT_DIAG_TEXT_ID,
-                        TextContent::new(format!(
-                            "[文件已截断预览 · 总大小 {} bytes]\n\n{}",
-                            size, preview_text
+                        secondary_text(format!(
+                            "Preview truncated ({size} bytes total)\n\n{preview_text}"
                         )),
                     )],
                     ArtifactViewKind::Error(err) => vec![Content::new(
                         ARTIFACT_DIAG_TEXT_ID,
-                        TextContent::new(format!("加载产物失败：{err}")),
+                        secondary_text(format!("Failed to load artifact: {err}")),
                     )],
                     ArtifactViewKind::CustomHandled { summary_label } => {
                         vec![Content::new(
                             ARTIFACT_DIAG_TEXT_ID,
-                            TextContent::new(summary_label.clone()),
+                            secondary_text(summary_label.clone()),
                         )]
                     }
                 };

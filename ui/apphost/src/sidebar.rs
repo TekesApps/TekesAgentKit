@@ -99,6 +99,9 @@ impl AgentContainerAdapter for SidebarAdapter {
                 SidebarIntent::ArchiveSession(session_id) => {
                     run.archive_session(&session_id);
                 }
+                SidebarIntent::OpenSettings => {
+                    workbench.bump_revision();
+                }
             }
         }
     }
@@ -108,7 +111,7 @@ pub struct SessionSidebarContainer;
 
 impl SessionSidebarContainer {
     pub fn build(id: impl Into<String>, workbench: SharedAgentWorkbench) -> Result<LocalContainer> {
-        let container = ManagedAgentContainer::build_local(
+        let mut container = ManagedAgentContainer::build_local(
             id,
             SIDEBAR_SHELL_ID,
             SidebarSurface::build_content(),
@@ -116,6 +119,10 @@ impl SessionSidebarContainer {
             SidebarAdapter::new(),
             true,
         )?;
-        Ok(container.title("会话导航").switcher_icon("tekes-side-bar"))
+        container.with_host(&mut SidebarSurface::bind_context_menu);
+        Ok(container
+            .title("Tekes")
+            .switcher_icon("tekes-side-bar")
+            .content_padding(0.0))
     }
 }

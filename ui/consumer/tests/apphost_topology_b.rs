@@ -18,11 +18,61 @@ use tekes_agent_ui_consumer_check::studio::{
     CadSpecViewerProvider, DOMAIN_CAD_CUSTOM_SLOT_ID, DomainStudioRuntime, build_topology_b_app,
     build_topology_b_containers_and_options, render_app_to_rgba8,
 };
-use tekes_ui_app_host::PresentationState;
+use tekes_ui_app_host::{AppWindow, LocalContainer, PresentationOptions, PresentationState};
 use tekes_ui_controls::{
     DraftRevision, ExternalSelection, ExternalUndo, ExternalValueConflict, ExternalValueResult,
-    composition::{Component, ContentEvent, TextContent, TextFieldContent},
+    composition::{
+        Component, ComponentId, Content, ContentEvent, ContentHost, IconImage, IconRenderError,
+        StackContent, TextContent, TextFieldContent, WithIconRenderer,
+    },
+    extended::{Axis, Stack},
+    layout_view::IconRenderer,
 };
+use tekes_ui_scene::{ImageId, Rect, Scene};
+use tekes_ui_tokens::{Palette, Rgba, Theme};
+
+struct TestIcons;
+impl IconRenderer for TestIcons {
+    fn draw_icon(&mut self, _: &mut Scene, _: &str, _: Rect, _: Rgba) {}
+    fn prepare_icon(
+        &mut self,
+        _: &str,
+        _: f32,
+        _: f32,
+        _: Rgba,
+    ) -> Result<IconImage, IconRenderError> {
+        Ok(IconImage::new(ImageId(1), std::rc::Rc::new(())))
+    }
+}
+
+fn layout_host_for_focus(host: &mut ContentHost) {
+    let dummy_root = Content::new(
+        ComponentId(1),
+        StackContent {
+            model: Stack {
+                axis: Axis::Vertical,
+                gap: 0.0,
+            },
+            flexible_child: None,
+            children: Vec::new(),
+        },
+    );
+    let dummy = LocalContainer::new("dummy", dummy_root).unwrap();
+    let app =
+        AppWindow::from_containers(vec![dummy.into()], PresentationOptions::new("dummy")).unwrap();
+    let (_menus, mut hosted) = app.into_window_handler().unwrap();
+    let mut icons = TestIcons;
+    let mut renderer = WithIconRenderer::new(hosted.text_host_mut(), &mut icons);
+    let area = Rect::new(0.0, 0.0, 880.0, 720.0);
+    host.render(
+        &mut Scene::new(),
+        &mut renderer,
+        area,
+        area,
+        Palette::from(Theme::LIGHT),
+    )
+    .unwrap();
+}
 
 #[test]
 fn topology_b_domain_first_cad_viewer_and_zero_rebuild_focus_swap() {
@@ -97,6 +147,8 @@ fn topology_b_domain_first_cad_viewer_and_zero_rebuild_focus_swap() {
                 .unwrap();
             reader.stop_following();
             assert!(!reader.reading.is_following_latest());
+
+            layout_host_for_focus(h);
 
             // Focus Composer & enter active CJK Preedit ("正在修改装配公差").
             assert!(h.focus(Some(COMPOSER_EDITOR_ID), true));

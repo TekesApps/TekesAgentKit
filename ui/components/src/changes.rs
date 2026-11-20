@@ -1,8 +1,10 @@
-//! Workspace Changes surface (`Working Tree` vs `Turn Changes`), unified diff preview via
-//! `RichContent`, Diff citation capture, and capability-gated Git commit controls.
+//! Workspace Changes surface aligned with Tekes Review: `Working Tree` vs `Turn Changes`,
+//! native `DiffView` unified diff rendering via `RichDocument::from_diff`, Diff citation,
+//! and capability-gated Git commit controls.
 
 use crate::ResponsiveWidthMode;
 use crate::ids::*;
+use crate::ui_helpers::{icon_button, icon_row, label_text};
 use std::collections::BTreeMap;
 use tekes_ui_controls::{
     ButtonVariant, ScrollArea,
@@ -13,10 +15,11 @@ use tekes_ui_controls::{
         TextFieldContent,
     },
     extended::{
-        Axis, KeyedListItem, KeyedListSnapshot, ListBudget, ListDatasetKey, ListItemKey, Stack,
+        Axis, DiffKind, DiffLine, DiffView, KeyedListItem, KeyedListSnapshot, ListBudget,
+        ListDatasetKey, ListItemKey, Stack,
     },
 };
-use tekes_ui_tokens::Spacing;
+use tekes_ui_tokens::{Spacing, proposal::layout::MainAxisDistribution};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ChangeRowModel {
@@ -90,9 +93,27 @@ impl WorkspaceChangesSurface {
     }
 
     pub fn build_content() -> Content {
+        let quote_btn = icon_button(
+            CHANGES_QUOTE_ICON_ID,
+            "tekes-quote",
+            "Quote diff to conversation",
+        );
+        let header_row = StackContent {
+            model: Stack {
+                axis: Axis::Horizontal,
+                gap: Spacing::Tight.value(),
+            },
+            flexible_child: Some(CHANGES_HEADER_ID),
+            children: vec![
+                Content::new(CHANGES_HEADER_ID, label_text("Changes")),
+                Content::new(CHANGES_QUOTE_BTN_ID, quote_btn),
+            ],
+        }
+        .into_content_with_distribution(CHANGES_HEADER_ROW_ID, MainAxisDistribution::SpaceBetween);
+
         let mode_seg = SegmentedControlContent::new(
-            "变更视图模式",
-            vec!["工作区变更".into(), "本轮变更".into()],
+            "Changes view",
+            vec!["Working Tree".into(), "Turn Changes".into()],
         );
 
         let initial_snap = KeyedListSnapshot {
@@ -101,32 +122,35 @@ impl WorkspaceChangesSurface {
             display_items: Vec::new(),
         };
         let mut initial_rows = Vec::new();
-        let list = SelectableListContent::keyed(
-            "变更文件清单",
+        let mut list = SelectableListContent::keyed(
+            "Changed files",
             &initial_snap,
             &mut initial_rows,
             Self::budget(),
         )
         .expect("empty changes list");
+        list.set_navigation_layout(true);
+        list.set_navigation_selection_fill_only(true);
         let mut list_scroll = ScrollContent::new(
             ScrollArea::default(),
             Content::new(CHANGES_FILES_LIST_ID, list),
-        );
-        list_scroll.viewport_height = Some(120.0);
+        )
+        .scrollbar(true);
+        list_scroll.viewport_height = Some(112.0);
 
-        let diff_doc = RichDocument::from_markdown("```diff\n+ 等待加载 Diff…\n```");
+        let diff_doc = RichDocument::from_diff(&DiffView::default());
         let diff_rich =
             RichContent::new("workspace-diff", 1, diff_doc).expect("valid diff RichContent");
         let diff_scroll = ScrollContent::new(
             ScrollArea::default(),
             Content::new(CHANGES_DIFF_RICH_ID, diff_rich),
-        );
+        )
+        .scrollbar(true);
 
-        let quote_btn = Button::new("引用 Diff");
-        let mut commit_input = TextFieldContent::new("提交说明", "");
+        let mut commit_input = TextFieldContent::new("Commit message", "");
         commit_input.show_metadata = false;
-        commit_input.set_placeholder(Some("输入提交信息 (capability-gated)…".to_owned()));
-        let mut commit_btn = Button::new("提交");
+        commit_input.set_placeholder(Some("Commit message…".to_owned()));
+        let mut commit_btn = Button::new("Commit");
         commit_btn.variant = ButtonVariant::Primary;
 
         let commit_row = Content::new(
@@ -138,7 +162,6 @@ impl WorkspaceChangesSurface {
                 },
                 flexible_child: Some(CHANGES_COMMIT_INPUT_ID),
                 children: vec![
-                    Content::new(CHANGES_QUOTE_BTN_ID, quote_btn),
                     Content::new(CHANGES_COMMIT_INPUT_ID, commit_input),
                     Content::new(CHANGES_COMMIT_BTN_ID, commit_btn),
                 ],
@@ -150,11 +173,11 @@ impl WorkspaceChangesSurface {
             StackContent {
                 model: Stack {
                     axis: Axis::Vertical,
-                    gap: Spacing::Tight.value(),
+                    gap: Spacing::Regular.value(),
                 },
                 flexible_child: Some(CHANGES_DIFF_SCROLL_ID),
                 children: vec![
-                    Content::new(CHANGES_HEADER_ID, TextContent::new("工作区变更")),
+                    header_row,
                     Content::new(CHANGES_MODE_SEG_ID, mode_seg),
                     Content::new(CHANGES_FILES_SCROLL_ID, list_scroll),
                     Content::new(CHANGES_DIFF_SCROLL_ID, diff_scroll),
@@ -175,6 +198,34 @@ impl WorkspaceChangesSurface {
         k
     }
 
+    fn parse_unified_diff(diff_text: &str) -> DiffView {
+        if diff_text.trim().is_empty() {
+            return DiffView {
+                lines: vec![DiffLine {
+                    kind: DiffKind::Equal,
+                    text: "No changes selected.".to_owned(),
+                }],
+            };
+        }
+        let lines = diff_text
+            .lines()
+            .map(|raw| {
+                let kind = if raw.starts_with('+') && !raw.starts_with("+++") {
+                    DiffKind::Added
+                } else if raw.starts_with('-') && !raw.starts_with("---") {
+                    DiffKind::Removed
+                } else {
+                    DiffKind::Equal
+                };
+                DiffLine {
+                    kind,
+                    text: raw.to_owned(),
+                }
+            })
+            .collect();
+        DiffView { lines }
+    }
+
     pub fn sync(
         &mut self,
         host: &mut ContentHost,
@@ -191,11 +242,14 @@ impl WorkspaceChangesSurface {
                 .map(|s| format!(" · {s}"))
                 .unwrap_or_default();
             header.text = format!(
-                "变更 · {}@{} ({}) · {} 项{status_note}",
-                model.workspace_id,
+                "{} · {} {}{status_note}",
                 model.branch,
-                model.git_revision,
                 model.files.len(),
+                if model.files.len() == 1 {
+                    "file"
+                } else {
+                    "files"
+                }
             );
         }
 
@@ -219,10 +273,17 @@ impl WorkspaceChangesSurface {
                 name: item.label.clone(),
             });
             display_items.push(key);
+            let decor = CHANGES_ROW_DECOR_BASE + key.0 * 4;
             rows.push(ListRowDisplay {
                 key,
                 row_id: ComponentId(CHANGES_ROW_BASE + key.0),
-                display: ListDisplayUpdate::DefaultLabel,
+                display: ListDisplayUpdate::Replace(icon_row(
+                    ComponentId(decor),
+                    ComponentId(decor + 1),
+                    ComponentId(decor + 2),
+                    "tekes-file-code",
+                    item.label.clone(),
+                )),
             });
         }
 
@@ -253,13 +314,9 @@ impl WorkspaceChangesSurface {
             model.diff_text
         );
         if diff_sig != self.last_diff_sig {
-            let md = if model.diff_text.trim().is_empty() {
-                "当前无 Diff 内容。".to_owned()
-            } else {
-                format!("```diff\n{}\n```", model.diff_text)
-            };
+            let diff_view = Self::parse_unified_diff(&model.diff_text);
             let next_rev = self.diff_revision_counter.saturating_add(1);
-            let doc = RichDocument::from_markdown(&md);
+            let doc = RichDocument::from_diff(&diff_view);
             if let Some(rich) = host
                 .get_mut(CHANGES_DIFF_RICH_ID)
                 .and_then(|c| c.component_mut::<RichContent>())

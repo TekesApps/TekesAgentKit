@@ -1,9 +1,7 @@
 //! Multi-instance `SideChatContainer` (`ContainerMultiplicity::Multiple`) providing ephemeral
 //! fork conversations with isolated draft / CJK `Preedit` state and `PaneAccess` gating.
 
-use crate::{
-    AgentContainerAdapter, FOCUS_SWITCH_COMMAND, ManagedAgentContainer, SharedAgentWorkbench,
-};
+use crate::{AgentContainerAdapter, ManagedAgentContainer, SharedAgentWorkbench};
 use anyhow::Result;
 use std::sync::Arc;
 use tekes_agent_components_ui::{
@@ -11,11 +9,7 @@ use tekes_agent_components_ui::{
 };
 use tekes_agent_presentation::RunScope;
 use tekes_agent_ui_bindings::{SideChatAccess, SideChatBinding};
-use tekes_ui_app_host::{
-    ContainerFactory, ContainerMultiplicity, ContainerToolbarHost, ContainerToolbarPosition,
-    LocalContainer,
-};
-use tekes_ui_app_protocol::ToolbarItem;
+use tekes_ui_app_host::{ContainerFactory, ContainerMultiplicity, LocalContainer};
 use tekes_ui_controls::composition::{ContentActionRecord, ContentHost};
 
 struct SideChatAdapter {
@@ -134,19 +128,7 @@ impl SideChatContainer {
             SideChatAdapter::new(id),
             false,
         )?;
-        Ok(container
-            .title("SideChat 分支")
-            .switcher_icon("tekes-side-chat")
-            .toolbar_host(ContainerToolbarHost::Container {
-                position: ContainerToolbarPosition::Top,
-            })
-            .toolbar(vec![ToolbarItem {
-                id: FOCUS_SWITCH_COMMAND,
-                title: "Focus 切换".into(),
-                enabled: true,
-                geometry_dependent: false,
-            }])
-            .focus_switch(FOCUS_SWITCH_COMMAND))
+        Ok(container.title("SideChat").switcher_icon("tekes-side-chat"))
     }
 
     /// Registers a `ContainerMultiplicity::Multiple` factory for ephemeral side-chat panels.

@@ -1,16 +1,12 @@
-//! `WorkspaceFilesContainer` (`Others` or `Focus`-swappable) using `WorkspaceFilesSurface` and
-//! `WorkspaceBinding`, routing open/attach intents across containers via `SharedAgentWorkbench`.
+//! `WorkspaceFilesContainer` using `WorkspaceFilesSurface` and `WorkspaceBinding`.
 
-use crate::{
-    AgentContainerAdapter, FOCUS_SWITCH_COMMAND, ManagedAgentContainer, SharedAgentWorkbench,
-};
+use crate::{AgentContainerAdapter, ManagedAgentContainer, SharedAgentWorkbench};
 use anyhow::Result;
 use tekes_agent_components_ui::{
     FILES_SHELL_ID, FileTreeRowModel, FilesIntent, ResponsiveWidthMode, WorkspaceFilesSurface,
 };
 use tekes_agent_ui_bindings::{ArtifactOpenRequest, WorkbenchCommand};
-use tekes_ui_app_host::{ContainerToolbarHost, ContainerToolbarPosition, LocalContainer};
-use tekes_ui_app_protocol::ToolbarItem;
+use tekes_ui_app_host::LocalContainer;
 use tekes_ui_controls::composition::{ContentActionRecord, ContentHost};
 
 struct WorkspaceFilesAdapter {
@@ -112,7 +108,7 @@ pub struct WorkspaceFilesContainer;
 
 impl WorkspaceFilesContainer {
     pub fn build(id: impl Into<String>, workbench: SharedAgentWorkbench) -> Result<LocalContainer> {
-        let container = ManagedAgentContainer::build_local(
+        let mut container = ManagedAgentContainer::build_local(
             id,
             FILES_SHELL_ID,
             WorkspaceFilesSurface::build_content(),
@@ -120,18 +116,7 @@ impl WorkspaceFilesContainer {
             WorkspaceFilesAdapter::new(),
             false,
         )?;
-        Ok(container
-            .title("工作区文件")
-            .switcher_icon("tekes-files")
-            .toolbar_host(ContainerToolbarHost::Container {
-                position: ContainerToolbarPosition::Top,
-            })
-            .toolbar(vec![ToolbarItem {
-                id: FOCUS_SWITCH_COMMAND,
-                title: "Focus 切换".into(),
-                enabled: true,
-                geometry_dependent: false,
-            }])
-            .focus_switch(FOCUS_SWITCH_COMMAND))
+        container.with_host(&mut WorkspaceFilesSurface::bind_context_menu);
+        Ok(container.title("Files").switcher_icon("tekes-files"))
     }
 }

@@ -137,8 +137,8 @@ impl FixtureSessionEndpoint {
             let (sender, _) = broadcast::channel(256);
             let mut line = SessionLine {
                 meta: SessionMeta {
-                    title: "重构 AgentKit AppHost 视图层".into(),
-                    folder: "tekes-agentkit".into(),
+                    title: "AppHost 视图与会话工作台".into(),
+                    folder: "TekesAgentKit".into(),
                     running: false,
                     status: "active".into(),
                     updated_at: 1_760_000_260.0,
@@ -149,8 +149,8 @@ impl FixtureSessionEndpoint {
                 cancel: Arc::new(AtomicBool::new(false)),
                 turn: 26,
                 todos: json!([
-                    { "content": "完成 Core Trio (Transcript / Composer / Sidebar / Summary) 容器接入", "status": "completed" },
-                    { "content": "验证 WindowWake 无轮询流式刷新与长历史前置锚点", "status": "in_progress" }
+                    { "content": "对齐 TekesUI AppHost 容器默认边距与无边框阅读流", "status": "completed" },
+                    { "content": "验证 WindowWake 流式刷新与长历史前置锚点", "status": "in_progress" }
                 ]),
                 token_usage: json!({
                     "uncachedInputTokens": 1240,
@@ -167,7 +167,7 @@ impl FixtureSessionEndpoint {
                     json!({
                         "turn": n,
                         "id": format!("alpha-u-{n}"),
-                        "content": [{ "type": "text", "text": format!("历史轮次 {n:02}：检查 TekesUI AppHost 容器生命周期与 CJK 输入法兼容性。") }]
+                        "content": [{ "type": "text", "text": format!("检查模块 #{n:02}：确认 AppHost 容器切换与中文输入法组合态。") }]
                     }),
                 );
                 append_row(
@@ -178,7 +178,7 @@ impl FixtureSessionEndpoint {
                         "step": 1,
                         "message": {
                             "id": format!("alpha-a-{n}"),
-                            "content": [{ "type": "text", "text": format!("第 {n:02} 轮巡检完成：未检测到 ContentHost 重建或 preedit 丢失。") }],
+                            "content": [{ "type": "text", "text": format!("已完成模块 #{n:02} 巡检：容器实例与输入状态均保持稳定。") }],
                             "usage": { "inputTokens": 48, "outputTokens": 24 }
                         }
                     }),
@@ -199,7 +199,7 @@ impl FixtureSessionEndpoint {
                     "id": "alpha-u-26",
                     "content": [{
                         "type": "text",
-                        "text": "请检查 AppHost 容器切换与长会话分页性能，并展示改动报告。"
+                        "text": "检查 AppHost 容器切换与长会话分页性能，并总结本次改动。"
                     }]
                 }),
             );
@@ -243,7 +243,7 @@ impl FixtureSessionEndpoint {
                             },
                             {
                                 "type": "text",
-                                "text": "## AppHost 阶段进展\n\n已完成 Core Trio 容器投影，支持 `Focus <-> Others` 零重建切换。\n\n- `ReadingController` 保持前置分页阅读位置\n- `TextFieldContent` 在组合态保护中文 preedit\n\n```rust\nstate.promote(\"agent-run\")?;\n```\n\n详情见 [架构设计](doc:docs/tekesui-apphost-architecture.md)。"
+                                "text": "## AppHost 阶段进展\n\n已完成 Core Trio 容器投影，支持 Focus 与 Others 零重建切换。\n\n- ReadingController 保持前置分页阅读位置\n- TextFieldContent 在组合态保护中文 preedit\n\n```rust\nstate.promote(\"agent-run\")?;\n```\n\n详情见 [架构设计](doc:docs/tekesui-apphost-architecture.md)。"
                             }
                         ],
                         "usage": { "inputTokens": 320, "outputTokens": 148 }
@@ -402,21 +402,6 @@ impl FixtureSessionEndpoint {
 
         let mut actionables = BTreeMap::new();
         actionables.insert(
-            "apr-alpha-1".into(),
-            json!({
-                "id": "apr-alpha-1",
-                "sessionId": DEFAULT_MAIN_SESSION_ID,
-                "kind": "approval",
-                "revision": 1,
-                "payload": {
-                    "sessionId": DEFAULT_MAIN_SESSION_ID,
-                    "approvalId": "apr-alpha-1",
-                    "toolName": "workspace.commit",
-                    "reason": "确认在本地 Git 提交 AppHost 阶段快照？"
-                }
-            }),
-        );
-        actionables.insert(
             "q-beta-1".into(),
             json!({
                 "id": "q-beta-1",
@@ -443,7 +428,7 @@ impl FixtureSessionEndpoint {
             DEFAULT_MAIN_SESSION_ID.into(),
             vec![FixtureQueueItem {
                 id: "queue-1".into(),
-                text: "下一步补充 Phase 2 Files / Changes / Artifact 容器验收".into(),
+                text: "补充 Files / Changes / Artifact 容器验收".into(),
             }],
         );
 
