@@ -41,8 +41,10 @@ struct RunUiState {
     endpoint_id: String,
     filter_mode: SidebarFilterMode,
     search_query: String,
+    selected_harness: String,
     selected_model: String,
     selected_preset: String,
+    selected_effort: String,
     local_pins: BTreeSet<String>,
     local_titles: BTreeMap<String, String>,
     local_archived: BTreeSet<String>,
@@ -51,8 +53,10 @@ struct RunUiState {
     revision: u64,
 }
 
+pub const AVAILABLE_HARNESSES: [&str; 3] = ["Tekes", "Pi", "DSH"];
 pub const AVAILABLE_MODELS: [&str; 3] = ["claude-sonnet-4", "gpt-5", "gemini-2.5-pro"];
 pub const AVAILABLE_PRESETS: [&str; 3] = ["Workspace Write", "Read Only", "Full Access"];
+pub const AVAILABLE_EFFORTS: [&str; 3] = ["Low", "Medium", "High"];
 
 /// Coordinates one `SessionRuntime` + `RunController` with UI containers via `UiWakeNotifier`.
 pub struct RunWorkbenchBinding {
@@ -108,6 +112,14 @@ impl RunWorkbenchBinding {
                 }
             }
         });
+        let lower_endpoint = endpoint_id.to_ascii_lowercase();
+        let selected_harness = if lower_endpoint.contains("pi") {
+            AVAILABLE_HARNESSES[1].to_owned()
+        } else if lower_endpoint.contains("dsh") {
+            AVAILABLE_HARNESSES[2].to_owned()
+        } else {
+            AVAILABLE_HARNESSES[0].to_owned()
+        };
         Arc::new(Self {
             runtime,
             controller,
@@ -117,8 +129,10 @@ impl RunWorkbenchBinding {
                 endpoint_id,
                 filter_mode: SidebarFilterMode::All,
                 search_query: String::new(),
+                selected_harness,
                 selected_model: AVAILABLE_MODELS[0].to_owned(),
                 selected_preset: AVAILABLE_PRESETS[0].to_owned(),
+                selected_effort: AVAILABLE_EFFORTS[1].to_owned(),
                 local_pins: BTreeSet::new(),
                 local_titles: BTreeMap::new(),
                 local_archived: BTreeSet::new(),
@@ -491,6 +505,40 @@ impl RunWorkbenchBinding {
         self.wake.wake();
     }
 
+    fn commit_draft_setting(&self, key: &str, value: Value) {
+        let snap = self.controller.snapshot();
+        if let Some(token) = &snap.selection {
+            let mut settings = snap.draft.settings.clone();
+            settings.insert(key.to_owned(), value);
+            self.controller.commit_settings(token, settings, false);
+        }
+        self.wake.wake();
+    }
+
+    pub fn selected_harness(&self) -> String {
+        self.ui
+            .lock()
+            .expect("run ui lock")
+            .selected_harness
+            .clone()
+    }
+
+    pub fn set_harness(&self, index: usize) {
+        let snap = self.controller.snapshot();
+        // Established threads lock their Harness identity once transcript turns exist.
+        if snap.run.is_some() && !snap.transcript.items.is_empty() {
+            return;
+        }
+        if let Some(harness) = AVAILABLE_HARNESSES.get(index) {
+            {
+                let mut guard = self.ui.lock().expect("run ui lock");
+                guard.selected_harness = (*harness).to_owned();
+                guard.revision = guard.revision.saturating_add(1);
+            }
+            self.commit_draft_setting("harness", json!(*harness));
+        }
+    }
+
     pub fn selected_model(&self) -> String {
         self.ui.lock().expect("run ui lock").selected_model.clone()
     }
@@ -502,13 +550,7 @@ impl RunWorkbenchBinding {
                 guard.selected_model = (*model).to_owned();
                 guard.revision = guard.revision.saturating_add(1);
             }
-            let snap = self.controller.snapshot();
-            if let Some(token) = &snap.selection {
-                let mut settings = snap.draft.settings.clone();
-                settings.insert("model".into(), json!(*model));
-                self.controller.commit_settings(token, settings, false);
-            }
-            self.wake.wake();
+            self.commit_draft_setting("model", json!(*model));
         }
     }
 
@@ -523,13 +565,22 @@ impl RunWorkbenchBinding {
                 guard.selected_preset = (*preset).to_owned();
                 guard.revision = guard.revision.saturating_add(1);
             }
-            let snap = self.controller.snapshot();
-            if let Some(token) = &snap.selection {
-                let mut settings = snap.draft.settings.clone();
-                settings.insert("preset".into(), json!(*preset));
-                self.controller.commit_settings(token, settings, false);
+            self.commit_draft_setting("preset", json!(*preset));
+        }
+    }
+
+    pub fn selected_effort(&self) -> String {
+        self.ui.lock().expect("run ui lock").selected_effort.clone()
+    }
+
+    pub fn set_effort(&self, index: usize) {
+        if let Some(effort) = AVAILABLE_EFFORTS.get(index) {
+            {
+                let mut guard = self.ui.lock().expect("run ui lock");
+                guard.selected_effort = (*effort).to_owned();
+                guard.revision = guard.revision.saturating_add(1);
             }
-            self.wake.wake();
+            self.commit_draft_setting("reasoningEffort", json!(effort.to_ascii_lowercase()));
         }
     }
 

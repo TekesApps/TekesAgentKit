@@ -7,10 +7,13 @@ use tekes_agent_apphost::{
     SummaryContainer,
 };
 use tekes_agent_components_ui::{
-    COMPOSER_CONTROLS_STACK_ID, COMPOSER_EDITOR_ID, COMPOSER_SEND_BTN_ID, ResponsiveWidthMode,
-    SIDEBAR_FILTER_ID, SIDEBAR_LIST_ID, SIDEBAR_PIN_BTN_ID, SUMMARY_HEADER_ID,
-    TRANSCRIPT_EARLIER_BTN_ID, TRANSCRIPT_LATEST_BTN_ID, TRANSCRIPT_READER_ID,
-    TRANSCRIPT_RICH_BODY_ID, TRANSCRIPT_THINKING_DISC_ID, TranscriptReader, TranscriptSurface,
+    COMPOSER_ATTACH_BTN_ID, COMPOSER_CARD_ID, COMPOSER_CONTROLS_STACK_ID, COMPOSER_EDITOR_ID,
+    COMPOSER_EFFORT_SELECT_ID, COMPOSER_HARNESS_SELECT_ID, COMPOSER_INPUT_ROW_ID,
+    COMPOSER_MODEL_SELECT_ID, COMPOSER_PRESET_SELECT_ID, COMPOSER_SEND_BTN_ID,
+    RUN_SETUP_TOOLBAR_ROOT_ID, ResponsiveWidthMode, SIDEBAR_FILTER_ID, SIDEBAR_LIST_ID,
+    SIDEBAR_PIN_BTN_ID, SUMMARY_HEADER_ID, TRANSCRIPT_EARLIER_BTN_ID, TRANSCRIPT_LATEST_BTN_ID,
+    TRANSCRIPT_READER_ID, TRANSCRIPT_RICH_BODY_ID, TRANSCRIPT_THINKING_DISC_ID, TranscriptReader,
+    TranscriptSurface,
 };
 use tekes_agent_contract::EndpointConnector;
 use tekes_agent_presentation::{ComposerDestination, RunController, RunScope};
@@ -23,8 +26,8 @@ use tekes_ui_app_host::{AppWindow, Container, OthersOptions, PresentationOptions
 use tekes_ui_controls::{
     ReadingAnchorUpdate,
     composition::{
-        Button, ContentEvent, KeyedSelectableListContent, RichContent, StackContent, TextContent,
-        TextFieldContent,
+        Button, ContentEvent, KeyedSelectableListContent, MenuContent, RichContent, StackContent,
+        TextContent, TextFieldContent,
     },
     extended::Axis,
 };
@@ -339,19 +342,44 @@ fn phase1_streaming_load_earlier_anchor_compact_layout_and_gpu_render() {
     reader.follow_latest();
     assert!(reader.reading.is_following_latest());
 
-    // Check responsive Compact (<520pt) vs Expanded width mode in AgentRunContainer.
-    let mut surface_comp = tekes_agent_components_ui::ComposerSurface::new();
+    // Check single-row pure-input ComposerSurface & top RunSetupToolbar responsive layout + locking.
+    let composer_host = tekes_ui_controls::composition::ContentHost::new(
+        tekes_agent_components_ui::ComposerSurface::build_content(),
+    )
+    .unwrap();
+    assert!(composer_host.get(COMPOSER_CARD_ID).is_some());
+    assert!(composer_host.get(COMPOSER_INPUT_ROW_ID).is_some());
+    assert!(composer_host.get(COMPOSER_ATTACH_BTN_ID).is_some());
+    assert!(composer_host.get(COMPOSER_EDITOR_ID).is_some());
+    assert!(composer_host.get(COMPOSER_SEND_BTN_ID).is_some());
+    assert!(composer_host.get(COMPOSER_MODEL_SELECT_ID).is_none());
+    assert!(composer_host.get(COMPOSER_PRESET_SELECT_ID).is_none());
+    assert!(composer_host.get(COMPOSER_EFFORT_SELECT_ID).is_none());
+    assert!(composer_host.get(COMPOSER_HARNESS_SELECT_ID).is_none());
+
+    let mut setup_toolbar = tekes_agent_components_ui::RunSetupToolbar::new();
     let snap = binding.run_snapshot();
-    let mut run_host = tekes_ui_controls::composition::ContentHost::new(
-        tekes_agent_components_ui::ComposerSurface::build_content(
+    assert!(snap.run.is_some() && !snap.transcript.items.is_empty());
+    let mut toolbar_host = tekes_ui_controls::composition::ContentHost::new(
+        tekes_agent_components_ui::RunSetupToolbar::build_content(
+            vec!["Tekes".into(), "Pi".into(), "DSH".into()],
+            vec!["Workspace Write".into()],
             vec!["claude-sonnet-4".into()],
-            vec!["标准均衡".into()],
+            vec!["Low".into(), "Medium".into(), "High".into()],
         ),
     )
     .unwrap();
-    surface_comp.sync(&mut run_host, &snap, 0, 0, ResponsiveWidthMode::Compact);
+    setup_toolbar.sync(
+        &mut toolbar_host,
+        &snap,
+        0,
+        0,
+        0,
+        1,
+        ResponsiveWidthMode::Compact,
+    );
     assert_eq!(
-        run_host
+        toolbar_host
             .get(COMPOSER_CONTROLS_STACK_ID)
             .unwrap()
             .component::<StackContent>()
@@ -360,9 +388,17 @@ fn phase1_streaming_load_earlier_anchor_compact_layout_and_gpu_render() {
             .axis,
         Axis::Vertical
     );
-    surface_comp.sync(&mut run_host, &snap, 0, 0, ResponsiveWidthMode::Expanded);
+    setup_toolbar.sync(
+        &mut toolbar_host,
+        &snap,
+        0,
+        0,
+        0,
+        1,
+        ResponsiveWidthMode::Expanded,
+    );
     assert_eq!(
-        run_host
+        toolbar_host
             .get(COMPOSER_CONTROLS_STACK_ID)
             .unwrap()
             .component::<StackContent>()
@@ -372,9 +408,45 @@ fn phase1_streaming_load_earlier_anchor_compact_layout_and_gpu_render() {
         Axis::Horizontal
     );
 
+    // Harness stays locked on an established thread: label omits dropdown chevron, items disable.
+    let harness_menu = toolbar_host
+        .get(COMPOSER_HARNESS_SELECT_ID)
+        .unwrap()
+        .component::<MenuContent>()
+        .unwrap();
+    assert_eq!(harness_menu.trigger.label, "Tekes");
+    assert!(
+        format!("{:?}", harness_menu.menu).contains("disabled: true"),
+        "expected locked harness items to be disabled"
+    );
+    assert_eq!(binding.selected_harness(), "Tekes");
+    binding.set_harness(1);
+    assert_eq!(binding.selected_harness(), "Tekes");
+
+    // Effort selection updates binding & commits `reasoningEffort` to draft settings.
+    binding.set_effort(2);
+    assert_eq!(binding.selected_effort(), "High");
+    assert_eq!(
+        binding
+            .run_snapshot()
+            .draft
+            .settings
+            .get("reasoningEffort")
+            .and_then(|v| v.as_str()),
+        Some("high")
+    );
+
     // Assemble full 3-column AppWindow (`nav_bar`, `focus`, `others` List card) & render Metal GPU frame.
     let sidebar = SessionSidebarContainer::build("agent-sidebar", workbench.clone()).unwrap();
-    let run = AgentRunContainer::build("agent-run", workbench.clone()).unwrap();
+    let mut run = AgentRunContainer::build("agent-run", workbench.clone()).unwrap();
+    run.with_host(&mut |h| {
+        assert!(h.get(RUN_SETUP_TOOLBAR_ROOT_ID).is_some());
+        assert!(h.get(COMPOSER_HARNESS_SELECT_ID).is_some());
+        assert!(h.get(COMPOSER_PRESET_SELECT_ID).is_some());
+        assert!(h.get(COMPOSER_MODEL_SELECT_ID).is_some());
+        assert!(h.get(COMPOSER_EFFORT_SELECT_ID).is_some());
+        assert!(h.get(COMPOSER_INPUT_ROW_ID).is_some());
+    });
     let summary =
         SummaryContainer::build_list_card("agent-summary", 280.0, workbench.clone()).unwrap();
 

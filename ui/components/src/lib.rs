@@ -17,7 +17,7 @@ pub mod transcript;
 pub use artifact::{ArtifactIntent, ArtifactViewKind, ArtifactViewModel, ArtifactViewerSurface};
 pub use changes::{ChangeRowModel, ChangesIntent, ChangesViewModel, WorkspaceChangesSurface};
 pub use child_run::{ChildRunIntent, ChildRunSurface, ChildRunSurfaceStatus};
-pub use composer::{ComposerIntent, ComposerSurface};
+pub use composer::{ComposerIntent, ComposerSurface, RunSetupIntent, RunSetupToolbar};
 pub use files::{FileTreeRowModel, FilesIntent, WorkspaceFilesSurface};
 pub use ids::*;
 pub use layout_mode::{COMPACT_WIDTH_BREAKPOINT, ResponsiveWidthMode};

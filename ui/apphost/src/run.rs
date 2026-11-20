@@ -5,11 +5,13 @@ use crate::{AgentContainerAdapter, ManagedAgentContainer, SharedAgentWorkbench};
 use anyhow::Result;
 use tekes_agent_components_ui::{
     ComposerIntent, ComposerSurface, RUN_CONTAINER_SHELL_ID, RUN_CONTAINER_STACK_ID,
-    ResponsiveWidthMode, TRANSCRIPT_ROOT_ID, TranscriptIntent, TranscriptSurface,
+    ResponsiveWidthMode, RunSetupIntent, RunSetupToolbar, TRANSCRIPT_ROOT_ID, TranscriptIntent,
+    TranscriptSurface,
 };
 use tekes_agent_presentation::ActionablePrompt;
 use tekes_agent_ui_bindings::{
-    AVAILABLE_MODELS, AVAILABLE_PRESETS, ArtifactOpenRequest, WorkbenchCommand,
+    AVAILABLE_EFFORTS, AVAILABLE_HARNESSES, AVAILABLE_MODELS, AVAILABLE_PRESETS,
+    ArtifactOpenRequest, WorkbenchCommand,
 };
 use tekes_ui_app_host::LocalContainer;
 use tekes_ui_controls::{
@@ -21,34 +23,32 @@ use tekes_ui_tokens::Spacing;
 pub const FOCUS_SWITCH_COMMAND: u64 = 9001;
 
 struct AgentRunAdapter {
+    setup_toolbar: RunSetupToolbar,
     transcript: TranscriptSurface,
     composer: ComposerSurface,
+    has_setup_toolbar: bool,
     transcript_only: bool,
     composer_only: bool,
 }
 
 impl AgentRunAdapter {
-    fn new(transcript_only: bool, composer_only: bool) -> Self {
+    fn new(has_setup_toolbar: bool, transcript_only: bool, composer_only: bool) -> Self {
         Self {
+            setup_toolbar: RunSetupToolbar::new(),
             transcript: TranscriptSurface::new(),
             composer: ComposerSurface::new(),
+            has_setup_toolbar,
             transcript_only,
             composer_only,
         }
     }
 
-    fn model_index(name: &str) -> usize {
-        AVAILABLE_MODELS
-            .iter()
-            .position(|m| *m == name)
-            .unwrap_or(0)
+    fn catalog_index(catalog: &[&str], name: &str) -> usize {
+        catalog.iter().position(|item| *item == name).unwrap_or(0)
     }
 
-    fn preset_index(name: &str) -> usize {
-        AVAILABLE_PRESETS
-            .iter()
-            .position(|p| *p == name)
-            .unwrap_or(0)
+    fn catalog_vec(catalog: &[&str]) -> Vec<String> {
+        catalog.iter().map(|s| (*s).to_owned()).collect()
     }
 }
 
@@ -64,16 +64,28 @@ impl AgentContainerAdapter for AgentRunAdapter {
             return;
         };
         let snapshot = run.run_snapshot();
+        if self.has_setup_toolbar {
+            let harness_idx = Self::catalog_index(&AVAILABLE_HARNESSES, &run.selected_harness());
+            let preset_idx = Self::catalog_index(&AVAILABLE_PRESETS, &run.selected_preset());
+            let model_idx = Self::catalog_index(&AVAILABLE_MODELS, &run.selected_model());
+            let effort_idx = Self::catalog_index(&AVAILABLE_EFFORTS, &run.selected_effort());
+            self.setup_toolbar.sync(
+                host,
+                &snapshot,
+                harness_idx,
+                preset_idx,
+                model_idx,
+                effort_idx,
+                width_mode,
+            );
+        }
         if !self.composer_only {
             let actionables: Vec<ActionablePrompt> = run.actionables_for(&snapshot);
             self.transcript
                 .sync(host, &snapshot, &actionables, width_mode);
         }
         if !self.transcript_only {
-            let model_idx = Self::model_index(&run.selected_model());
-            let preset_idx = Self::preset_index(&run.selected_preset());
-            self.composer
-                .sync(host, &snapshot, model_idx, preset_idx, width_mode);
+            self.composer.sync(host, &snapshot, width_mode);
         }
     }
 
@@ -135,6 +147,17 @@ impl AgentContainerAdapter for AgentRunAdapter {
             }
         }
 
+        if self.has_setup_toolbar {
+            for intent in self.setup_toolbar.handle_actions(&snapshot, &records) {
+                match intent {
+                    RunSetupIntent::SelectHarness(idx) => run.set_harness(idx),
+                    RunSetupIntent::SelectPreset(idx) => run.set_preset(idx),
+                    RunSetupIntent::SelectModel(idx) => run.set_model(idx),
+                    RunSetupIntent::SelectEffort(idx) => run.set_effort(idx),
+                }
+            }
+        }
+
         if !self.transcript_only {
             for intent in self.composer.handle_actions(host, &snapshot, &records) {
                 match intent {
@@ -164,8 +187,6 @@ impl AgentContainerAdapter for AgentRunAdapter {
                     } => {
                         run.remove_annotation(&destination, &annotation_id);
                     }
-                    ComposerIntent::SelectModel(idx) => run.set_model(idx),
-                    ComposerIntent::SelectPreset(idx) => run.set_preset(idx),
                     ComposerIntent::RemoveQueued {
                         item_id,
                         session_id,
@@ -183,19 +204,22 @@ pub struct AgentRunContainer;
 
 impl AgentRunContainer {
     pub fn build(id: impl Into<String>, workbench: SharedAgentWorkbench) -> Result<LocalContainer> {
-        let models = AVAILABLE_MODELS.iter().map(|s| (*s).to_owned()).collect();
-        let presets = AVAILABLE_PRESETS.iter().map(|s| (*s).to_owned()).collect();
+        let harnesses = AgentRunAdapter::catalog_vec(&AVAILABLE_HARNESSES);
+        let presets = AgentRunAdapter::catalog_vec(&AVAILABLE_PRESETS);
+        let models = AgentRunAdapter::catalog_vec(&AVAILABLE_MODELS);
+        let efforts = AgentRunAdapter::catalog_vec(&AVAILABLE_EFFORTS);
         let root = Content::new(
             RUN_CONTAINER_STACK_ID,
             StackContent {
                 model: Stack {
                     axis: Axis::Vertical,
-                    gap: Spacing::Relaxed.value(),
+                    gap: Spacing::Regular.value(),
                 },
                 flexible_child: Some(TRANSCRIPT_ROOT_ID),
                 children: vec![
+                    RunSetupToolbar::build_content(harnesses, presets, models, efforts),
                     TranscriptSurface::build_content(),
-                    ComposerSurface::build_content(models, presets),
+                    ComposerSurface::build_content(),
                 ],
             },
         );
@@ -204,7 +228,7 @@ impl AgentRunContainer {
             RUN_CONTAINER_SHELL_ID,
             root,
             workbench,
-            AgentRunAdapter::new(false, false),
+            AgentRunAdapter::new(true, false, false),
             false,
         )?;
         Ok(container
@@ -231,7 +255,7 @@ impl TranscriptContainer {
             tekes_ui_controls::composition::ComponentId(11),
             TranscriptSurface::build_content(),
             workbench,
-            AgentRunAdapter::new(true, false),
+            AgentRunAdapter::new(false, true, false),
             false,
         )?;
         Ok(container
@@ -244,14 +268,12 @@ pub struct ComposerContainer;
 
 impl ComposerContainer {
     pub fn build(id: impl Into<String>, workbench: SharedAgentWorkbench) -> Result<LocalContainer> {
-        let models = AVAILABLE_MODELS.iter().map(|s| (*s).to_owned()).collect();
-        let presets = AVAILABLE_PRESETS.iter().map(|s| (*s).to_owned()).collect();
         let container = ManagedAgentContainer::build_local(
             id,
             tekes_ui_controls::composition::ComponentId(12),
-            ComposerSurface::build_content(models, presets),
+            ComposerSurface::build_content(),
             workbench,
-            AgentRunAdapter::new(false, true),
+            AgentRunAdapter::new(false, false, true),
             false,
         )?;
         Ok(container.title("Composer").switcher_icon("tekes-send"))

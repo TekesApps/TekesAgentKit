@@ -6,6 +6,8 @@ use tekes_ui_controls::composition::ComponentId;
 
 pub const RUN_CONTAINER_SHELL_ID: ComponentId = ComponentId(1);
 pub const RUN_CONTAINER_STACK_ID: ComponentId = ComponentId(10);
+pub const RUN_SETUP_TOOLBAR_ROOT_ID: ComponentId = ComponentId(20);
+pub const RUN_SETUP_TOOLBAR_SEP_ID: ComponentId = ComponentId(21);
 
 // Transcript surface: 100..=399
 pub const TRANSCRIPT_ROOT_ID: ComponentId = ComponentId(100);
@@ -73,6 +75,9 @@ pub const COMPOSER_CARD_STACK_ID: ComponentId = ComponentId(417);
 pub const COMPOSER_HARNESS_LABEL_ID: ComponentId = ComponentId(418);
 pub const COMPOSER_QUEUED_STEER_BTN_ID: ComponentId = ComponentId(419);
 pub const COMPOSER_QUEUED_REMOVE_BTN_ID: ComponentId = ComponentId(420);
+pub const COMPOSER_INPUT_ROW_ID: ComponentId = ComponentId(422);
+pub const COMPOSER_EFFORT_SELECT_ID: ComponentId = ComponentId(423);
+pub const COMPOSER_HARNESS_SELECT_ID: ComponentId = ComponentId(424);
 pub const COMPOSER_CHIP_BASE: u64 = 450;
 
 // Sidebar surface: 600..=699 (+ passive rows 10_000+, row decor 50_000+)

@@ -1,6 +1,8 @@
-//! Unified Tekes-aligned Composer surface: optional queued-prompt strip above a single
-//! rounded `PanelContent` card containing context chips, frameless `TextSurfacePresentation::Content`
-//! IME-safe editor, `+` attach, permission & model `MenuContent` pickers, and Send/Stop button.
+//! Unified Tekes-aligned Composer & top Run setup toolbar:
+//! - `RunSetupToolbar`: top configuration strip (`Harness`, `Approval`, `Model`, `Effort`)
+//!   with hairline separator, automatically wrapping to 2 compact rows when `< 520px`.
+//! - `ComposerSurface`: single-row pure-input capsule (`+` attach, frameless IME-safe editor,
+//!   `↑`/`■` Send/Stop) with optional context chips & queued-prompt strip.
 
 use crate::ResponsiveWidthMode;
 use crate::ids::*;
@@ -8,16 +10,527 @@ use crate::ui_helpers::{card_panel, secondary_text};
 use std::collections::BTreeMap;
 use tekes_agent_presentation::{ComposerArtifact, ComposerDestination, RunScope, RunSnapshot};
 use tekes_ui_controls::{
-    ButtonVariant, DraftRevision, ExternalSelection, ExternalUndo, TextSurfacePresentation,
+    ButtonTextRenderer, ButtonVariant, DraftRevision, ExternalSelection, ExternalUndo,
+    TextSurfacePresentation,
     composition::{
         Button, Component, ComponentId, Content, ContentActionKind, ContentActionPayload,
-        ContentActionRecord, ContentHost, MenuContent, MenuEntry, StackContent, TextFieldContent,
-        TextSubmitPolicy, TextViewport,
+        ContentActionRecord, ContentHost, ContentRole, ContentSemantics, ContentTheme,
+        CurveSubtreeCapability, MenuContent, MenuEntry, SeparatorContent, StackContent,
+        TextFieldContent, TextSubmitPolicy, TextViewport,
     },
     extended::{Axis, Stack},
-    layout::Insets,
+    layout::{AlignmentOverride, Insets, MeasuredChild, layout_measured_children},
 };
-use tekes_ui_tokens::{Spacing, proposal::layout::MainAxisDistribution};
+use tekes_ui_scene::{Rect, Scene, Size};
+use tekes_ui_tokens::{
+    Spacing, proposal,
+    proposal::layout::{CrossAxisAlignment, MainAxisDistribution},
+};
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum RunSetupIntent {
+    SelectHarness(usize),
+    SelectPreset(usize),
+    SelectModel(usize),
+    SelectEffort(usize),
+}
+
+/// Top configuration strip (`Harness`, `Approval`, `Model`, `Effort`) mounted at the top of
+/// `AgentRunContainer` above `TranscriptSurface` and `ComposerSurface`.
+#[derive(Debug)]
+pub struct RunSetupToolbar {
+    harnesses: Vec<String>,
+    presets: Vec<String>,
+    models: Vec<String>,
+    efforts: Vec<String>,
+    last_mode: ResponsiveWidthMode,
+    last_harness: Option<(usize, bool)>,
+    last_preset_idx: Option<usize>,
+    last_model_idx: Option<usize>,
+    last_effort_idx: Option<usize>,
+}
+
+impl Default for RunSetupToolbar {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl RunSetupToolbar {
+    pub fn new() -> Self {
+        Self {
+            harnesses: Vec::new(),
+            presets: Vec::new(),
+            models: Vec::new(),
+            efforts: Vec::new(),
+            last_mode: ResponsiveWidthMode::Expanded,
+            last_harness: None,
+            last_preset_idx: None,
+            last_model_idx: None,
+            last_effort_idx: None,
+        }
+    }
+
+    fn make_setup_menu(
+        labels: &[String],
+        selected_idx: usize,
+        prefix: Option<&str>,
+        locked: bool,
+    ) -> MenuContent {
+        let active = selected_idx.min(labels.len().saturating_sub(1));
+        let prefix = prefix.unwrap_or("");
+        let trigger_label = labels
+            .get(active)
+            .map(|l| {
+                if locked {
+                    format!("{prefix}{l}")
+                } else {
+                    format!("{prefix}{l} ▾")
+                }
+            })
+            .unwrap_or_else(|| "Select ▾".to_owned());
+        let mut menu = MenuContent::new(trigger_label, labels.to_vec());
+        let entries: Vec<MenuEntry> = labels
+            .iter()
+            .enumerate()
+            .map(|(i, label)| MenuEntry::Item {
+                value: label.clone(),
+                label: label.clone(),
+                checked: Some(i == active),
+                disabled: locked,
+            })
+            .collect();
+        if !entries.is_empty() {
+            let _ = menu.set_entries(entries);
+        }
+        menu.trigger.variant = ButtonVariant::Panel;
+        menu.trigger.set_transparent_chrome(true);
+        menu
+    }
+
+    fn sync_menu_state(
+        host: &mut ContentHost,
+        id: ComponentId,
+        labels: &[String],
+        selected_idx: usize,
+        prefix: Option<&str>,
+        locked: bool,
+    ) {
+        let Some(menu) = host
+            .get_mut(id)
+            .and_then(|c| c.component_mut::<MenuContent>())
+        else {
+            return;
+        };
+        let active = selected_idx.min(labels.len().saturating_sub(1));
+        let prefix = prefix.unwrap_or("");
+        if let Some(label) = labels.get(active) {
+            let desired = if locked {
+                format!("{prefix}{label}")
+            } else {
+                format!("{prefix}{label} ▾")
+            };
+            if menu.trigger.label != desired {
+                menu.trigger.set_contents(desired);
+            }
+        }
+        let entries: Vec<MenuEntry> = labels
+            .iter()
+            .enumerate()
+            .map(|(i, label)| MenuEntry::Item {
+                value: label.clone(),
+                label: label.clone(),
+                checked: Some(i == active),
+                disabled: locked,
+            })
+            .collect();
+        if !entries.is_empty() {
+            let _ = menu.set_entries(entries);
+        }
+    }
+
+    fn cache_labels(host: &ContentHost, id: ComponentId, cache: &mut Vec<String>) {
+        if cache.is_empty()
+            && let Some(m) = host.get(id).and_then(|c| c.component::<MenuContent>())
+        {
+            *cache = m.labels.clone();
+        }
+    }
+
+    pub fn build_content(
+        harnesses: Vec<String>,
+        presets: Vec<String>,
+        models: Vec<String>,
+        efforts: Vec<String>,
+    ) -> Content {
+        let harness_menu = Self::make_setup_menu(&harnesses, 0, None, false);
+        let preset_menu = Self::make_setup_menu(&presets, 0, None, false);
+        let model_menu = Self::make_setup_menu(&models, 0, None, false);
+        let effort_menu = Self::make_setup_menu(&efforts, 1, Some("Effort: "), false);
+
+        let primary_row = Content::new(
+            COMPOSER_PRIMARY_ROW_ID,
+            StackContent {
+                model: Stack {
+                    axis: Axis::Horizontal,
+                    gap: Spacing::Tight.value(),
+                },
+                flexible_child: None,
+                children: vec![
+                    Content::new(COMPOSER_HARNESS_SELECT_ID, harness_menu),
+                    Content::new(COMPOSER_PRESET_SELECT_ID, preset_menu),
+                ],
+            },
+        );
+
+        let secondary_row = Content::new(
+            COMPOSER_SECONDARY_ROW_ID,
+            StackContent {
+                model: Stack {
+                    axis: Axis::Horizontal,
+                    gap: Spacing::Tight.value(),
+                },
+                flexible_child: None,
+                children: vec![
+                    Content::new(COMPOSER_MODEL_SELECT_ID, model_menu),
+                    Content::new(COMPOSER_EFFORT_SELECT_ID, effort_menu),
+                ],
+            },
+        );
+
+        let controls = StackContent {
+            model: Stack {
+                axis: Axis::Horizontal,
+                gap: Spacing::Tight.value(),
+            },
+            flexible_child: None,
+            children: vec![primary_row, secondary_row],
+        }
+        .into_content_with_distribution(
+            COMPOSER_CONTROLS_STACK_ID,
+            MainAxisDistribution::SpaceBetween,
+        );
+
+        let sep = Content::new(
+            RUN_SETUP_TOOLBAR_SEP_ID,
+            SeparatorContent::new(Axis::Horizontal),
+        );
+
+        Content::new(
+            RUN_SETUP_TOOLBAR_ROOT_ID,
+            StackContent {
+                model: Stack {
+                    axis: Axis::Vertical,
+                    gap: Spacing::Tight.value(),
+                },
+                flexible_child: None,
+                children: vec![controls, sep],
+            },
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn sync(
+        &mut self,
+        host: &mut ContentHost,
+        snapshot: &RunSnapshot,
+        selected_harness_idx: usize,
+        selected_preset_idx: usize,
+        selected_model_idx: usize,
+        selected_effort_idx: usize,
+        width_mode: ResponsiveWidthMode,
+    ) {
+        Self::cache_labels(host, COMPOSER_HARNESS_SELECT_ID, &mut self.harnesses);
+        Self::cache_labels(host, COMPOSER_PRESET_SELECT_ID, &mut self.presets);
+        Self::cache_labels(host, COMPOSER_MODEL_SELECT_ID, &mut self.models);
+        Self::cache_labels(host, COMPOSER_EFFORT_SELECT_ID, &mut self.efforts);
+
+        if self.last_mode != width_mode {
+            if let Some(controls) = host
+                .get_mut(COMPOSER_CONTROLS_STACK_ID)
+                .and_then(|c| c.component_mut::<StackContent>())
+            {
+                match width_mode {
+                    ResponsiveWidthMode::Compact => {
+                        controls.model.axis = Axis::Vertical;
+                        controls.model.gap = 2.0;
+                    }
+                    ResponsiveWidthMode::Expanded => {
+                        controls.model.axis = Axis::Horizontal;
+                        controls.model.gap = Spacing::Tight.value();
+                    }
+                }
+            }
+            self.last_mode = width_mode;
+        }
+
+        let harness_locked = snapshot.run.is_some() && !snapshot.transcript.items.is_empty();
+        if self.last_harness != Some((selected_harness_idx, harness_locked)) {
+            self.last_harness = Some((selected_harness_idx, harness_locked));
+            let harnesses = self.harnesses.clone();
+            Self::sync_menu_state(
+                host,
+                COMPOSER_HARNESS_SELECT_ID,
+                &harnesses,
+                selected_harness_idx,
+                None,
+                harness_locked,
+            );
+        }
+
+        if self.last_preset_idx != Some(selected_preset_idx) {
+            self.last_preset_idx = Some(selected_preset_idx);
+            let presets = self.presets.clone();
+            Self::sync_menu_state(
+                host,
+                COMPOSER_PRESET_SELECT_ID,
+                &presets,
+                selected_preset_idx,
+                None,
+                false,
+            );
+        }
+
+        if self.last_model_idx != Some(selected_model_idx) {
+            self.last_model_idx = Some(selected_model_idx);
+            let models = self.models.clone();
+            Self::sync_menu_state(
+                host,
+                COMPOSER_MODEL_SELECT_ID,
+                &models,
+                selected_model_idx,
+                None,
+                false,
+            );
+        }
+
+        if self.last_effort_idx != Some(selected_effort_idx) {
+            self.last_effort_idx = Some(selected_effort_idx);
+            let efforts = self.efforts.clone();
+            Self::sync_menu_state(
+                host,
+                COMPOSER_EFFORT_SELECT_ID,
+                &efforts,
+                selected_effort_idx,
+                Some("Effort: "),
+                false,
+            );
+        }
+    }
+
+    pub fn handle_actions(
+        &mut self,
+        snapshot: &RunSnapshot,
+        records: &[ContentActionRecord],
+    ) -> Vec<RunSetupIntent> {
+        let mut out = Vec::new();
+        let harness_locked = snapshot.run.is_some() && !snapshot.transcript.items.is_empty();
+        for record in records {
+            if let Some(ContentActionPayload::MenuSelection(sel)) = &record.payload {
+                match record.action.target {
+                    id if id == COMPOSER_HARNESS_SELECT_ID && !harness_locked => {
+                        out.push(RunSetupIntent::SelectHarness(sel.index()));
+                    }
+                    id if id == COMPOSER_PRESET_SELECT_ID => {
+                        out.push(RunSetupIntent::SelectPreset(sel.index()));
+                    }
+                    id if id == COMPOSER_MODEL_SELECT_ID => {
+                        out.push(RunSetupIntent::SelectModel(sel.index()));
+                    }
+                    id if id == COMPOSER_EFFORT_SELECT_ID => {
+                        out.push(RunSetupIntent::SelectEffort(sel.index()));
+                    }
+                    _ => {}
+                }
+            }
+        }
+        out
+    }
+}
+
+/// Horizontal composer row that centers `+` and `↑`/`■` for single-line input and
+/// bottom-aligns them with the last visible input line once text wraps/grows.
+#[derive(Debug)]
+struct ComposerInputRow {
+    gap: f32,
+    flexible_child: ComponentId,
+    children: Vec<Content>,
+    arranged: bool,
+}
+
+impl ComposerInputRow {
+    fn new(gap: f32, flexible_child: ComponentId, children: Vec<Content>) -> Self {
+        Self {
+            gap,
+            flexible_child,
+            children,
+            arranged: false,
+        }
+    }
+
+    fn finite(v: f32) -> f32 {
+        if v.is_finite() { v } else { 0.0 }
+    }
+
+    fn measurements(
+        &mut self,
+        text: &mut dyn ButtonTextRenderer,
+        available: Size,
+        intrinsic: bool,
+    ) -> Vec<MeasuredChild> {
+        let mut measured: Vec<_> = self
+            .children
+            .iter_mut()
+            .map(|c| {
+                if intrinsic {
+                    c.measure_intrinsic(text, available)
+                } else {
+                    c.measure(text, available)
+                }
+            })
+            .collect();
+        if let Some(i) = self
+            .children
+            .iter()
+            .position(|c| c.id() == self.flexible_child)
+        {
+            let fixed: f32 = measured
+                .iter()
+                .enumerate()
+                .filter(|(n, _)| *n != i)
+                .map(|(_, m)| Self::finite(m.size.width).max(0.0))
+                .sum();
+            let gap_total =
+                Self::finite(self.gap).max(0.0) * self.children.len().saturating_sub(1) as f32;
+            let left = (available.width - fixed - gap_total).max(0.0);
+            let constrained = Size::new(left, available.height);
+            measured[i] = if intrinsic {
+                self.children[i].measure_intrinsic(text, constrained)
+            } else {
+                self.children[i].measure(text, constrained)
+            };
+        }
+        measured
+    }
+
+    fn measure_content(
+        &mut self,
+        text: &mut dyn ButtonTextRenderer,
+        available: Size,
+        intrinsic: bool,
+    ) -> MeasuredChild {
+        let measured = self.measurements(text, available, intrinsic);
+        let mut main = 0.0_f32;
+        let mut cross = 0.0_f32;
+        for m in measured {
+            main += Self::finite(m.size.width).clamp(0.0, 1e8);
+            cross = cross.max(Self::finite(m.size.height).max(0.0));
+        }
+        main += Self::finite(self.gap).max(0.0) * self.children.len().saturating_sub(1) as f32;
+        MeasuredChild::new(Size::new(
+            if available.width.is_finite() {
+                available.width.max(0.0)
+            } else {
+                main
+            },
+            cross,
+        ))
+    }
+}
+
+impl Component for ComposerInputRow {
+    fn host_reveal_passthrough(&self) -> bool {
+        self.arranged
+    }
+
+    fn curve_subtree_capability(&self) -> CurveSubtreeCapability {
+        CurveSubtreeCapability::Recursive
+    }
+
+    fn has_stable_hooks(&self) -> bool {
+        true
+    }
+
+    fn supports_prepared_lifecycle(&self) -> bool {
+        true
+    }
+
+    fn ignores_pointer_actions(&self) -> bool {
+        true
+    }
+
+    fn semantics(&self) -> ContentSemantics {
+        ContentSemantics::new(ContentRole::Group, "")
+    }
+
+    fn children(&self) -> &[Content] {
+        &self.children
+    }
+
+    fn children_mut(&mut self) -> Option<&mut Vec<Content>> {
+        Some(&mut self.children)
+    }
+
+    fn measure(&mut self, text: &mut dyn ButtonTextRenderer, available: Size) -> MeasuredChild {
+        self.measure_content(text, available, false)
+    }
+
+    fn measure_intrinsic(
+        &mut self,
+        text: &mut dyn ButtonTextRenderer,
+        available: Size,
+    ) -> MeasuredChild {
+        self.measure_content(text, available, true)
+    }
+
+    fn arrange(&mut self, text: &mut dyn ButtonTextRenderer, frame: Rect, clip: Rect) {
+        self.arranged = frame.size.width.is_finite()
+            && frame.size.height.is_finite()
+            && frame.size.width > 0.0
+            && frame.size.height > 0.0;
+        let measured = self.measurements(text, frame.size, false);
+        let flex_idx = self
+            .children
+            .iter()
+            .position(|c| c.id() == self.flexible_child);
+        let max_fixed_h = measured
+            .iter()
+            .enumerate()
+            .filter(|(i, _)| Some(*i) != flex_idx)
+            .map(|(_, m)| m.size.height)
+            .fold(0.0_f32, f32::max);
+        let editor_h = flex_idx.map_or(0.0, |i| measured[i].size.height);
+        let cross_axis = if editor_h > max_fixed_h + 4.0 {
+            CrossAxisAlignment::Trailing
+        } else {
+            CrossAxisAlignment::Center
+        };
+        let placements = layout_measured_children(
+            frame,
+            Axis::Horizontal,
+            &measured,
+            self.gap,
+            proposal::layout::ROW,
+            AlignmentOverride {
+                cross_axis: Some(cross_axis),
+                ..AlignmentOverride::default()
+            },
+        );
+        for (child, placed) in self.children.iter_mut().zip(placements) {
+            child.arrange(text, placed.frame, clip);
+        }
+    }
+
+    fn paint(
+        &mut self,
+        _: &mut Scene,
+        _: &mut dyn ButtonTextRenderer,
+        _: Rect,
+        _: Rect,
+        _: ContentTheme,
+    ) {
+    }
+}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ComposerIntent {
@@ -43,8 +556,6 @@ pub enum ComposerIntent {
         destination: ComposerDestination,
         annotation_id: String,
     },
-    SelectModel(usize),
-    SelectPreset(usize),
     RemoveQueued {
         item_id: String,
         session_id: String,
@@ -74,11 +585,6 @@ pub struct ComposerSurface {
     synced_rev: u64,
     chips_sig: String,
     chip_targets: BTreeMap<ComponentId, ChipTarget>,
-    last_mode: ResponsiveWidthMode,
-    models: Vec<String>,
-    presets: Vec<String>,
-    last_model_idx: usize,
-    last_preset_idx: usize,
     active_queued: Option<QueuedStripItem>,
     last_queued_sig: String,
 }
@@ -98,11 +604,6 @@ impl ComposerSurface {
             synced_rev: 0,
             chips_sig: String::new(),
             chip_targets: BTreeMap::new(),
-            last_mode: ResponsiveWidthMode::Expanded,
-            models: Vec::new(),
-            presets: Vec::new(),
-            last_model_idx: usize::MAX,
-            last_preset_idx: usize::MAX,
             active_queued: None,
             last_queued_sig: String::new(),
         }
@@ -115,7 +616,7 @@ impl ComposerSurface {
             .set_presentation(TextSurfacePresentation::Content);
         field.show_metadata = false;
         field.viewport = TextViewport::Grow {
-            min: 40.0,
+            min: 28.0,
             max: 140.0,
         };
         field.submit_policy = TextSubmitPolicy::CommandEnter;
@@ -123,32 +624,7 @@ impl ComposerSurface {
         Content::new(COMPOSER_EDITOR_ID, field)
     }
 
-    fn make_menu(labels: &[String], selected_idx: usize) -> MenuContent {
-        let active = selected_idx.min(labels.len().saturating_sub(1));
-        let trigger_label = labels
-            .get(active)
-            .map(|l| format!("{l} ▾"))
-            .unwrap_or_else(|| "Select ▾".to_owned());
-        let mut menu = MenuContent::new(trigger_label, labels.to_vec());
-        let entries: Vec<MenuEntry> = labels
-            .iter()
-            .enumerate()
-            .map(|(i, label)| MenuEntry::Item {
-                value: label.clone(),
-                label: label.clone(),
-                checked: Some(i == active),
-                disabled: false,
-            })
-            .collect();
-        if !entries.is_empty() {
-            let _ = menu.set_entries(entries);
-        }
-        menu.trigger.variant = ButtonVariant::Panel;
-        menu.trigger.set_transparent_chrome(true);
-        menu
-    }
-
-    pub fn build_content(models: Vec<String>, presets: Vec<String>) -> Content {
+    pub fn build_content() -> Content {
         let queued_slot = Content::new(
             COMPOSER_QUEUED_SLOT_ID,
             StackContent {
@@ -177,56 +653,20 @@ impl ComposerSurface {
         attach_btn.variant = ButtonVariant::Panel;
         attach_btn.set_transparent_chrome(true);
 
-        let preset_menu = Self::make_menu(&presets, 0);
-        let model_menu = Self::make_menu(&models, 0);
-
-        let harness_label = Content::new(COMPOSER_HARNESS_LABEL_ID, secondary_text("Tekes"));
-
-        let primary_row = Content::new(
-            COMPOSER_PRIMARY_ROW_ID,
-            StackContent {
-                model: Stack {
-                    axis: Axis::Horizontal,
-                    gap: Spacing::Tight.value(),
-                },
-                flexible_child: None,
-                children: vec![
-                    Content::new(COMPOSER_ATTACH_BTN_ID, attach_btn),
-                    Content::new(COMPOSER_PRESET_SELECT_ID, preset_menu),
-                    harness_label,
-                ],
-            },
-        );
-
         let mut send_btn = Button::new("↑").with_accessible_name("Send");
         send_btn.variant = ButtonVariant::Primary;
 
-        let secondary_row = Content::new(
-            COMPOSER_SECONDARY_ROW_ID,
-            StackContent {
-                model: Stack {
-                    axis: Axis::Horizontal,
-                    gap: Spacing::Tight.value(),
-                },
-                flexible_child: None,
-                children: vec![
-                    Content::new(COMPOSER_MODEL_SELECT_ID, model_menu),
+        let input_row = Content::new(
+            COMPOSER_INPUT_ROW_ID,
+            ComposerInputRow::new(
+                Spacing::Tight.value(),
+                COMPOSER_EDITOR_ID,
+                vec![
+                    Content::new(COMPOSER_ATTACH_BTN_ID, attach_btn),
+                    Self::make_editor(),
                     Content::new(COMPOSER_SEND_BTN_ID, send_btn),
                 ],
-            },
-        );
-
-        let controls = StackContent {
-            model: Stack {
-                axis: Axis::Horizontal,
-                gap: Spacing::Tight.value(),
-            },
-            flexible_child: None,
-            children: vec![primary_row, secondary_row],
-        }
-        .into_content_with_distribution(
-            COMPOSER_CONTROLS_STACK_ID,
-            MainAxisDistribution::SpaceBetween,
+            ),
         );
 
         let card_body = Content::new(
@@ -234,16 +674,16 @@ impl ComposerSurface {
             StackContent {
                 model: Stack {
                     axis: Axis::Vertical,
-                    gap: Spacing::Tight.value(),
+                    gap: 0.0,
                 },
                 flexible_child: None,
-                children: vec![chips_row, Self::make_editor(), controls],
+                children: vec![chips_row, input_row],
             },
         );
         let card = card_panel(
             COMPOSER_CARD_ID,
             card_body,
-            Insets::new(10.0, 14.0, 8.0, 14.0),
+            Insets::new(6.0, 10.0, 6.0, 10.0),
         );
 
         Content::new(
@@ -251,7 +691,7 @@ impl ComposerSurface {
             StackContent {
                 model: Stack {
                     axis: Axis::Vertical,
-                    gap: Spacing::Tight.value(),
+                    gap: 0.0,
                 },
                 flexible_child: None,
                 children: vec![queued_slot, card],
@@ -263,40 +703,6 @@ impl ComposerSurface {
         host.get(COMPOSER_EDITOR_ID)
             .and_then(|c| c.component::<TextFieldContent>())
             .is_some_and(TextFieldContent::composing)
-    }
-
-    fn sync_menu_state(
-        host: &mut ContentHost,
-        id: ComponentId,
-        labels: &[String],
-        selected_idx: usize,
-    ) {
-        let Some(menu) = host
-            .get_mut(id)
-            .and_then(|c| c.component_mut::<MenuContent>())
-        else {
-            return;
-        };
-        let active = selected_idx.min(labels.len().saturating_sub(1));
-        if let Some(label) = labels.get(active) {
-            let desired = format!("{label} ▾");
-            if menu.trigger.label != desired {
-                menu.trigger.set_contents(desired);
-            }
-        }
-        let entries: Vec<MenuEntry> = labels
-            .iter()
-            .enumerate()
-            .map(|(i, label)| MenuEntry::Item {
-                value: label.clone(),
-                label: label.clone(),
-                checked: Some(i == active),
-                disabled: false,
-            })
-            .collect();
-        if !entries.is_empty() {
-            let _ = menu.set_entries(entries);
-        }
     }
 
     fn sync_queued_strip(&mut self, host: &mut ContentHost, snapshot: &RunSnapshot) {
@@ -332,6 +738,7 @@ impl ComposerSurface {
         self.last_queued_sig = sig;
         self.active_queued = queued.clone();
 
+        let has_queued = queued.is_some();
         if let Some(item) = queued {
             let preview = if item.text.chars().count() > 54 {
                 let head: String = item.text.chars().take(54).collect();
@@ -384,44 +791,24 @@ impl ComposerSurface {
         } else {
             replace_stack_children(host, COMPOSER_QUEUED_SLOT_ID, Vec::new());
         }
+        if let Some(root) = host
+            .get_mut(COMPOSER_ROOT_ID)
+            .and_then(|c| c.component_mut::<StackContent>())
+        {
+            root.model.gap = if has_queued {
+                Spacing::Tight.value()
+            } else {
+                0.0
+            };
+        }
     }
 
     pub fn sync(
         &mut self,
         host: &mut ContentHost,
         snapshot: &RunSnapshot,
-        selected_model_idx: usize,
-        selected_preset_idx: usize,
-        width_mode: ResponsiveWidthMode,
+        _width_mode: ResponsiveWidthMode,
     ) {
-        if self.models.is_empty()
-            && let Some(m) = host
-                .get(COMPOSER_MODEL_SELECT_ID)
-                .and_then(|c| c.component::<MenuContent>())
-        {
-            self.models = m.labels.clone();
-        }
-        if self.presets.is_empty()
-            && let Some(p) = host
-                .get(COMPOSER_PRESET_SELECT_ID)
-                .and_then(|c| c.component::<MenuContent>())
-        {
-            self.presets = p.labels.clone();
-        }
-
-        if self.last_mode != width_mode {
-            if let Some(controls) = host
-                .get_mut(COMPOSER_CONTROLS_STACK_ID)
-                .and_then(|c| c.component_mut::<StackContent>())
-            {
-                controls.model.axis = match width_mode {
-                    ResponsiveWidthMode::Compact => Axis::Vertical,
-                    ResponsiveWidthMode::Expanded => Axis::Horizontal,
-                };
-            }
-            self.last_mode = width_mode;
-        }
-
         self.sync_queued_strip(host, snapshot);
 
         let destination = snapshot.selection.as_ref().map(|s| s.destination.clone());
@@ -441,13 +828,13 @@ impl ComposerSurface {
                 .editors
                 .remove(&next_key)
                 .unwrap_or_else(Self::make_editor);
-            let _ = host.insert(COMPOSER_CARD_STACK_ID, next_editor);
+            let _ = host.insert(COMPOSER_INPUT_ROW_ID, next_editor);
             let _ = host.reorder(
-                COMPOSER_CARD_STACK_ID,
+                COMPOSER_INPUT_ROW_ID,
                 &[
-                    COMPOSER_CHIPS_ROW_ID,
+                    COMPOSER_ATTACH_BTN_ID,
                     COMPOSER_EDITOR_ID,
-                    COMPOSER_CONTROLS_STACK_ID,
+                    COMPOSER_SEND_BTN_ID,
                 ],
             );
             self.selected = destination.clone();
@@ -479,22 +866,6 @@ impl ComposerSurface {
         }
 
         self.sync_chips(host, snapshot);
-
-        if self.last_model_idx != selected_model_idx {
-            self.last_model_idx = selected_model_idx;
-            let models = self.models.clone();
-            Self::sync_menu_state(host, COMPOSER_MODEL_SELECT_ID, &models, selected_model_idx);
-        }
-        if self.last_preset_idx != selected_preset_idx {
-            self.last_preset_idx = selected_preset_idx;
-            let presets = self.presets.clone();
-            Self::sync_menu_state(
-                host,
-                COMPOSER_PRESET_SELECT_ID,
-                &presets,
-                selected_preset_idx,
-            );
-        }
 
         let composing_now = Self::composing(host);
         let can_cancel = snapshot.run.as_ref().is_some_and(|r| r.can_cancel);
@@ -577,7 +948,18 @@ impl ComposerSurface {
             children.push(Content::new(id, btn));
         }
 
+        let has_chips = !children.is_empty();
         replace_stack_children(host, COMPOSER_CHIPS_ROW_ID, children);
+        if let Some(card_stack) = host
+            .get_mut(COMPOSER_CARD_STACK_ID)
+            .and_then(|c| c.component_mut::<StackContent>())
+        {
+            card_stack.model.gap = if has_chips {
+                Spacing::Tight.value()
+            } else {
+                0.0
+            };
+        }
     }
 
     pub fn handle_actions(
@@ -621,18 +1003,6 @@ impl ComposerSurface {
                         destination: dest.clone(),
                         annotation_id: id.clone(),
                     }),
-                }
-                continue;
-            }
-            if let Some(ContentActionPayload::MenuSelection(sel)) = &record.payload {
-                match record.action.target {
-                    id if id == COMPOSER_MODEL_SELECT_ID => {
-                        out.push(ComposerIntent::SelectModel(sel.index()));
-                    }
-                    id if id == COMPOSER_PRESET_SELECT_ID => {
-                        out.push(ComposerIntent::SelectPreset(sel.index()));
-                    }
-                    _ => {}
                 }
                 continue;
             }

@@ -114,7 +114,7 @@ impl SideChatSurface {
             .set_presentation(TextSurfacePresentation::Content);
         field.show_metadata = false;
         field.viewport = TextViewport::Grow {
-            min: 40.0,
+            min: 28.0,
             max: 140.0,
         };
         field.submit_policy = TextSubmitPolicy::CommandEnter;
@@ -140,7 +140,7 @@ impl SideChatSurface {
         let composer_panel = card_panel(
             SIDECHAT_COMPOSER_PANEL_ID,
             composer_row,
-            Insets::new(8.0, 12.0, 8.0, 12.0),
+            Insets::new(6.0, 10.0, 6.0, 10.0),
         );
 
         Content::new(
