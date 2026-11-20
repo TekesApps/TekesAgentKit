@@ -632,4 +632,218 @@ impl RunWorkbenchBinding {
     pub fn active_session_address(&self) -> Option<SessionAddress> {
         self.current_scope().map(|scope| scope.address())
     }
+
+    pub fn connection_epoch(&self) -> u64 {
+        self.runtime.inspect(|state| state.connection_epoch)
+    }
+
+    fn verify_queue_epoch(&self, expected_epoch: u64) -> Result<()> {
+        self.runtime.inspect(|state| {
+            tekes_agent_contract::require(
+                state.connection == tekes_agent_session::ConnectionState::Ready
+                    && state.connection_epoch == expected_epoch,
+                "队列变更被拒绝：连接状态未就绪或 connectionEpoch 已过期",
+            )
+        })
+    }
+
+    /// Epoch-fenced queued-prompt removal (`session.updateQueue` Remove).
+    pub fn remove_queued_prompt_at_epoch(
+        &self,
+        expected_epoch: u64,
+        session_id: &str,
+        item_id: &str,
+    ) -> Result<()> {
+        if let Err(err) = self.verify_queue_epoch(expected_epoch) {
+            self.ui.lock().expect("run ui lock").last_error = Some(err.to_string());
+            self.bump_ui();
+            return Err(err);
+        }
+        let runtime = Arc::clone(&self.runtime);
+        let runtime_check = Arc::clone(&self.runtime);
+        let wake = Arc::clone(&self.wake);
+        let sid = session_id.to_owned();
+        let iid = item_id.to_owned();
+        let rpc_id = format!("queue-rm-{}", uuid::Uuid::new_v4());
+        let ui_ref = self.runtime.clone();
+        let _ = ui_ref;
+        self.handle.spawn(async move {
+            let _ = runtime
+                .call_optional_at_epoch_with_validation(
+                    expected_epoch,
+                    "session.updateQueue",
+                    json!({
+                        "sessionId": sid,
+                        "itemId": iid,
+                        "action": tekes_agent_contract::QueueAction::Remove,
+                    }),
+                    &rpc_id,
+                    move || {
+                        runtime_check.inspect(|state| {
+                            tekes_agent_contract::require(
+                                state.connection == tekes_agent_session::ConnectionState::Ready
+                                    && state.connection_epoch == expected_epoch,
+                                "stale connection epoch at queue removal admission",
+                            )
+                        })
+                    },
+                )
+                .await;
+            wake.wake();
+        });
+        self.bump_ui();
+        Ok(())
+    }
+
+    /// Blocking variant of `remove_queued_prompt_at_epoch` for deterministic verification.
+    pub fn remove_queued_prompt_at_epoch_blocking(
+        &self,
+        expected_epoch: u64,
+        session_id: &str,
+        item_id: &str,
+    ) -> Result<()> {
+        if let Err(err) = self.verify_queue_epoch(expected_epoch) {
+            self.ui.lock().expect("run ui lock").last_error = Some(err.to_string());
+            self.bump_ui();
+            return Err(err);
+        }
+        let runtime = Arc::clone(&self.runtime);
+        let runtime_check = Arc::clone(&self.runtime);
+        let sid = session_id.to_owned();
+        let iid = item_id.to_owned();
+        let rpc_id = format!("queue-rm-{}", uuid::Uuid::new_v4());
+        let res = self.handle.block_on(async move {
+            runtime
+                .call_optional_at_epoch_with_validation(
+                    expected_epoch,
+                    "session.updateQueue",
+                    json!({
+                        "sessionId": sid,
+                        "itemId": iid,
+                        "action": tekes_agent_contract::QueueAction::Remove,
+                    }),
+                    &rpc_id,
+                    move || {
+                        runtime_check.inspect(|state| {
+                            tekes_agent_contract::require(
+                                state.connection == tekes_agent_session::ConnectionState::Ready
+                                    && state.connection_epoch == expected_epoch,
+                                "stale connection epoch at queue removal admission",
+                            )
+                        })
+                    },
+                )
+                .await
+        });
+        if let Err(err) = &res {
+            self.ui.lock().expect("run ui lock").last_error = Some(err.to_string());
+        } else {
+            self.ui.lock().expect("run ui lock").last_error = None;
+        }
+        self.bump_ui();
+        res.map(|_| ())
+    }
+
+    /// Epoch-fenced queued-prompt text edit (`session.updateQueue` Edit).
+    pub fn edit_queued_prompt_at_epoch(
+        &self,
+        expected_epoch: u64,
+        session_id: &str,
+        item_id: &str,
+        new_text: String,
+    ) -> Result<()> {
+        if let Err(err) = self.verify_queue_epoch(expected_epoch) {
+            self.ui.lock().expect("run ui lock").last_error = Some(err.to_string());
+            self.bump_ui();
+            return Err(err);
+        }
+        let runtime = Arc::clone(&self.runtime);
+        let runtime_check = Arc::clone(&self.runtime);
+        let wake = Arc::clone(&self.wake);
+        let sid = session_id.to_owned();
+        let iid = item_id.to_owned();
+        let rpc_id = format!("queue-edit-{}", uuid::Uuid::new_v4());
+        let action = tekes_agent_contract::QueueAction::Edit {
+            content: vec![json!({ "type": "text", "text": new_text })],
+        };
+        self.handle.spawn(async move {
+            let _ = runtime
+                .call_optional_at_epoch_with_validation(
+                    expected_epoch,
+                    "session.updateQueue",
+                    json!({
+                        "sessionId": sid,
+                        "itemId": iid,
+                        "action": action,
+                    }),
+                    &rpc_id,
+                    move || {
+                        runtime_check.inspect(|state| {
+                            tekes_agent_contract::require(
+                                state.connection == tekes_agent_session::ConnectionState::Ready
+                                    && state.connection_epoch == expected_epoch,
+                                "stale connection epoch at queue edit admission",
+                            )
+                        })
+                    },
+                )
+                .await;
+            wake.wake();
+        });
+        self.bump_ui();
+        Ok(())
+    }
+
+    /// Blocking variant of `edit_queued_prompt_at_epoch` for deterministic verification.
+    pub fn edit_queued_prompt_at_epoch_blocking(
+        &self,
+        expected_epoch: u64,
+        session_id: &str,
+        item_id: &str,
+        new_text: String,
+    ) -> Result<()> {
+        if let Err(err) = self.verify_queue_epoch(expected_epoch) {
+            self.ui.lock().expect("run ui lock").last_error = Some(err.to_string());
+            self.bump_ui();
+            return Err(err);
+        }
+        let runtime = Arc::clone(&self.runtime);
+        let runtime_check = Arc::clone(&self.runtime);
+        let sid = session_id.to_owned();
+        let iid = item_id.to_owned();
+        let rpc_id = format!("queue-edit-{}", uuid::Uuid::new_v4());
+        let action = tekes_agent_contract::QueueAction::Edit {
+            content: vec![json!({ "type": "text", "text": new_text })],
+        };
+        let res = self.handle.block_on(async move {
+            runtime
+                .call_optional_at_epoch_with_validation(
+                    expected_epoch,
+                    "session.updateQueue",
+                    json!({
+                        "sessionId": sid,
+                        "itemId": iid,
+                        "action": action,
+                    }),
+                    &rpc_id,
+                    move || {
+                        runtime_check.inspect(|state| {
+                            tekes_agent_contract::require(
+                                state.connection == tekes_agent_session::ConnectionState::Ready
+                                    && state.connection_epoch == expected_epoch,
+                                "stale connection epoch at queue edit admission",
+                            )
+                        })
+                    },
+                )
+                .await
+        });
+        if let Err(err) = &res {
+            self.ui.lock().expect("run ui lock").last_error = Some(err.to_string());
+        } else {
+            self.ui.lock().expect("run ui lock").last_error = None;
+        }
+        self.bump_ui();
+        res.map(|_| ())
+    }
 }

@@ -125,6 +125,62 @@ pub const ARTIFACT_IMAGE_ID: ComponentId = ComponentId(1312);
 pub const ARTIFACT_DIAG_TEXT_ID: ComponentId = ComponentId(1313);
 pub const ARTIFACT_CUSTOM_SLOT_ID: ComponentId = ComponentId(1400);
 
+// Tasks & Queue surface: 1500..=1599 (+ passive rows 32_000+)
+pub const TASKS_SHELL_ID: ComponentId = ComponentId(1500);
+pub const TASKS_ROOT_ID: ComponentId = ComponentId(1501);
+pub const TASKS_HEADER_ID: ComponentId = ComponentId(1502);
+pub const TASKS_SCROLL_ID: ComponentId = ComponentId(1503);
+pub const TASKS_STACK_ID: ComponentId = ComponentId(1504);
+pub const TASKS_ERROR_ID: ComponentId = ComponentId(1505);
+pub const TASKS_QUEUE_SECTION_ID: ComponentId = ComponentId(1506);
+pub const TASKS_QUEUE_EDIT_ROW_ID: ComponentId = ComponentId(1507);
+pub const TASKS_QUEUE_EDIT_INPUT_ID: ComponentId = ComponentId(1508);
+pub const TASKS_QUEUE_APPLY_BTN_ID: ComponentId = ComponentId(1509);
+pub const TASKS_QUEUE_REMOVE_BTN_ID: ComponentId = ComponentId(1510);
+pub const TASKS_JOBS_SECTION_ID: ComponentId = ComponentId(1511);
+pub const TASKS_QUEUE_ROW_BASE: u64 = 32_000;
+pub const TASKS_TASK_ROW_BASE: u64 = 32_500;
+pub const TASKS_TASK_OPEN_BTN_BASE: u64 = 33_000;
+
+// ChildRun surface: 1600..=1699 (+ passive rows 34_000+)
+pub const CHILD_RUN_SHELL_ID: ComponentId = ComponentId(1600);
+pub const CHILD_RUN_ROOT_ID: ComponentId = ComponentId(1601);
+pub const CHILD_RUN_HEADER_ID: ComponentId = ComponentId(1602);
+pub const CHILD_RUN_ACTIONS_ROW_ID: ComponentId = ComponentId(1603);
+pub const CHILD_RUN_EARLIER_BTN_ID: ComponentId = ComponentId(1604);
+pub const CHILD_RUN_REFRESH_BTN_ID: ComponentId = ComponentId(1605);
+pub const CHILD_RUN_READER_ID: ComponentId = ComponentId(1606);
+pub const CHILD_RUN_STATUS_ID: ComponentId = ComponentId(1607);
+pub const CHILD_RUN_ROW_BASE: u64 = 34_000;
+
+// SideChat surface: 1700..=1799
+pub const SIDECHAT_SHELL_ID: ComponentId = ComponentId(1700);
+pub const SIDECHAT_ROOT_ID: ComponentId = ComponentId(1701);
+pub const SIDECHAT_HEADER_ID: ComponentId = ComponentId(1702);
+pub const SIDECHAT_ACTIONS_ROW_ID: ComponentId = ComponentId(1703);
+pub const SIDECHAT_ACCESS_BADGE_ID: ComponentId = ComponentId(1704);
+pub const SIDECHAT_CREATE_BTN_ID: ComponentId = ComponentId(1705);
+pub const SIDECHAT_CLOSE_BTN_ID: ComponentId = ComponentId(1706);
+pub const SIDECHAT_SCROLL_ID: ComponentId = ComponentId(1707);
+pub const SIDECHAT_RICH_ID: ComponentId = ComponentId(1708);
+pub const SIDECHAT_COMPOSER_ROW_ID: ComponentId = ComponentId(1709);
+pub const SIDECHAT_EDITOR_ID: ComponentId = ComponentId(1710);
+pub const SIDECHAT_SEND_BTN_ID: ComponentId = ComponentId(1711);
+pub const SIDECHAT_ERROR_ID: ComponentId = ComponentId(1712);
+
+// Harness Settings surface: 1800..=1899 (+ dynamic controls 38_000+)
+pub const SETTINGS_SHELL_ID: ComponentId = ComponentId(1800);
+pub const SETTINGS_ROOT_ID: ComponentId = ComponentId(1801);
+pub const SETTINGS_HEADER_ID: ComponentId = ComponentId(1802);
+pub const SETTINGS_BANNER_ID: ComponentId = ComponentId(1803);
+pub const SETTINGS_ACTIONS_ROW_ID: ComponentId = ComponentId(1804);
+pub const SETTINGS_REFRESH_BTN_ID: ComponentId = ComponentId(1805);
+pub const SETTINGS_APPLY_BTN_ID: ComponentId = ComponentId(1806);
+pub const SETTINGS_FIELDS_SCROLL_ID: ComponentId = ComponentId(1807);
+pub const SETTINGS_FIELDS_STACK_ID: ComponentId = ComponentId(1808);
+pub const SETTINGS_FIELD_BASE: u64 = 38_000;
+pub const SETTINGS_CONTROL_BASE: u64 = 39_000;
+
 /// Replace all dynamic children of a mutable `StackContent` container while keeping `ComponentHost` IDs clean.
 pub fn replace_stack_children(
     host: &mut tekes_ui_controls::composition::ContentHost,

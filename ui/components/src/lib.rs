@@ -1,24 +1,38 @@
 //! Agent-owned composition of public TekesUI controls. No endpoint or Run state machine.
 pub mod artifact;
 pub mod changes;
+pub mod child_run;
 pub mod composer;
 pub mod files;
 pub mod ids;
 pub mod layout_mode;
+pub mod settings;
 pub mod shell;
 pub mod sidebar;
+pub mod sidechat;
 pub mod summary;
+pub mod tasks_queue;
 pub mod transcript;
 
 pub use artifact::{ArtifactIntent, ArtifactViewKind, ArtifactViewModel, ArtifactViewerSurface};
 pub use changes::{ChangeRowModel, ChangesIntent, ChangesViewModel, WorkspaceChangesSurface};
+pub use child_run::{ChildRunIntent, ChildRunSurface, ChildRunSurfaceStatus};
 pub use composer::{ComposerIntent, ComposerSurface};
 pub use files::{FileTreeRowModel, FilesIntent, WorkspaceFilesSurface};
 pub use ids::*;
 pub use layout_mode::{COMPACT_WIDTH_BREAKPOINT, ResponsiveWidthMode};
+pub use settings::{
+    HarnessSettingsIntent, HarnessSettingsSurface, HarnessSettingsViewModel, SettingFieldKindModel,
+    SettingFieldModel,
+};
 pub use shell::AgentContainerShell;
 pub use sidebar::{SidebarFilterSelection, SidebarIntent, SidebarRowModel, SidebarSurface};
+pub use sidechat::{SideChatIntent, SideChatSurface, SideChatSurfaceAccess};
 pub use summary::{SummaryIntent, SummarySurface};
+pub use tasks_queue::{
+    QueuedPromptViewModel, TaskRowViewModel, TasksQueueIntent, TasksQueueSurface,
+    TasksQueueViewModel,
+};
 pub use transcript::{TranscriptIntent, TranscriptReader, TranscriptSurface};
 
 use std::collections::BTreeMap;

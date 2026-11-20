@@ -754,6 +754,10 @@ fn report_wording() -> TranscriptToolReportWording {
     }
 }
 
+pub(crate) fn format_transcript_body(snapshot: &RunSnapshot) -> String {
+    format_transcript(snapshot, "").0
+}
+
 fn format_transcript(
     snapshot: &RunSnapshot,
     search_query: &str,

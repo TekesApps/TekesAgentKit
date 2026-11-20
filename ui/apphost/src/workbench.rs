@@ -7,8 +7,9 @@ use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 use tekes_agent_contract::{ArtifactSelectionReference, SessionAddress};
 use tekes_agent_ui_bindings::{
-    ArtifactOpenRequest, ChildRunOpenRequest, ComposerQuoteRequest, RunWorkbenchBinding,
-    SideChatOpenRequest, UiWakeNotifier, WorkbenchCommand, WorkspaceBinding,
+    ArtifactOpenRequest, ChildRunBinding, ChildRunOpenRequest, ComposerQuoteRequest,
+    HarnessSettingsBinding, RunWorkbenchBinding, SideChatBinding, SideChatOpenRequest,
+    UiWakeNotifier, WorkbenchCommand, WorkspaceBinding,
 };
 use tekes_ui_app_host::navigation;
 use tekes_ui_platform_macos::{WakeResult, WindowWake};
@@ -55,6 +56,9 @@ struct WorkbenchInner {
     pending_artifacts: VecDeque<ArtifactOpenRequest>,
     pending_child_runs: VecDeque<ChildRunOpenRequest>,
     pending_sidechats: VecDeque<SideChatOpenRequest>,
+    child_runs: BTreeMap<String, Arc<ChildRunBinding>>,
+    sidechats: BTreeMap<String, Arc<SideChatBinding>>,
+    harness_settings: Option<Arc<HarnessSettingsBinding>>,
     background_text_updates: BTreeMap<String, String>,
 }
 
@@ -69,6 +73,7 @@ pub struct SharedAgentWorkbench {
     last_observed_bg_revision: Rc<Cell<u64>>,
     last_observed_run_revision: Rc<Cell<u64>>,
     last_observed_ws_revision: Rc<Cell<u64>>,
+    last_observed_aux_revision: Rc<Cell<u64>>,
 }
 
 impl std::fmt::Debug for SharedAgentWorkbench {
@@ -103,6 +108,9 @@ impl SharedAgentWorkbench {
                 pending_artifacts: VecDeque::new(),
                 pending_child_runs: VecDeque::new(),
                 pending_sidechats: VecDeque::new(),
+                child_runs: BTreeMap::new(),
+                sidechats: BTreeMap::new(),
+                harness_settings: None,
                 background_text_updates: BTreeMap::new(),
             })),
             wake_hub: AppHostWakeHub::new(),
@@ -111,6 +119,7 @@ impl SharedAgentWorkbench {
             last_observed_bg_revision: Rc::new(Cell::new(0)),
             last_observed_run_revision: Rc::new(Cell::new(0)),
             last_observed_ws_revision: Rc::new(Cell::new(0)),
+            last_observed_aux_revision: Rc::new(Cell::new(0)),
         }
     }
 
@@ -188,6 +197,73 @@ impl SharedAgentWorkbench {
         self.inner.borrow_mut().pending_artifacts.pop_front()
     }
 
+    pub fn attach_child_run_binding(
+        &self,
+        instance_id: impl Into<String>,
+        binding: Arc<ChildRunBinding>,
+    ) {
+        let key = instance_id.into();
+        {
+            let mut inner = self.inner.borrow_mut();
+            inner.child_runs.insert(key, binding);
+            inner.revision = inner.revision.saturating_add(1);
+        }
+        self.notify_wakes();
+    }
+
+    pub fn child_run_binding(&self, instance_id: &str) -> Option<Arc<ChildRunBinding>> {
+        let inner = self.inner.borrow();
+        inner
+            .child_runs
+            .get(instance_id)
+            .or_else(|| inner.child_runs.get("default"))
+            .cloned()
+    }
+
+    pub fn pop_pending_child_run(&self) -> Option<ChildRunOpenRequest> {
+        self.inner.borrow_mut().pending_child_runs.pop_front()
+    }
+
+    pub fn attach_sidechat_binding(
+        &self,
+        instance_id: impl Into<String>,
+        binding: Arc<SideChatBinding>,
+    ) {
+        let key = instance_id.into();
+        {
+            let mut inner = self.inner.borrow_mut();
+            inner.sidechats.insert(key, binding);
+            inner.revision = inner.revision.saturating_add(1);
+        }
+        self.notify_wakes();
+    }
+
+    pub fn sidechat_binding(&self, instance_id: &str) -> Option<Arc<SideChatBinding>> {
+        let inner = self.inner.borrow();
+        inner
+            .sidechats
+            .get(instance_id)
+            .or_else(|| inner.sidechats.get("default"))
+            .cloned()
+    }
+
+    pub fn pop_pending_sidechat(&self) -> Option<SideChatOpenRequest> {
+        self.inner.borrow_mut().pending_sidechats.pop_front()
+    }
+
+    pub fn attach_harness_settings_binding(&self, binding: Arc<HarnessSettingsBinding>) {
+        {
+            let mut inner = self.inner.borrow_mut();
+            inner.harness_settings = Some(binding);
+            inner.revision = inner.revision.saturating_add(1);
+        }
+        self.notify_wakes();
+    }
+
+    pub fn harness_settings_binding(&self) -> Option<Arc<HarnessSettingsBinding>> {
+        self.inner.borrow().harness_settings.clone()
+    }
+
     pub fn set_latest_quote(&self, quote: ArtifactSelectionReference) {
         {
             let mut inner = self.inner.borrow_mut();
@@ -206,21 +282,36 @@ impl SharedAgentWorkbench {
         let bg_rev = self
             .background_revision
             .load(std::sync::atomic::Ordering::Acquire);
-        let (run_opt, ws_opt) = {
+        let (run_opt, ws_opt, settings_opt, child_list, side_list) = {
             let inner = self.inner.borrow();
-            (inner.run.clone(), inner.workspace.clone())
+            (
+                inner.run.clone(),
+                inner.workspace.clone(),
+                inner.harness_settings.clone(),
+                inner.child_runs.values().cloned().collect::<Vec<_>>(),
+                inner.sidechats.values().cloned().collect::<Vec<_>>(),
+            )
         };
         let run_rev = run_opt.as_ref().map_or(0, |r| r.ui_revision());
         let ws_rev = ws_opt.as_ref().map_or(0, |w| w.ui_revision());
+        let mut aux_rev = settings_opt.as_ref().map_or(0, |s| s.ui_revision());
+        for c in child_list {
+            aux_rev = aux_rev.saturating_add(c.view_snapshot().revision);
+        }
+        for s in side_list {
+            aux_rev = aux_rev.saturating_add(s.view_snapshot().revision);
+        }
 
         let bg_changed = bg_rev != self.last_observed_bg_revision.get();
         let run_changed = run_rev != self.last_observed_run_revision.get();
         let ws_changed = ws_rev != self.last_observed_ws_revision.get();
+        let aux_changed = aux_rev != self.last_observed_aux_revision.get();
 
-        if bg_changed || run_changed || ws_changed {
+        if bg_changed || run_changed || ws_changed || aux_changed {
             self.last_observed_bg_revision.set(bg_rev);
             self.last_observed_run_revision.set(run_rev);
             self.last_observed_ws_revision.set(ws_rev);
+            self.last_observed_aux_revision.set(aux_rev);
             let mut inner = self.inner.borrow_mut();
             inner.revision = inner.revision.saturating_add(1);
             if bg_changed

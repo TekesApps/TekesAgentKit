@@ -5,6 +5,8 @@
 pub mod fixture_sep;
 pub mod fixture_wse;
 pub mod run;
+pub mod settings;
+pub mod tasks_sidechat;
 pub mod workspace;
 
 pub use fixture_sep::{
@@ -14,6 +16,14 @@ pub use fixture_sep::{
 pub use fixture_wse::{DeterministicWorkspaceEndpoint, ReadOnlyFsWorkspaceEndpoint};
 pub use run::{
     AVAILABLE_MODELS, AVAILABLE_PRESETS, RunWorkbenchBinding, SidebarFilterMode, SidebarSessionRow,
+};
+pub use settings::{
+    HarnessSettingField, HarnessSettingKind, HarnessSettingsBinding, HarnessSettingsState,
+    MASKED_SECRET_DISPLAY,
+};
+pub use tasks_sidechat::{
+    ChildRunBinding, ChildRunStatus, ChildRunViewSnapshot, QueuedPromptItem, SideChatAccess,
+    SideChatBinding, SideChatViewSnapshot, TaskRowEntry, project_queued_prompts, project_tasks,
 };
 pub use workspace::{
     ChangesSnapshot, ChangesViewMode, LoadedArtifact, LoadedArtifactContent, WorkspaceBinding,
