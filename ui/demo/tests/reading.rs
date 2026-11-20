@@ -69,9 +69,9 @@ async fn append_and_reflow_preserve_reading_intent_without_stealing_focus() {
     render(&mut ui, &mut text, &mut scene, 900.);
     ui.follow_latest();
     render(&mut ui, &mut text, &mut scene, 900.);
-    let before = ui.transcript().field.surface.scroll.offset.y;
+    let before = ui.transcript().field.surface.scroll().offset.y;
     assert!(before > 0.);
-    let position = ui.transcript().field.surface.inner.center();
+    let position = ui.transcript().field.surface.inner().center();
     ui.event(&ContentEvent::Scroll {
         position,
         delta: Point::new(0., -90.),
@@ -90,7 +90,7 @@ async fn append_and_reflow_preserve_reading_intent_without_stealing_focus() {
             .unwrap()
             .is_following_latest()
     );
-    let offset = ui.transcript().field.surface.scroll.offset.y;
+    let offset = ui.transcript().field.surface.scroll().offset.y;
     let old_focus = ui.tree.focused();
     // Incoming tail text is a document input, not a custom scroll correction.
     ui.tree
@@ -100,11 +100,9 @@ async fn append_and_reflow_preserve_reading_intent_without_stealing_focus() {
         .unwrap()
         .field
         .surface
-        .input
-        .text
-        .push_str("\n追加消息一\n追加消息二");
+        .append_text("\n追加消息一\n追加消息二");
     render(&mut ui, &mut text, &mut scene, 900.);
-    assert!((ui.transcript().field.surface.scroll.offset.y - offset).abs() < 1.);
+    assert!((ui.transcript().field.surface.scroll().offset.y - offset).abs() < 1.);
     assert_eq!(ui.tree.focused(), old_focus);
     render(&mut ui, &mut text, &mut scene, 600.);
     assert!(
@@ -118,8 +116,8 @@ async fn append_and_reflow_preserve_reading_intent_without_stealing_focus() {
     ui.follow_latest();
     render(&mut ui, &mut text, &mut scene, 600.);
     assert_eq!(
-        ui.transcript().field.surface.scroll.offset.y,
-        ui.transcript().field.surface.scroll.limit().y
+        ui.transcript().field.surface.scroll().offset.y,
+        ui.transcript().field.surface.scroll().limit().y
     );
     runtime.stop().await.unwrap();
 }

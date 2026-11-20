@@ -1,4 +1,10 @@
 //! Agent-owned composition of public TekesUI controls. No endpoint or Run state machine.
+pub mod layout_mode;
+pub mod shell;
+
+pub use layout_mode::{COMPACT_WIDTH_BREAKPOINT, ResponsiveWidthMode};
+pub use shell::AgentContainerShell;
+
 use std::collections::BTreeMap;
 use tekes_agent_presentation::{ComposerDestination, RunScope, RunSnapshot};
 use tekes_ui_controls::{
@@ -75,7 +81,7 @@ impl Component for AgentText {
             let scale = t.backing_scale();
             if let Some(host) = t.text_surface_host() {
                 let type_scale = host.type_scale();
-                let role = self.field.surface.role;
+                let role = self.field.surface.role();
                 self.field.reading.as_mut().unwrap().layout_with(
                     &mut self.field.surface,
                     f,
@@ -175,7 +181,7 @@ impl RunSurface {
                 flexible_child: None,
                 children: buttons
                     .into_iter()
-                    .map(|(id, label)| Content::new(id, ButtonContent::new(label)))
+                    .map(|(id, label)| Content::new(id, Button::new(label)))
                     .collect(),
             },
         );
@@ -216,7 +222,7 @@ impl RunSurface {
             .surface
     }
     pub fn composing(&self) -> bool {
-        self.editor().input.marked.is_some()
+        self.editor().marked().is_some()
     }
     pub fn transcript(&self) -> &AgentText {
         self.tree
@@ -236,7 +242,7 @@ impl RunSurface {
         self.tree
             .get_mut(id)
             .unwrap()
-            .component_mut::<ButtonContent>()
+            .component_mut::<Button>()
             .unwrap()
             .button
             .state
@@ -279,9 +285,10 @@ impl RunSurface {
         }
         // Remote deltas never replace preedit, cursor or undo state. A changed authoritative
         // draft (e.g. accepted submit) updates only when there is no active composition.
-        if !self.composing() && self.editor().input.text != s.draft.text {
+        if !self.composing() && self.editor().text() != s.draft.text {
             let editor = self.text_mut(COMPOSER);
-            editor.field.surface.input = tekes_ui_controls::TextInput::new(&s.draft.text, false);
+            *editor.field.surface.input_mut() =
+                tekes_ui_controls::TextInput::new(&s.draft.text, false);
         }
         self.committed = s.draft.text.clone();
         let text = s
@@ -302,11 +309,8 @@ impl RunSurface {
             .collect::<Vec<_>>()
             .join("\n\n");
         let field = &mut self.text_mut(TRANSCRIPT).field;
-        if field.surface.input.text != text {
-            field.surface.input.text = text;
-            let len = field.surface.input.len();
-            field.surface.input.anchor = field.surface.input.anchor.min(len);
-            field.surface.input.caret = field.surface.input.caret.min(len);
+        if field.surface.text() != text {
+            field.surface.input_mut().set_text(&text);
         }
         self.tree
             .get_mut(STATUS)
@@ -348,8 +352,8 @@ impl RunSurface {
         }
         self.tree.event(e);
         let mut out = vec![];
-        if !self.composing() && self.editor().input.text != self.committed {
-            self.committed = self.editor().input.text.clone();
+        if !self.composing() && self.editor().text() != self.committed {
+            self.committed = self.editor().text().to_owned();
             if let Some(destination) = &self.selected {
                 out.push(Intent::Edit {
                     destination: destination.clone(),
@@ -364,7 +368,7 @@ impl RunSurface {
                 .tree
                 .get(id)
                 .unwrap()
-                .component::<ButtonContent>()
+                .component::<Button>()
                 .unwrap()
                 .activations;
             let old = self.counts.insert(id, count).unwrap_or(0);

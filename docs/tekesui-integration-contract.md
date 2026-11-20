@@ -1,43 +1,33 @@
-# AgentKit × TekesUI：首个 Run 接入契约
+# AgentKit × TekesUI：AppHost 容器接入契约
 
-状态：开发试点，非生产 UI 发布。范围为连接状态、纯文本 Transcript、单行 Composer、显式发送/停止、流式回传、会话草稿切换、重连和分页。Tasks/Subagents/SideChat/Summary 暂不接 UI。
+状态：基于不可变公开 `TekesUI v0.4.1`（`4ed5b2912e34312a0e0d9e9780d09482b58a0cc6`）的原生 `AppHost` 容器体系，完整架构定义见 [AppHost 架构规范](tekesui-apphost-architecture.md)。
 
-## 依赖与构建
+## 依赖与隔离
 
-- AgentKit 基线 v0.3.0 / aab9fb30623525a949b6fae80af3646a8c5f2ece，Rust 1.95.0。
-- TekesUI 的 composition 仍为实验 API。当前消费 base commit 及完整源码 SHA-256 见 `ui/tekesui-source.json`，包含该工作树必要的未提交实现；不能仅用 base commit 重现。
-- `prepare-tekesui-demo.py --source <明确选择的源码>` 只读取外部工作树，复制并校验清单文件到被忽略的 `ui/.deps/tekesui`。不修改、不提交、不推送 TekesUI；不静默跟随 sibling path。UI workspace 与 headless 默认构建隔离。
-- 这是开发快照，不是发布依赖。发布前必须取得包含这些 API 的不可变公开 commit/tag，再转换依赖；当前不打 UI release tag。
+- Headless / Web 工作区（根目录 `Cargo.toml`）通过 `exclude = ["ui"]` 保持完全独立，不引入任何 `tekes-ui-*` 依赖。
+- `ui/Cargo.toml` 明确固定指向 `TekesUI` 公开不可变 commit `4ed5b2912e34312a0e0d9e9780d09482b58a0cc6`（tag `v0.4.1`），记录于 `ui/tekesui-source.json` 并由 `scripts/check-ui-boundaries.py` 静态校验，不依赖未提交的兄弟工作树。
+- 严格禁止任何 Swift 源码或工具链；`ui/` 全工作区强制 `#![forbid(unsafe_code)]`（工作区 `unsafe_code = "forbid"`），平台 `objc2` 封装完全留在 TekesUI 内部。
 
-## 所有权与数据方向
+## 所有权与数据流
 
 | 层 | 拥有 | 不承担 |
 |---|---|---|
-| TekesUI | 通用输入/选区/撤销/组字、控件焦点、布局/渲染、ReadingController/滚动几何、平台文本服务 | Session、发送回执、连接状态、Agent 草稿归属 |
-| AgentKit presentation | Session scope、RunSnapshot、草稿、提交身份/echo、取消、重连后的状态、历史分页 | 原生编辑与滚动的另一个实现 |
-| AgentKit UI components | RunSurface 组合、每 destination 的控件实例、Agent 意图映射、只读 snapshot 展示 | SEP 协议、重试策略、第二套 Run 状态机 |
-| Demo host | 窗口/主题输入、Tokio 执行器、公开平台事件翻译、Clipboard/AX/TextInputState 桥接、transport 配置 | 私有 AppKit 接口、TekesUI 缺失能力的通用替代实现 |
+| TekesUI (`AppHost` / `Controls` / `Settings`) | `AppWindow`、`PresentationOptions`（`nav_bar` / `focus` / `others` / `OthersGroup` / `ContainerFactory`）、`ContentHost`、`TextFieldContent`、受控值事务、`ReadingController`、前插阅读锚点、`WindowWake`、Metal/CoreText/AX | Session、发送回执、SEP/WSE、Agent 状态机 |
+| AgentKit Presentation & Bindings | Session scope、`RunSnapshot`、草稿、`SideChatController`、`SummaryFacts`、`AgentTask`、`WorkspaceBinding`、epoch/revision 防护 | 通用窗口分栏、TabStrip/SplitView 外壳 |
+| AgentKit UI Components & `AppHost` Adapters | 槽位无关组件与 `ContainerContent` 包装、`SharedAgentWorkbench` 共享意图通道、响应式窄/宽重排、`AgentSettingsOwner` | 业务窗口主布局决策、凭据、系统权限 |
+| Desktop Host（形态 A `demo` / 形态 B `consumer`） | `PresentationOptions` 槽位编排、业务主视图、Tokio 运行时、自定义 `ArtifactViewerProvider` | 私有 AppKit 调用、复制 Run 状态机 |
 
-输入是 `RunSnapshot`；输出是捕获 destination 的 Edit、Send、Cancel、Earlier、Reconnect、Select 意图。
-Edit 调用 RunController::edit；Send 在发起时 prepare 捕获 ticket，再异步 dispatch；Cancel、Earlier 分别调用 controller 原接口；Reconnect 调用 SessionRuntime。错误可见，不重放未知写操作。连接状态与按钮权限只从 snapshot 派生。
+## 焦点、IME、草稿与槽位热交换
 
-## 焦点、IME 与草稿
+- 每个 destination（主会话 `Run`、各 `SideChat`）保留独立的 `TextFieldContent` 与阅读视图实例；`preedit` 期间不写入 Agent 草稿，禁止 `Send`、会话切换与外部值覆盖。
+- `AppHost` 执行 `focus ↔ others` 互换或隐藏恢复时仅改变布局位置，`ManagedAgentContainer` 保持底层 `ContentHost`、`ReadingController` 锚点及活跃 `preedit` 原样存活，仅按容器宽度断点自适应工具栏与卡片排布。
 
-- 每个 destination 保留自己的 TekesUI 编辑器实例，切换不按帧重建控件；同一 scope 的异步数据更新不抢焦点、不覆盖编辑器选区/undo/preedit。
-- 组字由 TekesUI TextFieldContent/TextInput 处理。preedit 不写入 Agent 草稿；Commit/Unmark 后才发出 Edit。
-- 首版只有显式 Send，Enter 永不提交。marked text 存在时禁止 Send 和会话切换；不在 AgentKit 内实现候选窗、组字算法或新撤销栈。多行键盘编辑缺口见清单。
-- 发送回填、草稿恢复和晚回包归属继续由现有 presentation 管理。取消网络任务不等于取消本地编辑器组字。
+## 验证分层
 
-## 阅读与历史
-
-- Transcript 保留只读 TextFieldContent 的输入/选区语义，使用其公开 TextSurface + ReadingController 绘制完整阅读视口。向上滚动/选择后停止跟随；尾部追加与重排通过现有阅读锚点保留位置；只有显式“回到最新”恢复跟随，不抢 Composer 焦点。
-- 每个 destination 保留自己的 Transcript 控件/阅读状态。消息内容来自现有 projector，不直接读取 harness 文件。
-- Earlier 调用已有冻结分页；当前 ReadingController 对头部插入不提供消息 ID 锚点映射。分页数据正确性可验证，但头部插入后的无跳动体验为阻塞缺口，不能标为通过。
-
-## 验证边界
-
-UI demo 的默认 transport 是本地、确定性的 SEP fixture，经过真实 SessionRuntime/RunController；不是另一个 UI 状态机，也不代表真实模型验收。原有 Native/Pi/DSH CLI 集成独立保留。验证分协议与状态、公共组件消费、原生合成文本服务、真实物理 IME/VoiceOver/性能五层，后两层不能由自动合成输入替代。
-
-后台 UI 唤醒缺口使 demo 必须显式启用 `--frame-pump`；它仅是开发演示驱动，不是生产解决方案，不声称空闲零回调。缺口及所需上游接口见 [清单](tekesui-gaps.md)。
-
-Demo 支持显式 Native endpoint JSON（URL、bearer 环境变量名、两个 session ID）；真实 Native SEP 已验证到 RunController → TekesUI GPU 离屏输出。该证据不代表真实模型或原生交互验收。运行方法见 [UI README](../ui/README.md)。
+证据始终分六层独立记录，互不替代：
+1. **静态边界与 Root 回归**：`check-headless-boundaries.py`、`check-ui-boundaries.py`、`scripts/tests`、Root `cargo test`。
+2. **Headless 组件与重放**：`SharedAgentWorkbench` / `ManagedAgentContainer` 生命周期、前插锚点、受控编辑、Fenced Actions 与双形态容器矩阵。
+3. **真实 Kernel SEP → AppHost GPU 离屏渲染**：真实 Kernel 进程经 `SessionRuntime` 驱动 `AppHost` `HostedWindow::render_headless_rgba8` 输出 PNG。
+4. **原生窗口合成自测（`--native-selftest`）**：使用 `tekes-ui-platform-macos` 公开 selftest 接口驱动真实 macOS `AppWindow`，验证无 `--frame-pump` 的 `WindowWake` 刷新、合成 IME `Preedit`/`Commit` 与 `focus_switch` 互换。
+5. **双公开消费者验证**：形态 A（`ui/demo`）与形态 B（独立公开消费者 `ui/consumer`）各自装配并验证 `OthersTab::List`、`ContainerFactory` 多实例及跨槽位交换。
+6. **真机人工与硬件验收（独立标记 `not_run` / 人工单独执行）**：真实物理系统中文输入法候选窗、macOS VoiceOver 真人走查与 120Hz ProMotion 真机手感性能。
