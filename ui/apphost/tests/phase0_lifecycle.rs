@@ -15,7 +15,6 @@ use tekes_ui_controls::{
         Component, ComponentId, Content, ContentEvent, ContentHost, StackContent, TextContent,
         TextFieldContent, TextSubmitPolicy, TextViewport,
     },
-    extended::{Axis, Stack},
 };
 use tekes_ui_render::Renderer;
 use tekes_ui_scene::{Point, Rect, Scene, Size};
@@ -104,7 +103,7 @@ impl AgentContainerAdapter for DemoPhase0Adapter {
         if let Some(node) = host.get_mut(NOTE_ID)
             && let Some(text) = node.component_mut::<TextContent>()
         {
-            text.text = format!("{status} ({width_mode:?})");
+            text.set_text(format!("{status} ({width_mode:?})"));
         }
     }
 }
@@ -119,17 +118,14 @@ fn demo_content(label: &str) -> Content {
     composer.submit_policy = TextSubmitPolicy::CommandEnter;
     Content::new(
         STACK_ID,
-        StackContent {
-            model: Stack {
-                axis: Axis::Vertical,
-                gap: 8.0,
-            },
-            flexible_child: Some(COMPOSER_ID),
-            children: vec![
+        StackContent::vertical(
+            8.0,
+            vec![
                 Content::new(NOTE_ID, TextContent::new(label)),
                 Content::new(COMPOSER_ID, composer),
             ],
-        },
+        )
+        .with_flexible_child(COMPOSER_ID),
     )
 }
 
@@ -165,7 +161,7 @@ fn phase0_wake_publisher_and_inactive_deferral_work_without_frame_pump() {
             .unwrap()
             .component::<TextContent>()
             .unwrap();
-        assert_eq!(note.text, "idle (Expanded)");
+        assert_eq!(note.text(), "idle (Expanded)");
     });
 
     // Re-activating triggers synchronized projection immediately.
@@ -181,7 +177,7 @@ fn phase0_wake_publisher_and_inactive_deferral_work_without_frame_pump() {
             .unwrap()
             .component::<TextContent>()
             .unwrap();
-        assert_eq!(note.text, "stream-ready (Expanded)");
+        assert_eq!(note.text(), "stream-ready (Expanded)");
     });
 
     // UiWakeNotifier can notify safely with zero dead panics when zero wakes registered.
@@ -237,8 +233,8 @@ fn phase0_slot_swap_preserves_mount_identity_and_active_cjk_preedit_and_responsi
                 .unwrap()
                 .component_mut::<TextFieldContent>()
                 .unwrap();
-            let baseline = field_mut.surface.input().external_baseline();
-            let result = field_mut.surface.apply_external_value(
+            let baseline = field_mut.input().external_baseline();
+            let result = field_mut.apply_external_value(
                 &baseline,
                 &DraftRevision {
                     identity: "session:a".to_owned(),

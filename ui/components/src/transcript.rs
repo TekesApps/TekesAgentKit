@@ -21,7 +21,6 @@ use tekes_ui_controls::{
         RichContent, RichDocument, SearchCommandKind, SearchFieldContent, StackContent,
         TextContent,
     },
-    extended::{Axis, Stack},
     layout::{Insets, MeasuredChild},
 };
 use tekes_ui_scene::{Rect, Scene, Size};
@@ -200,7 +199,7 @@ impl Component for TranscriptReader {
     ) {
         if let Some(host) = text.text_surface_host() {
             self.surface
-                .draw(host, scene, theme.palette, self.focused, false);
+                .draw(host, scene, theme.palette(), self.focused, false);
         }
     }
 
@@ -339,38 +338,17 @@ impl TranscriptSurface {
     pub fn build_content() -> Content {
         let header = Content::new(
             TRANSCRIPT_HEADER_ID,
-            StackContent {
-                model: Stack {
-                    axis: Axis::Vertical,
-                    gap: 0.0,
-                },
-                flexible_child: None,
-                children: Vec::new(),
-            },
+            StackContent::vertical(0.0, Vec::new()),
         );
 
         let search_row = Content::new(
             TRANSCRIPT_SEARCH_ROW_ID,
-            StackContent {
-                model: Stack {
-                    axis: Axis::Horizontal,
-                    gap: Spacing::Tight.value(),
-                },
-                flexible_child: None,
-                children: Vec::new(),
-            },
+            StackContent::horizontal(Spacing::Tight.value(), Vec::new()),
         );
 
         let user_bubble_slot = Content::new(
             TRANSCRIPT_LATEST_USER_SLOT_ID,
-            StackContent {
-                model: Stack {
-                    axis: Axis::Vertical,
-                    gap: 0.0,
-                },
-                flexible_child: None,
-                children: Vec::new(),
-            },
+            StackContent::vertical(0.0, Vec::new()),
         );
 
         let rich_doc = RichDocument::from_markdown("");
@@ -384,19 +362,15 @@ impl TranscriptSurface {
 
         let footnote_row = Content::new(
             TRANSCRIPT_FOOTNOTE_ROW_ID,
-            StackContent {
-                model: Stack {
-                    axis: Axis::Horizontal,
-                    gap: Spacing::Tight.value(),
-                },
-                flexible_child: None,
-                children: vec![
+            StackContent::horizontal(
+                Spacing::Tight.value(),
+                vec![
                     Content::new(TRANSCRIPT_COPY_BTN_ID, copy_btn),
                     Content::new(TRANSCRIPT_UP_BTN_ID, up_btn),
                     Content::new(TRANSCRIPT_DOWN_BTN_ID, down_btn),
                     Content::new(TRANSCRIPT_FORK_BTN_ID, fork_btn),
                 ],
-            },
+            ),
         );
 
         let activity_disc = Content::new(
@@ -412,53 +386,31 @@ impl TranscriptSurface {
 
         let latest_turn = Content::new(
             TRANSCRIPT_LATEST_TURN_SLOT_ID,
-            StackContent {
-                model: Stack {
-                    axis: Axis::Vertical,
-                    gap: Spacing::Regular.value(),
-                },
-                flexible_child: None,
-                children: vec![
+            StackContent::vertical(
+                Spacing::Regular.value(),
+                vec![
                     activity_disc,
                     Content::new(TRANSCRIPT_RICH_BODY_ID, rich_content),
                     footnote_row,
                 ],
-            },
+            ),
         );
 
         let latest_slot = Content::new(
             TRANSCRIPT_LATEST_SLOT_ID,
-            StackContent {
-                model: Stack {
-                    axis: Axis::Horizontal,
-                    gap: 0.0,
-                },
-                flexible_child: None,
-                children: Vec::new(),
-            },
+            StackContent::horizontal(0.0, Vec::new()),
         );
 
         let actionables_stack = Content::new(
             TRANSCRIPT_ACTIONABLES_STACK_ID,
-            StackContent {
-                model: Stack {
-                    axis: Axis::Vertical,
-                    gap: Spacing::Regular.value(),
-                },
-                flexible_child: None,
-                children: Vec::new(),
-            },
+            StackContent::vertical(Spacing::Regular.value(), Vec::new()),
         );
 
         Content::new(
             TRANSCRIPT_ROOT_ID,
-            StackContent {
-                model: Stack {
-                    axis: Axis::Vertical,
-                    gap: Spacing::Tight.value(),
-                },
-                flexible_child: Some(TRANSCRIPT_READER_ID),
-                children: vec![
+            StackContent::vertical(
+                Spacing::Tight.value(),
+                vec![
                     header,
                     search_row,
                     Content::new(TRANSCRIPT_READER_ID, TranscriptReader::new()),
@@ -468,7 +420,8 @@ impl TranscriptSurface {
                     actionables_stack,
                     Content::new(TRANSCRIPT_SPACER_ID, TranscriptSpacer { fill: true }),
                 ],
-            },
+            )
+            .with_flexible_child(TRANSCRIPT_READER_ID),
         )
     }
 
@@ -482,7 +435,7 @@ impl TranscriptSurface {
                 .get_mut(TRANSCRIPT_SEARCH_ROW_ID)
                 .and_then(|c| c.component_mut::<StackContent>())
             {
-                row.flexible_child = Some(TRANSCRIPT_SEARCH_ID);
+                row.set_flexible_child(Some(TRANSCRIPT_SEARCH_ID));
             }
             replace_stack_children(
                 host,
@@ -495,7 +448,7 @@ impl TranscriptSurface {
                 .get_mut(TRANSCRIPT_SEARCH_ROW_ID)
                 .and_then(|c| c.component_mut::<StackContent>())
             {
-                row.flexible_child = None;
+                row.set_flexible_child(None);
             }
             replace_stack_children(host, TRANSCRIPT_SEARCH_ROW_ID, Vec::new());
         }
@@ -520,18 +473,15 @@ impl TranscriptSurface {
         let mut children = Vec::new();
         if let Some(msg) = notice_text {
             let mut reconnect_btn = Button::new("Reconnect");
-            reconnect_btn.variant = ButtonVariant::Panel;
-            let row = StackContent {
-                model: Stack {
-                    axis: Axis::Horizontal,
-                    gap: Spacing::Tight.value(),
-                },
-                flexible_child: Some(TRANSCRIPT_NOTICE_TEXT_ID),
-                children: vec![
+            reconnect_btn.set_variant(ButtonVariant::Panel);
+            let row = StackContent::horizontal(
+                Spacing::Tight.value(),
+                vec![
                     Content::new(TRANSCRIPT_NOTICE_TEXT_ID, secondary_text(msg)),
                     Content::new(TRANSCRIPT_RECONNECT_BTN_ID, reconnect_btn),
                 ],
-            }
+            )
+            .with_flexible_child(TRANSCRIPT_NOTICE_TEXT_ID)
             .into_content_with_distribution(ComponentId(116), MainAxisDistribution::SpaceBetween);
             children.push(card_panel(
                 TRANSCRIPT_NOTICE_PANEL_ID,
@@ -542,7 +492,7 @@ impl TranscriptSurface {
 
         if has_earlier {
             let mut earlier_btn = Button::new("↑ Load earlier messages");
-            earlier_btn.variant = ButtonVariant::Quiet;
+            earlier_btn.set_variant(ButtonVariant::Quiet);
             earlier_btn.set_transparent_chrome(true);
             children.push(Content::new(TRANSCRIPT_EARLIER_BTN_ID, earlier_btn));
         }
@@ -567,15 +517,10 @@ impl TranscriptSurface {
             ),
             Insets::new(8.0, 14.0, 8.0, 14.0),
         );
-        let aligned = StackContent {
-            model: Stack {
-                axis: Axis::Horizontal,
-                gap: 0.0,
-            },
-            flexible_child: None,
-            children: vec![bubble],
-        }
-        .into_content_with_distribution(TRANSCRIPT_USER_BUBBLE_ROW_ID, MainAxisDistribution::End);
+        let aligned = StackContent::horizontal(0.0, vec![bubble]).into_content_with_distribution(
+            TRANSCRIPT_USER_BUBBLE_ROW_ID,
+            MainAxisDistribution::End,
+        );
         replace_stack_children(host, TRANSCRIPT_LATEST_USER_SLOT_ID, vec![aligned]);
     }
 
@@ -593,15 +538,9 @@ impl TranscriptSurface {
                 "tekes-jump-bottom",
                 "Jump to latest",
             );
-            let aligned = StackContent {
-                model: Stack {
-                    axis: Axis::Horizontal,
-                    gap: 0.0,
-                },
-                flexible_child: None,
-                children: vec![Content::new(TRANSCRIPT_LATEST_BTN_ID, btn)],
-            }
-            .into_content_with_distribution(ComponentId(139), MainAxisDistribution::End);
+            let aligned =
+                StackContent::horizontal(0.0, vec![Content::new(TRANSCRIPT_LATEST_BTN_ID, btn)])
+                    .into_content_with_distribution(ComponentId(139), MainAxisDistribution::End);
             replace_stack_children(host, TRANSCRIPT_LATEST_SLOT_ID, vec![aligned]);
         }
     }
@@ -675,11 +614,11 @@ impl TranscriptSurface {
             .get_mut(TRANSCRIPT_ROOT_ID)
             .and_then(|c| c.component_mut::<StackContent>())
         {
-            root.flexible_child = Some(if empty_history {
+            root.set_flexible_child(Some(if empty_history {
                 TRANSCRIPT_SPACER_ID
             } else {
                 TRANSCRIPT_READER_ID
-            });
+            }));
         }
 
         self.sync_user_bubble(host, &parts.latest_user);
@@ -715,17 +654,17 @@ impl TranscriptSurface {
                 .get_mut(ComponentId(113))
                 .and_then(|c| c.component_mut::<TextContent>())
             {
-                label.text = if parts.activity_title.is_empty() {
-                    "Thought process".to_owned()
+                label.set_text(if parts.activity_title.is_empty() {
+                    "Thought process"
                 } else {
-                    parts.activity_title.clone()
-                };
+                    parts.activity_title.as_str()
+                });
             }
             if let Some(body) = host
                 .get_mut(TRANSCRIPT_THINKING_BODY_ID)
                 .and_then(|c| c.component_mut::<TextContent>())
             {
-                body.text = parts.activity_detail.clone();
+                body.set_text(&parts.activity_detail);
             }
         }
         if let Some(disc) = host
@@ -796,11 +735,11 @@ impl TranscriptSurface {
                     },
                 );
                 let mut btn = Button::new(choice.label.clone());
-                btn.variant = if choice.id == "allow" || choice.id == "option-0" {
+                btn.set_variant(if choice.id == "allow" || choice.id == "option-0" {
                     ButtonVariant::Primary
                 } else {
                     ButtonVariant::Panel
-                };
+                });
                 buttons.push(Content::new(btn_id, btn));
             }
 
@@ -810,26 +749,12 @@ impl TranscriptSurface {
             }
             card_children.push(Content::new(
                 buttons_row_id,
-                StackContent {
-                    model: Stack {
-                        axis: Axis::Horizontal,
-                        gap: Spacing::Tight.value(),
-                    },
-                    flexible_child: None,
-                    children: buttons,
-                },
+                StackContent::horizontal(Spacing::Tight.value(), buttons),
             ));
 
             let body = Content::new(
                 stack_id,
-                StackContent {
-                    model: Stack {
-                        axis: Axis::Vertical,
-                        gap: Spacing::Tight.value(),
-                    },
-                    flexible_child: None,
-                    children: card_children,
-                },
+                StackContent::vertical(Spacing::Tight.value(), card_children),
             );
             cards.push(card_panel(
                 card_id,

@@ -21,7 +21,10 @@ pub use child_run::ChildRunContainer;
 pub use container::{AgentContainerAdapter, ManagedAgentContainer, ResourceContextOps};
 pub use files::WorkspaceFilesContainer;
 pub use process_components::{AgentProcessComponentDescriptor, CORE_PROCESS_COMPONENTS};
-pub use run::{AgentRunContainer, ComposerContainer, FOCUS_SWITCH_COMMAND, TranscriptContainer};
+pub use run::{
+    AgentRunContainer, ComposerContainer, FOCUS_SWITCH_COMMAND, RUN_TOOLBAR_APPROVAL_CMD,
+    RUN_TOOLBAR_EFFORT_CMD, RUN_TOOLBAR_HARNESS_CMD, RUN_TOOLBAR_MODEL_CMD, TranscriptContainer,
+};
 pub use settings::{
     AGENT_SETTINGS_SCHEMA_TOML, HarnessSettingsContainer, build_agent_settings_owner,
     build_agent_settings_owner_with_mode,

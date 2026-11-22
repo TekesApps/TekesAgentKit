@@ -14,7 +14,6 @@ use tekes_ui_controls::{
         RichDocument, ScrollContent, SeparatorContent, StackContent, TextContent, TextFieldContent,
         TextViewport,
     },
-    extended::{Axis, Stack},
 };
 use tekes_ui_scene::Size;
 use tekes_ui_tokens::{Spacing, proposal::layout::MainAxisDistribution};
@@ -98,62 +97,49 @@ impl ArtifactViewerSurface {
 
         let actions = Content::new(
             ARTIFACT_ACTIONS_ROW_ID,
-            StackContent {
-                model: Stack {
-                    axis: Axis::Horizontal,
-                    gap: Spacing::Micro.value(),
-                },
-                flexible_child: None,
-                children: vec![
+            StackContent::horizontal(
+                Spacing::Micro.value(),
+                vec![
                     Content::new(ARTIFACT_QUOTE_BTN_ID, quote_btn),
                     Content::new(ARTIFACT_ATTACH_BTN_ID, attach_btn),
                     Content::new(ARTIFACT_RELOAD_BTN_ID, reload_btn),
                 ],
-            },
+            ),
         );
 
-        let header_row = StackContent {
-            model: Stack {
-                axis: Axis::Horizontal,
-                gap: Spacing::Tight.value(),
-            },
-            flexible_child: Some(ARTIFACT_HEADER_ID),
-            children: vec![
+        let header_row = StackContent::horizontal(
+            Spacing::Tight.value(),
+            vec![
                 Content::new(ARTIFACT_HEADER_ID, label_text("Artifact")),
                 actions,
             ],
-        }
+        )
+        .with_flexible_child(ARTIFACT_HEADER_ID)
         .into_content_with_distribution(ARTIFACT_HEADER_ROW_ID, MainAxisDistribution::SpaceBetween);
 
         let body_slot = Content::new(
             ARTIFACT_BODY_SLOT_ID,
-            StackContent {
-                model: Stack {
-                    axis: Axis::Vertical,
-                    gap: Spacing::Regular.value(),
-                },
-                flexible_child: Some(ARTIFACT_BODY_SCROLL_ID),
-                children: vec![Content::new(
+            StackContent::vertical(
+                Spacing::Regular.value(),
+                vec![Content::new(
                     ARTIFACT_DIAG_TEXT_ID,
                     secondary_text("Select a file from Files or Summary to preview."),
                 )],
-            },
+            )
+            .with_flexible_child(ARTIFACT_BODY_SCROLL_ID),
         );
 
         Content::new(
             ARTIFACT_ROOT_ID,
-            StackContent {
-                model: Stack {
-                    axis: Axis::Vertical,
-                    gap: Spacing::Regular.value(),
-                },
-                flexible_child: Some(ARTIFACT_BODY_SLOT_ID),
-                children: vec![
+            StackContent::vertical(
+                Spacing::Regular.value(),
+                vec![
                     header_row,
                     Content::new(ARTIFACT_SEP_ID, SeparatorContent::default()),
                     body_slot,
                 ],
-            },
+            )
+            .with_flexible_child(ARTIFACT_BODY_SLOT_ID),
         )
     }
 
@@ -174,9 +160,9 @@ impl ArtifactViewerSurface {
                 .map(|b| format!(" · {b}"))
                 .unwrap_or_default();
             if model.path.is_empty() {
-                header.text = "Artifact".to_owned();
+                header.set_text("Artifact");
             } else {
-                header.text = format!("{}{badge}", model.path);
+                header.set_text(format!("{}{badge}", model.path));
             }
         }
 
@@ -320,11 +306,11 @@ impl ArtifactViewerSurface {
             .get_mut(ARTIFACT_QUOTE_BTN_ID)
             .and_then(|c| c.component_mut::<Button>())
         {
-            btn.button.state.disabled = !quotable;
+            btn.set_disabled(!quotable);
         }
         for id in [ARTIFACT_ATTACH_BTN_ID, ARTIFACT_RELOAD_BTN_ID] {
             if let Some(btn) = host.get_mut(id).and_then(|c| c.component_mut::<Button>()) {
-                btn.button.state.disabled = model.path.is_empty();
+                btn.set_disabled(model.path.is_empty());
             }
         }
     }
@@ -376,7 +362,7 @@ impl ArtifactViewerSurface {
     pub fn current_utf16_selection(host: &ContentHost) -> Option<Range<usize>> {
         host.get(ARTIFACT_CODE_EDITOR_ID)
             .and_then(|c| c.component::<TextFieldContent>())
-            .map(|f| f.surface.input().selection())
+            .map(|f| f.input().selection())
     }
 
     pub fn handle_actions(

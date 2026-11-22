@@ -265,7 +265,7 @@ pub fn replace_stack_children(
     let existing_ids: Vec<ComponentId> = host
         .get(parent)
         .and_then(|node| node.component::<tekes_ui_controls::composition::StackContent>())
-        .map(|stack| stack.children.iter().map(|c| c.id()).collect())
+        .map(|stack| stack.children().iter().map(|c| c.id()).collect())
         .unwrap_or_default();
     for id in existing_ids {
         let _ = host.remove(id);

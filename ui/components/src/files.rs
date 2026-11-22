@@ -13,7 +13,7 @@ use tekes_ui_controls::{
         ContentHost, MenuContent, MenuEntry, ScrollContent, SearchCommandKind, SearchFieldContent,
         StackContent, TextContent, TreeContent, TreeContentNode, TreeDisplayUpdate, TreeIntentKind,
     },
-    extended::{Axis, KeyedTreeNode, Stack, TreeDatasetKey, TreeNodeKey},
+    extended::{KeyedTreeNode, TreeDatasetKey, TreeNodeKey},
 };
 use tekes_ui_tokens::{Spacing, proposal::layout::MainAxisDistribution};
 
@@ -69,17 +69,14 @@ impl WorkspaceFilesSurface {
         search.set_placeholder(Some("Search workspace paths".to_owned()));
 
         let refresh_btn = icon_button(FILES_REFRESH_ICON_ID, "tekes-refresh", "Refresh files");
-        let header_row = StackContent {
-            model: Stack {
-                axis: Axis::Horizontal,
-                gap: Spacing::Tight.value(),
-            },
-            flexible_child: Some(FILES_HEADER_ID),
-            children: vec![
+        let header_row = StackContent::horizontal(
+            Spacing::Tight.value(),
+            vec![
                 Content::new(FILES_HEADER_ID, label_text("Workspace")),
                 Content::new(FILES_REFRESH_BTN_ID, refresh_btn),
             ],
-        }
+        )
+        .with_flexible_child(FILES_HEADER_ID)
         .into_content_with_distribution(FILES_HEADER_ROW_ID, MainAxisDistribution::SpaceBetween);
 
         let tree = TreeContent::new("Workspace tree", TreeDatasetKey(1), Vec::new())
@@ -102,19 +99,16 @@ impl WorkspaceFilesSurface {
 
         Content::new(
             FILES_ROOT_ID,
-            StackContent {
-                model: Stack {
-                    axis: Axis::Vertical,
-                    gap: Spacing::Regular.value(),
-                },
-                flexible_child: Some(FILES_TREE_SCROLL_ID),
-                children: vec![
+            StackContent::vertical(
+                Spacing::Regular.value(),
+                vec![
                     Content::new(FILES_SEARCH_ID, search),
                     header_row,
                     Content::new(FILES_TREE_SCROLL_ID, tree_scroll),
                     context_menu,
                 ],
-            },
+            )
+            .with_flexible_child(FILES_TREE_SCROLL_ID),
         )
     }
 
@@ -179,8 +173,8 @@ impl WorkspaceFilesSurface {
             } else {
                 workspace_id.to_owned()
             };
-            if header.text != next_title {
-                header.text = next_title;
+            if header.text() != next_title {
+                header.set_text(next_title);
             }
         }
 

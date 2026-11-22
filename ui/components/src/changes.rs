@@ -15,8 +15,8 @@ use tekes_ui_controls::{
         TextFieldContent,
     },
     extended::{
-        Axis, DiffKind, DiffLine, DiffView, KeyedListItem, KeyedListSnapshot, ListBudget,
-        ListDatasetKey, ListItemKey, Stack,
+        DiffKind, DiffLine, DiffView, KeyedListItem, KeyedListSnapshot, ListBudget, ListDatasetKey,
+        ListItemKey,
     },
 };
 use tekes_ui_tokens::{Spacing, proposal::layout::MainAxisDistribution};
@@ -98,17 +98,14 @@ impl WorkspaceChangesSurface {
             "tekes-quote",
             "Quote diff to conversation",
         );
-        let header_row = StackContent {
-            model: Stack {
-                axis: Axis::Horizontal,
-                gap: Spacing::Tight.value(),
-            },
-            flexible_child: Some(CHANGES_HEADER_ID),
-            children: vec![
+        let header_row = StackContent::horizontal(
+            Spacing::Tight.value(),
+            vec![
                 Content::new(CHANGES_HEADER_ID, label_text("Changes")),
                 Content::new(CHANGES_QUOTE_BTN_ID, quote_btn),
             ],
-        }
+        )
+        .with_flexible_child(CHANGES_HEADER_ID)
         .into_content_with_distribution(CHANGES_HEADER_ROW_ID, MainAxisDistribution::SpaceBetween);
 
         let mode_seg = SegmentedControlContent::new(
@@ -131,12 +128,12 @@ impl WorkspaceChangesSurface {
         .expect("empty changes list");
         list.set_navigation_layout(true);
         list.set_navigation_selection_fill_only(true);
-        let mut list_scroll = ScrollContent::new(
+        let list_scroll = ScrollContent::new(
             ScrollArea::default(),
             Content::new(CHANGES_FILES_LIST_ID, list),
         )
-        .scrollbar(true);
-        list_scroll.viewport_height = Some(112.0);
+        .scrollbar(true)
+        .with_viewport_height(Some(112.0));
 
         let diff_doc = RichDocument::from_diff(&DiffView::default());
         let diff_rich =
@@ -151,39 +148,33 @@ impl WorkspaceChangesSurface {
         commit_input.show_metadata = false;
         commit_input.set_placeholder(Some("Commit message…".to_owned()));
         let mut commit_btn = Button::new("Commit");
-        commit_btn.variant = ButtonVariant::Primary;
+        commit_btn.set_variant(ButtonVariant::Primary);
 
         let commit_row = Content::new(
             CHANGES_COMMIT_ROW_ID,
-            StackContent {
-                model: Stack {
-                    axis: Axis::Horizontal,
-                    gap: Spacing::Tight.value(),
-                },
-                flexible_child: Some(CHANGES_COMMIT_INPUT_ID),
-                children: vec![
+            StackContent::horizontal(
+                Spacing::Tight.value(),
+                vec![
                     Content::new(CHANGES_COMMIT_INPUT_ID, commit_input),
                     Content::new(CHANGES_COMMIT_BTN_ID, commit_btn),
                 ],
-            },
+            )
+            .with_flexible_child(CHANGES_COMMIT_INPUT_ID),
         );
 
         Content::new(
             CHANGES_ROOT_ID,
-            StackContent {
-                model: Stack {
-                    axis: Axis::Vertical,
-                    gap: Spacing::Regular.value(),
-                },
-                flexible_child: Some(CHANGES_DIFF_SCROLL_ID),
-                children: vec![
+            StackContent::vertical(
+                Spacing::Regular.value(),
+                vec![
                     header_row,
                     Content::new(CHANGES_MODE_SEG_ID, mode_seg),
                     Content::new(CHANGES_FILES_SCROLL_ID, list_scroll),
                     Content::new(CHANGES_DIFF_SCROLL_ID, diff_scroll),
                     commit_row,
                 ],
-            },
+            )
+            .with_flexible_child(CHANGES_DIFF_SCROLL_ID),
         )
     }
 
@@ -241,7 +232,7 @@ impl WorkspaceChangesSurface {
                 .as_deref()
                 .map(|s| format!(" · {s}"))
                 .unwrap_or_default();
-            header.text = format!(
+            header.set_text(format!(
                 "{} · {} {}{status_note}",
                 model.branch,
                 model.files.len(),
@@ -250,7 +241,7 @@ impl WorkspaceChangesSurface {
                 } else {
                     "files"
                 }
-            );
+            ));
         }
 
         if let Some(seg) = host
@@ -333,13 +324,13 @@ impl WorkspaceChangesSurface {
             .get_mut(CHANGES_QUOTE_BTN_ID)
             .and_then(|c| c.component_mut::<Button>())
         {
-            quote_btn.button.state.disabled = model.diff_text.trim().is_empty();
+            quote_btn.set_disabled(model.diff_text.trim().is_empty());
         }
         if let Some(commit_btn) = host
             .get_mut(CHANGES_COMMIT_BTN_ID)
             .and_then(|c| c.component_mut::<Button>())
         {
-            commit_btn.button.state.disabled = !model.can_commit;
+            commit_btn.set_disabled(!model.can_commit);
         }
     }
 

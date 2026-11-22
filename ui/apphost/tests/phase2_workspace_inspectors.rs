@@ -152,7 +152,7 @@ fn phase2_files_changes_fencing_and_capability_gated_commit() {
             .unwrap()
             .component::<Button>()
             .unwrap();
-        assert!(commit_btn.button.state.disabled);
+        assert!(commit_btn.is_disabled());
     });
 
     // Re-enable mutations -> commit succeeds & status updates.
@@ -251,8 +251,8 @@ fn phase2_artifact_multiple_factory_quote_staleness_png_gpu_and_cap_std_fs() {
             .unwrap()
             .component::<TextContent>()
             .unwrap()
-            .text
-            .clone();
+            .text()
+            .to_owned();
         assert!(txt.contains("CAD 模型定制视图"));
     });
 

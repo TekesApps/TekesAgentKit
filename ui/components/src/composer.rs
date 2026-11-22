@@ -18,7 +18,7 @@ use tekes_ui_controls::{
         CurveSubtreeCapability, MenuContent, MenuEntry, SeparatorContent, StackContent,
         TextFieldContent, TextSubmitPolicy, TextViewport,
     },
-    extended::{Axis, Stack},
+    extended::Axis,
     layout::{AlignmentOverride, Insets, MeasuredChild, layout_measured_children},
 };
 use tekes_ui_scene::{Rect, Scene, Size};
@@ -103,8 +103,8 @@ impl RunSetupToolbar {
         if !entries.is_empty() {
             let _ = menu.set_entries(entries);
         }
-        menu.trigger.variant = ButtonVariant::Panel;
-        menu.trigger.set_transparent_chrome(true);
+        menu.set_trigger_variant(ButtonVariant::Panel);
+        menu.set_trigger_transparent_chrome(true);
         menu
     }
 
@@ -130,8 +130,8 @@ impl RunSetupToolbar {
             } else {
                 format!("{prefix}{label} ▾")
             };
-            if menu.trigger.label != desired {
-                menu.trigger.set_contents(desired);
+            if menu.trigger().label() != desired {
+                menu.set_trigger_contents(desired);
             }
         }
         let entries: Vec<MenuEntry> = labels
@@ -153,7 +153,7 @@ impl RunSetupToolbar {
         if cache.is_empty()
             && let Some(m) = host.get(id).and_then(|c| c.component::<MenuContent>())
         {
-            *cache = m.labels.clone();
+            *cache = m.labels().to_vec();
         }
     }
 
@@ -170,46 +170,32 @@ impl RunSetupToolbar {
 
         let primary_row = Content::new(
             COMPOSER_PRIMARY_ROW_ID,
-            StackContent {
-                model: Stack {
-                    axis: Axis::Horizontal,
-                    gap: Spacing::Tight.value(),
-                },
-                flexible_child: None,
-                children: vec![
+            StackContent::horizontal(
+                Spacing::Tight.value(),
+                vec![
                     Content::new(COMPOSER_HARNESS_SELECT_ID, harness_menu),
                     Content::new(COMPOSER_PRESET_SELECT_ID, preset_menu),
                 ],
-            },
+            ),
         );
 
         let secondary_row = Content::new(
             COMPOSER_SECONDARY_ROW_ID,
-            StackContent {
-                model: Stack {
-                    axis: Axis::Horizontal,
-                    gap: Spacing::Tight.value(),
-                },
-                flexible_child: None,
-                children: vec![
+            StackContent::horizontal(
+                Spacing::Tight.value(),
+                vec![
                     Content::new(COMPOSER_MODEL_SELECT_ID, model_menu),
                     Content::new(COMPOSER_EFFORT_SELECT_ID, effort_menu),
                 ],
-            },
+            ),
         );
 
-        let controls = StackContent {
-            model: Stack {
-                axis: Axis::Horizontal,
-                gap: Spacing::Tight.value(),
-            },
-            flexible_child: None,
-            children: vec![primary_row, secondary_row],
-        }
-        .into_content_with_distribution(
-            COMPOSER_CONTROLS_STACK_ID,
-            MainAxisDistribution::SpaceBetween,
-        );
+        let controls =
+            StackContent::horizontal(Spacing::Tight.value(), vec![primary_row, secondary_row])
+                .into_content_with_distribution(
+                    COMPOSER_CONTROLS_STACK_ID,
+                    MainAxisDistribution::SpaceBetween,
+                );
 
         let sep = Content::new(
             RUN_SETUP_TOOLBAR_SEP_ID,
@@ -218,14 +204,7 @@ impl RunSetupToolbar {
 
         Content::new(
             RUN_SETUP_TOOLBAR_ROOT_ID,
-            StackContent {
-                model: Stack {
-                    axis: Axis::Vertical,
-                    gap: Spacing::Tight.value(),
-                },
-                flexible_child: None,
-                children: vec![controls, sep],
-            },
+            StackContent::vertical(Spacing::Tight.value(), vec![controls, sep]),
         )
     }
 
@@ -252,12 +231,12 @@ impl RunSetupToolbar {
             {
                 match width_mode {
                     ResponsiveWidthMode::Compact => {
-                        controls.model.axis = Axis::Vertical;
-                        controls.model.gap = 2.0;
+                        controls.set_axis(Axis::Vertical);
+                        controls.set_gap(2.0);
                     }
                     ResponsiveWidthMode::Expanded => {
-                        controls.model.axis = Axis::Horizontal;
-                        controls.model.gap = Spacing::Tight.value();
+                        controls.set_axis(Axis::Horizontal);
+                        controls.set_gap(Spacing::Tight.value());
                     }
                 }
             }
@@ -611,9 +590,7 @@ impl ComposerSurface {
 
     fn make_editor() -> Content {
         let mut field = TextFieldContent::new("输入消息", "");
-        field
-            .surface
-            .set_presentation(TextSurfacePresentation::Content);
+        field.set_surface_presentation(TextSurfacePresentation::Content);
         field.show_metadata = false;
         field.viewport = TextViewport::Grow {
             min: 28.0,
@@ -627,34 +604,20 @@ impl ComposerSurface {
     pub fn build_content() -> Content {
         let queued_slot = Content::new(
             COMPOSER_QUEUED_SLOT_ID,
-            StackContent {
-                model: Stack {
-                    axis: Axis::Vertical,
-                    gap: 0.0,
-                },
-                flexible_child: None,
-                children: Vec::new(),
-            },
+            StackContent::vertical(0.0, Vec::new()),
         );
 
         let chips_row = Content::new(
             COMPOSER_CHIPS_ROW_ID,
-            StackContent {
-                model: Stack {
-                    axis: Axis::Horizontal,
-                    gap: Spacing::Tight.value(),
-                },
-                flexible_child: None,
-                children: Vec::new(),
-            },
+            StackContent::horizontal(Spacing::Tight.value(), Vec::new()),
         );
 
         let mut attach_btn = Button::new("+").with_accessible_name("Attach context");
-        attach_btn.variant = ButtonVariant::Panel;
+        attach_btn.set_variant(ButtonVariant::Panel);
         attach_btn.set_transparent_chrome(true);
 
         let mut send_btn = Button::new("↑").with_accessible_name("Send");
-        send_btn.variant = ButtonVariant::Primary;
+        send_btn.set_variant(ButtonVariant::Primary);
 
         let input_row = Content::new(
             COMPOSER_INPUT_ROW_ID,
@@ -671,14 +634,7 @@ impl ComposerSurface {
 
         let card_body = Content::new(
             COMPOSER_CARD_STACK_ID,
-            StackContent {
-                model: Stack {
-                    axis: Axis::Vertical,
-                    gap: 0.0,
-                },
-                flexible_child: None,
-                children: vec![chips_row, input_row],
-            },
+            StackContent::vertical(0.0, vec![chips_row, input_row]),
         );
         let card = card_panel(
             COMPOSER_CARD_ID,
@@ -688,14 +644,7 @@ impl ComposerSurface {
 
         Content::new(
             COMPOSER_ROOT_ID,
-            StackContent {
-                model: Stack {
-                    axis: Axis::Vertical,
-                    gap: 0.0,
-                },
-                flexible_child: None,
-                children: vec![queued_slot, card],
-            },
+            StackContent::vertical(0.0, vec![queued_slot, card]),
         )
     }
 
@@ -747,37 +696,30 @@ impl ComposerSurface {
                 item.text
             };
             let mut steer_btn = Button::new("Steer");
-            steer_btn.variant = ButtonVariant::Panel;
+            steer_btn.set_variant(ButtonVariant::Panel);
             steer_btn.set_transparent_chrome(true);
             let mut remove_btn = Button::new("×").with_accessible_name("Remove queued prompt");
-            remove_btn.variant = ButtonVariant::Panel;
+            remove_btn.set_variant(ButtonVariant::Panel);
             remove_btn.set_transparent_chrome(true);
 
             let actions = Content::new(
                 ComponentId(421),
-                StackContent {
-                    model: Stack {
-                        axis: Axis::Horizontal,
-                        gap: Spacing::Micro.value(),
-                    },
-                    flexible_child: None,
-                    children: vec![
+                StackContent::horizontal(
+                    Spacing::Micro.value(),
+                    vec![
                         Content::new(COMPOSER_QUEUED_STEER_BTN_ID, steer_btn),
                         Content::new(COMPOSER_QUEUED_REMOVE_BTN_ID, remove_btn),
                     ],
-                },
+                ),
             );
-            let row = StackContent {
-                model: Stack {
-                    axis: Axis::Horizontal,
-                    gap: Spacing::Tight.value(),
-                },
-                flexible_child: Some(COMPOSER_QUEUED_TEXT_ID),
-                children: vec![
+            let row = StackContent::horizontal(
+                Spacing::Tight.value(),
+                vec![
                     Content::new(COMPOSER_QUEUED_TEXT_ID, secondary_text(preview)),
                     actions,
                 ],
-            }
+            )
+            .with_flexible_child(COMPOSER_QUEUED_TEXT_ID)
             .into_content_with_distribution(
                 COMPOSER_QUEUED_ROW_ID,
                 MainAxisDistribution::SpaceBetween,
@@ -795,11 +737,11 @@ impl ComposerSurface {
             .get_mut(COMPOSER_ROOT_ID)
             .and_then(|c| c.component_mut::<StackContent>())
         {
-            root.model.gap = if has_queued {
+            root.set_gap(if has_queued {
                 Spacing::Tight.value()
             } else {
                 0.0
-            };
+            });
         }
     }
 
@@ -847,9 +789,9 @@ impl ComposerSurface {
             && !field.composing()
             && field.text() != snapshot.draft.text
         {
-            let baseline = field.surface.input().external_baseline();
+            let baseline = field.input().external_baseline();
             self.synced_rev = self.synced_rev.saturating_add(1).max(1);
-            let _ = field.surface.apply_external_value(
+            let _ = field.apply_external_value(
                 &baseline,
                 &DraftRevision {
                     identity: destination
@@ -874,17 +816,17 @@ impl ComposerSurface {
             .and_then(|c| c.component_mut::<Button>())
         {
             if can_cancel {
-                if send.label != "■" {
+                if send.label() != "■" {
                     send.set_contents("■");
                     send.set_accessible_name(Some("Stop".to_owned()));
                 }
-                send.button.state.disabled = false;
+                send.set_disabled(false);
             } else {
-                if send.label != "↑" {
+                if send.label() != "↑" {
                     send.set_contents("↑");
                     send.set_accessible_name(Some("Send".to_owned()));
                 }
-                send.button.state.disabled = !snapshot.can_submit || composing_now;
+                send.set_disabled(!snapshot.can_submit || composing_now);
             }
         }
     }
@@ -924,7 +866,7 @@ impl ComposerSurface {
             self.chip_targets
                 .insert(id, ChipTarget::Artifact(art.id().to_owned()));
             let mut btn = Button::new(label);
-            btn.variant = ButtonVariant::Panel;
+            btn.set_variant(ButtonVariant::Panel);
             children.push(Content::new(id, btn));
         }
 
@@ -944,7 +886,7 @@ impl ComposerSurface {
             self.chip_targets
                 .insert(id, ChipTarget::Annotation(ann.id.clone()));
             let mut btn = Button::new(tag);
-            btn.variant = ButtonVariant::Panel;
+            btn.set_variant(ButtonVariant::Panel);
             children.push(Content::new(id, btn));
         }
 
@@ -954,11 +896,11 @@ impl ComposerSurface {
             .get_mut(COMPOSER_CARD_STACK_ID)
             .and_then(|c| c.component_mut::<StackContent>())
         {
-            card_stack.model.gap = if has_chips {
+            card_stack.set_gap(if has_chips {
                 Spacing::Tight.value()
             } else {
                 0.0
-            };
+            });
         }
     }
 

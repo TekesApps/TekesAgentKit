@@ -25,7 +25,6 @@ use tekes_ui_controls::{
         Component, ComponentId, Content, ContentEvent, ContentHost, IconImage, IconRenderError,
         StackContent, TextContent, TextFieldContent, WithIconRenderer,
     },
-    extended::{Axis, Stack},
     layout_view::IconRenderer,
 };
 use tekes_ui_scene::{ImageId, Rect, Scene};
@@ -46,17 +45,7 @@ impl IconRenderer for TestIcons {
 }
 
 fn layout_host_for_focus(host: &mut ContentHost) {
-    let dummy_root = Content::new(
-        ComponentId(1),
-        StackContent {
-            model: Stack {
-                axis: Axis::Vertical,
-                gap: 0.0,
-            },
-            flexible_child: None,
-            children: Vec::new(),
-        },
-    );
+    let dummy_root = Content::new(ComponentId(1), StackContent::vertical(0.0, Vec::new()));
     let dummy = LocalContainer::new("dummy", dummy_root).unwrap();
     let app =
         AppWindow::from_containers(vec![dummy.into()], PresentationOptions::new("dummy")).unwrap();
@@ -93,15 +82,15 @@ fn topology_b_domain_first_cad_viewer_and_zero_rebuild_focus_swap() {
                 .unwrap()
                 .component::<TextContent>()
                 .unwrap()
-                .text
+                .text()
                 .contains("specs/chassis.cadspec")
         );
-        let custom_txt = &h
+        let custom_txt = h
             .get(DOMAIN_CAD_CUSTOM_SLOT_ID)
             .unwrap()
             .component::<TextContent>()
             .unwrap()
-            .text;
+            .text();
         assert!(custom_txt.contains("CAD 参数规范定制面板"));
     });
 
@@ -198,8 +187,8 @@ fn topology_b_domain_first_cad_viewer_and_zero_rebuild_focus_swap() {
             .component_mut::<TextFieldContent>()
             .unwrap();
         assert!(Component::composing(field));
-        let baseline = field.surface.input().external_baseline();
-        let conflict = field.surface.apply_external_value(
+        let baseline = field.input().external_baseline();
+        let conflict = field.apply_external_value(
             &baseline,
             &DraftRevision {
                 identity: "topology-b-swap".to_owned(),

@@ -2362,8 +2362,8 @@ dependencies = [
 
 [[package]]
 name = "tekes-ui-app-host"
-version = "0.4.1"
-source = "git+https://github.com/TekesApps/TekesUI.git?rev=4ed5b2912e34312a0e0d9e9780d09482b58a0cc6#4ed5b2912e34312a0e0d9e9780d09482b58a0cc6"
+version = "0.4.7"
+source = "git+https://github.com/TekesApps/TekesUI.git?rev=563c2a505fe8bbf149930b1e3ae39778900c2d7f#563c2a505fe8bbf149930b1e3ae39778900c2d7f"
 dependencies = [
  "anyhow",
  "resvg",
@@ -2386,8 +2386,8 @@ dependencies = [
 
 [[package]]
 name = "tekes-ui-app-protocol"
-version = "0.4.1"
-source = "git+https://github.com/TekesApps/TekesUI.git?rev=4ed5b2912e34312a0e0d9e9780d09482b58a0cc6#4ed5b2912e34312a0e0d9e9780d09482b58a0cc6"
+version = "0.4.7"
+source = "git+https://github.com/TekesApps/TekesUI.git?rev=563c2a505fe8bbf149930b1e3ae39778900c2d7f#563c2a505fe8bbf149930b1e3ae39778900c2d7f"
 dependencies = [
  "serde",
  "serde_json",
@@ -2395,8 +2395,8 @@ dependencies = [
 
 [[package]]
 name = "tekes-ui-controls"
-version = "0.4.1"
-source = "git+https://github.com/TekesApps/TekesUI.git?rev=4ed5b2912e34312a0e0d9e9780d09482b58a0cc6#4ed5b2912e34312a0e0d9e9780d09482b58a0cc6"
+version = "0.4.7"
+source = "git+https://github.com/TekesApps/TekesUI.git?rev=563c2a505fe8bbf149930b1e3ae39778900c2d7f#563c2a505fe8bbf149930b1e3ae39778900c2d7f"
 dependencies = [
  "resvg",
  "serde_json",
@@ -2413,8 +2413,8 @@ dependencies = [
 
 [[package]]
 name = "tekes-ui-design-export"
-version = "0.4.1"
-source = "git+https://github.com/TekesApps/TekesUI.git?rev=4ed5b2912e34312a0e0d9e9780d09482b58a0cc6#4ed5b2912e34312a0e0d9e9780d09482b58a0cc6"
+version = "0.4.7"
+source = "git+https://github.com/TekesApps/TekesUI.git?rev=563c2a505fe8bbf149930b1e3ae39778900c2d7f#563c2a505fe8bbf149930b1e3ae39778900c2d7f"
 dependencies = [
  "serde_json",
  "sha2 0.11.1",
@@ -2422,13 +2422,13 @@ dependencies = [
 
 [[package]]
 name = "tekes-ui-icons"
-version = "0.4.1"
-source = "git+https://github.com/TekesApps/TekesUI.git?rev=4ed5b2912e34312a0e0d9e9780d09482b58a0cc6#4ed5b2912e34312a0e0d9e9780d09482b58a0cc6"
+version = "0.4.7"
+source = "git+https://github.com/TekesApps/TekesUI.git?rev=563c2a505fe8bbf149930b1e3ae39778900c2d7f#563c2a505fe8bbf149930b1e3ae39778900c2d7f"
 
 [[package]]
 name = "tekes-ui-macos-bridge"
-version = "0.4.1"
-source = "git+https://github.com/TekesApps/TekesUI.git?rev=4ed5b2912e34312a0e0d9e9780d09482b58a0cc6#4ed5b2912e34312a0e0d9e9780d09482b58a0cc6"
+version = "0.4.7"
+source = "git+https://github.com/TekesApps/TekesUI.git?rev=563c2a505fe8bbf149930b1e3ae39778900c2d7f#563c2a505fe8bbf149930b1e3ae39778900c2d7f"
 dependencies = [
  "tekes-ui-controls",
  "tekes-ui-platform-macos",
@@ -2439,8 +2439,8 @@ dependencies = [
 
 [[package]]
 name = "tekes-ui-module-runtime"
-version = "0.4.1"
-source = "git+https://github.com/TekesApps/TekesUI.git?rev=4ed5b2912e34312a0e0d9e9780d09482b58a0cc6#4ed5b2912e34312a0e0d9e9780d09482b58a0cc6"
+version = "0.4.7"
+source = "git+https://github.com/TekesApps/TekesUI.git?rev=563c2a505fe8bbf149930b1e3ae39778900c2d7f#563c2a505fe8bbf149930b1e3ae39778900c2d7f"
 dependencies = [
  "anyhow",
  "mach2",
@@ -2458,13 +2458,13 @@ dependencies = [
 
 [[package]]
 name = "tekes-ui-motion"
-version = "0.4.1"
-source = "git+https://github.com/TekesApps/TekesUI.git?rev=4ed5b2912e34312a0e0d9e9780d09482b58a0cc6#4ed5b2912e34312a0e0d9e9780d09482b58a0cc6"
+version = "0.4.7"
+source = "git+https://github.com/TekesApps/TekesUI.git?rev=563c2a505fe8bbf149930b1e3ae39778900c2d7f#563c2a505fe8bbf149930b1e3ae39778900c2d7f"
 
 [[package]]
 name = "tekes-ui-platform-macos"
-version = "0.4.1"
-source = "git+https://github.com/TekesApps/TekesUI.git?rev=4ed5b2912e34312a0e0d9e9780d09482b58a0cc6#4ed5b2912e34312a0e0d9e9780d09482b58a0cc6"
+version = "0.4.7"
+source = "git+https://github.com/TekesApps/TekesUI.git?rev=563c2a505fe8bbf149930b1e3ae39778900c2d7f#563c2a505fe8bbf149930b1e3ae39778900c2d7f"
 dependencies = [
  "block2",
  "objc2",
@@ -2478,8 +2478,8 @@ dependencies = [
 
 [[package]]
 name = "tekes-ui-render"
-version = "0.4.1"
-source = "git+https://github.com/TekesApps/TekesUI.git?rev=4ed5b2912e34312a0e0d9e9780d09482b58a0cc6#4ed5b2912e34312a0e0d9e9780d09482b58a0cc6"
+version = "0.4.7"
+source = "git+https://github.com/TekesApps/TekesUI.git?rev=563c2a505fe8bbf149930b1e3ae39778900c2d7f#563c2a505fe8bbf149930b1e3ae39778900c2d7f"
 dependencies = [
  "anyhow",
  "bytemuck",
@@ -2498,16 +2498,16 @@ dependencies = [
 
 [[package]]
 name = "tekes-ui-scene"
-version = "0.4.1"
-source = "git+https://github.com/TekesApps/TekesUI.git?rev=4ed5b2912e34312a0e0d9e9780d09482b58a0cc6#4ed5b2912e34312a0e0d9e9780d09482b58a0cc6"
+version = "0.4.7"
+source = "git+https://github.com/TekesApps/TekesUI.git?rev=563c2a505fe8bbf149930b1e3ae39778900c2d7f#563c2a505fe8bbf149930b1e3ae39778900c2d7f"
 dependencies = [
  "tekes-ui-tokens",
 ]
 
 [[package]]
 name = "tekes-ui-settings"
-version = "0.4.1"
-source = "git+https://github.com/TekesApps/TekesUI.git?rev=4ed5b2912e34312a0e0d9e9780d09482b58a0cc6#4ed5b2912e34312a0e0d9e9780d09482b58a0cc6"
+version = "0.4.7"
+source = "git+https://github.com/TekesApps/TekesUI.git?rev=563c2a505fe8bbf149930b1e3ae39778900c2d7f#563c2a505fe8bbf149930b1e3ae39778900c2d7f"
 dependencies = [
  "serde",
  "tekes-ui-controls",
@@ -2518,8 +2518,8 @@ dependencies = [
 
 [[package]]
 name = "tekes-ui-text"
-version = "0.4.1"
-source = "git+https://github.com/TekesApps/TekesUI.git?rev=4ed5b2912e34312a0e0d9e9780d09482b58a0cc6#4ed5b2912e34312a0e0d9e9780d09482b58a0cc6"
+version = "0.4.7"
+source = "git+https://github.com/TekesApps/TekesUI.git?rev=563c2a505fe8bbf149930b1e3ae39778900c2d7f#563c2a505fe8bbf149930b1e3ae39778900c2d7f"
 dependencies = [
  "objc2-core-foundation",
  "objc2-core-graphics",
@@ -2531,8 +2531,8 @@ dependencies = [
 
 [[package]]
 name = "tekes-ui-tokens"
-version = "0.4.1"
-source = "git+https://github.com/TekesApps/TekesUI.git?rev=4ed5b2912e34312a0e0d9e9780d09482b58a0cc6#4ed5b2912e34312a0e0d9e9780d09482b58a0cc6"
+version = "0.4.7"
+source = "git+https://github.com/TekesApps/TekesUI.git?rev=563c2a505fe8bbf149930b1e3ae39778900c2d7f#563c2a505fe8bbf149930b1e3ae39778900c2d7f"
 dependencies = [
  "serde_json",
  "tekes-ui-design-export",

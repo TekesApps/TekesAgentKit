@@ -34,7 +34,6 @@ use tekes_ui_controls::composition::{
     Component, ComponentId, Content, ContentEvent, ContentHost, IconImage, IconRenderError,
     StackContent, TextContent, TextFieldContent, WithIconRenderer,
 };
-use tekes_ui_controls::extended::{Axis, Stack};
 use tekes_ui_controls::layout_view::IconRenderer;
 use tekes_ui_render::Renderer;
 use tekes_ui_scene::{Rect, Scene};
@@ -58,17 +57,7 @@ impl IconRenderer for TestIcons {
 }
 
 fn layout_host_for_focus(host: &mut ContentHost) {
-    let dummy_root = Content::new(
-        ComponentId(1),
-        StackContent {
-            model: Stack {
-                axis: Axis::Vertical,
-                gap: 0.0,
-            },
-            flexible_child: None,
-            children: Vec::new(),
-        },
-    );
+    let dummy_root = Content::new(ComponentId(1), StackContent::vertical(0.0, Vec::new()));
     let dummy = tekes_ui_app_host::LocalContainer::new("dummy", dummy_root).unwrap();
     let app =
         AppWindow::from_containers(vec![dummy.into()], PresentationOptions::new("dummy")).unwrap();
@@ -130,13 +119,13 @@ fn setup_phase3_workbench() -> (
 fn host_contains_text(host: &ContentHost, id: ComponentId, needle: &str) -> bool {
     host.get(id)
         .and_then(|n| n.component::<TextContent>())
-        .is_some_and(|t| t.text.contains(needle))
+        .is_some_and(|t| t.text().contains(needle))
 }
 
 fn stack_children_count(host: &ContentHost, stack_id: ComponentId) -> usize {
     host.get(stack_id)
         .and_then(|n| n.component::<StackContent>())
-        .map_or(0, |s| s.children.len())
+        .map_or(0, |s| s.children().len())
 }
 
 fn any_text_field_in_host(host: &ContentHost, root: ComponentId) -> bool {
@@ -149,7 +138,7 @@ fn any_text_field_in_host(host: &ContentHost, root: ComponentId) -> bool {
             return true;
         }
         if let Some(s) = node.component::<StackContent>() {
-            for child in &s.children {
+            for child in s.children() {
                 stack.push(child.id());
             }
         }

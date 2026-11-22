@@ -11,7 +11,6 @@ use tekes_ui_controls::{
         Button, Component, ComponentId, Content, ContentActionKind, ContentActionRecord,
         ContentHost, ScrollContent, StackContent, TextContent, TextFieldContent,
     },
-    extended::{Axis, Stack},
 };
 use tekes_ui_tokens::Spacing;
 
@@ -84,37 +83,16 @@ impl TasksQueueSurface {
 
         let edit_row = Content::new(
             TASKS_QUEUE_EDIT_ROW_ID,
-            StackContent {
-                model: Stack {
-                    axis: Axis::Horizontal,
-                    gap: Spacing::Tight.value(),
-                },
-                flexible_child: None,
-                children: Vec::new(),
-            },
+            StackContent::horizontal(Spacing::Tight.value(), Vec::new()),
         );
 
         let queue_section = Content::new(
             TASKS_QUEUE_SECTION_ID,
-            StackContent {
-                model: Stack {
-                    axis: Axis::Vertical,
-                    gap: Spacing::Tight.value(),
-                },
-                flexible_child: None,
-                children: Vec::new(),
-            },
+            StackContent::vertical(Spacing::Tight.value(), Vec::new()),
         );
         let jobs_section = Content::new(
             TASKS_JOBS_SECTION_ID,
-            StackContent {
-                model: Stack {
-                    axis: Axis::Vertical,
-                    gap: Spacing::Tight.value(),
-                },
-                flexible_child: None,
-                children: Vec::new(),
-            },
+            StackContent::vertical(Spacing::Tight.value(), Vec::new()),
         );
 
         let scroll = Content::new(
@@ -123,28 +101,21 @@ impl TasksQueueSurface {
                 ScrollArea::default(),
                 Content::new(
                     TASKS_STACK_ID,
-                    StackContent {
-                        model: Stack {
-                            axis: Axis::Vertical,
-                            gap: Spacing::Regular.value(),
-                        },
-                        flexible_child: None,
-                        children: vec![queue_section, jobs_section],
-                    },
+                    StackContent::vertical(
+                        Spacing::Regular.value(),
+                        vec![queue_section, jobs_section],
+                    ),
                 ),
             ),
         );
 
         Content::new(
             TASKS_ROOT_ID,
-            StackContent {
-                model: Stack {
-                    axis: Axis::Vertical,
-                    gap: Spacing::Regular.value(),
-                },
-                flexible_child: Some(TASKS_SCROLL_ID),
-                children: vec![header, error, edit_row, scroll],
-            },
+            StackContent::vertical(
+                Spacing::Regular.value(),
+                vec![header, error, edit_row, scroll],
+            )
+            .with_flexible_child(TASKS_SCROLL_ID),
         )
     }
 
@@ -155,11 +126,11 @@ impl TasksQueueSurface {
         let edit_input = Content::new(TASKS_QUEUE_EDIT_INPUT_ID, edit_field);
 
         let mut apply_btn = Button::new("Update");
-        apply_btn.variant = ButtonVariant::Primary;
+        apply_btn.set_variant(ButtonVariant::Primary);
         let apply = Content::new(TASKS_QUEUE_APPLY_BTN_ID, apply_btn);
 
         let mut rm_btn = Button::new("Remove");
-        rm_btn.variant = ButtonVariant::Quiet;
+        rm_btn.set_variant(ButtonVariant::Quiet);
         rm_btn.set_transparent_chrome(true);
         let remove = Content::new(TASKS_QUEUE_REMOVE_BTN_ID, rm_btn);
 
@@ -173,7 +144,7 @@ impl TasksQueueSurface {
                 .get_mut(TASKS_QUEUE_EDIT_ROW_ID)
                 .and_then(|n| n.component_mut::<StackContent>())
             {
-                row.flexible_child = Some(TASKS_QUEUE_EDIT_INPUT_ID);
+                row.set_flexible_child(Some(TASKS_QUEUE_EDIT_INPUT_ID));
             }
             replace_stack_children(
                 host,
@@ -185,7 +156,7 @@ impl TasksQueueSurface {
                 .get_mut(TASKS_QUEUE_EDIT_ROW_ID)
                 .and_then(|n| n.component_mut::<StackContent>())
             {
-                row.flexible_child = None;
+                row.set_flexible_child(None);
             }
             replace_stack_children(host, TASKS_QUEUE_EDIT_ROW_ID, Vec::new());
         }
@@ -202,9 +173,9 @@ impl TasksQueueSurface {
             && !field.composing()
             && field.text() != new_text
         {
-            let baseline = field.surface.input().external_baseline();
+            let baseline = field.input().external_baseline();
             self.synced_rev = self.synced_rev.saturating_add(1).max(1);
-            let _ = field.surface.apply_external_value(
+            let _ = field.apply_external_value(
                 &baseline,
                 &DraftRevision {
                     identity: identity.to_owned(),
@@ -226,9 +197,9 @@ impl TasksQueueSurface {
         let header_text = format!("队列 {} · 任务 {}", model.queued.len(), model.tasks.len());
         if let Some(node) = host.get_mut(TASKS_HEADER_ID)
             && let Some(txt) = node.component_mut::<TextContent>()
-            && txt.text != header_text
+            && txt.text() != header_text
         {
-            txt.text = header_text;
+            txt.set_text(header_text);
         }
 
         if self.last_error_sig != model.error {
@@ -236,7 +207,7 @@ impl TasksQueueSurface {
             if let Some(node) = host.get_mut(TASKS_ERROR_ID)
                 && let Some(txt) = node.component_mut::<TextContent>()
             {
-                txt.text = model.error.clone().unwrap_or_default();
+                txt.set_text(model.error.clone().unwrap_or_default());
             }
         }
 
@@ -261,7 +232,7 @@ impl TasksQueueSurface {
             if let Some(node) = host.get_mut(btn_id)
                 && let Some(btn) = node.component_mut::<Button>()
             {
-                btn.button.state.disabled = !can_mutate;
+                btn.set_disabled(!can_mutate);
             }
         }
 
@@ -318,21 +289,15 @@ impl TasksQueueSurface {
                 if task.child_session_id.is_some() {
                     let btn_id = ComponentId(TASKS_TASK_OPEN_BTN_BASE + idx_u64);
                     let mut btn = Button::new("Open Trace");
-                    btn.variant = ButtonVariant::Quiet;
+                    btn.set_variant(ButtonVariant::Quiet);
                     btn.set_transparent_chrome(true);
                     row_children.push(Content::new(btn_id, btn));
                     self.open_targets.push((btn_id, task.clone()));
                 }
                 task_children.push(Content::new(
                     row_id,
-                    StackContent {
-                        model: Stack {
-                            axis: Axis::Horizontal,
-                            gap: Spacing::Tight.value(),
-                        },
-                        flexible_child: Some(content_id),
-                        children: row_children,
-                    },
+                    StackContent::horizontal(Spacing::Tight.value(), row_children)
+                        .with_flexible_child(content_id),
                 ));
             }
         }

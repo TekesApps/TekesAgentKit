@@ -13,9 +13,7 @@ use tekes_ui_controls::{
         ListDisplayUpdate, ListIntentKind, ListRowDisplay, ScrollContent, SelectableListContent,
         StackContent, TextContent,
     },
-    extended::{
-        Axis, KeyedListItem, KeyedListSnapshot, ListBudget, ListDatasetKey, ListItemKey, Stack,
-    },
+    extended::{KeyedListItem, KeyedListSnapshot, ListBudget, ListDatasetKey, ListItemKey},
 };
 use tekes_ui_tokens::{Spacing, proposal::layout::MainAxisDistribution};
 
@@ -99,14 +97,7 @@ impl SummarySurface {
         let tasks_header = Content::new(SUMMARY_TASKS_HEADER_ID, caption_text("Tasks"));
         let tasks_stack = Content::new(
             SUMMARY_TASKS_STACK_ID,
-            StackContent {
-                model: Stack {
-                    axis: Axis::Vertical,
-                    gap: Spacing::Tight.value(),
-                },
-                flexible_child: None,
-                children: Vec::new(),
-            },
+            StackContent::vertical(Spacing::Tight.value(), Vec::new()),
         );
 
         let nav_header = Content::new(SUMMARY_NAV_HEADER_ID, caption_text("SubAgents & Artifacts"));
@@ -129,25 +120,14 @@ impl SummarySurface {
 
         let host_sections = Content::new(
             SUMMARY_HOST_SECTIONS_ID,
-            StackContent {
-                model: Stack {
-                    axis: Axis::Vertical,
-                    gap: Spacing::Regular.value(),
-                },
-                flexible_child: None,
-                children: Vec::new(),
-            },
+            StackContent::vertical(Spacing::Regular.value(), Vec::new()),
         );
 
         let stack = Content::new(
             SUMMARY_STACK_ID,
-            StackContent {
-                model: Stack {
-                    axis: Axis::Vertical,
-                    gap: Spacing::Relaxed.value(),
-                },
-                flexible_child: None,
-                children: vec![
+            StackContent::vertical(
+                Spacing::Relaxed.value(),
+                vec![
                     header,
                     usage_caption,
                     tasks_header,
@@ -156,7 +136,7 @@ impl SummarySurface {
                     Content::new(SUMMARY_LIST_ID, nav_list),
                     host_sections,
                 ],
-            },
+            ),
         );
 
         Content::new(
@@ -204,7 +184,7 @@ impl SummarySurface {
                 .get_mut(SUMMARY_USAGE_CAPTION_ID)
                 .and_then(|c| c.component_mut::<TextContent>())
             {
-                caption.text = usage_text;
+                caption.set_text(usage_text);
             }
         }
 
@@ -321,9 +301,9 @@ impl SummarySurface {
         if let Some(hdr) = host
             .get_mut(SUMMARY_NAV_HEADER_ID)
             .and_then(|c| c.component_mut::<TextContent>())
-            && hdr.text != nav_title
+            && hdr.text() != nav_title
         {
-            hdr.text = nav_title.to_owned();
+            hdr.set_text(nav_title);
         }
 
         if sig != self.last_list_sig {
@@ -376,17 +356,14 @@ impl SummarySurface {
                 let row_id = alloc();
                 let key_id = alloc();
                 let val_id = alloc();
-                let row = StackContent {
-                    model: Stack {
-                        axis: Axis::Horizontal,
-                        gap: Spacing::Tight.value(),
-                    },
-                    flexible_child: Some(key_id),
-                    children: vec![
+                let row = StackContent::horizontal(
+                    Spacing::Tight.value(),
+                    vec![
                         Content::new(key_id, secondary_text(k.clone())),
                         Content::new(val_id, TextContent::new(v.clone())),
                     ],
-                }
+                )
+                .with_flexible_child(key_id)
                 .into_content_with_distribution(row_id, MainAxisDistribution::SpaceBetween);
                 children.push(row);
             }

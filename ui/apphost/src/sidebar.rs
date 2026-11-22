@@ -121,7 +121,6 @@ impl SessionSidebarContainer {
         )?;
         container.with_host(&mut SidebarSurface::bind_context_menu);
         Ok(container
-            .title("Tekes")
             .switcher_icon("tekes-side-bar")
             .content_padding(0.0))
     }

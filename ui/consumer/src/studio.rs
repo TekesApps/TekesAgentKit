@@ -33,11 +33,11 @@ use tekes_ui_controls::{
         IconContent, PanelContent, RichContent, RichDocument, ScrollContent, StackContent,
         TextContent, TreeContent, TreeContentNode, TreeDisplayUpdate,
     },
-    extended::{Axis, KeyedTreeNode, Stack, TreeDatasetKey, TreeNodeKey},
+    extended::{KeyedTreeNode, TreeDatasetKey, TreeNodeKey},
     layout::Insets,
 };
 use tekes_ui_render::Renderer;
-use tekes_ui_tokens::{Spacing, Theme, proposal::TextRole};
+use tekes_ui_tokens::{Spacing, Theme};
 
 pub const DOMAIN_OUTLINER_SHELL_ID: ComponentId = ComponentId(2000);
 pub const DOMAIN_OUTLINER_HEADER_ID: ComponentId = ComponentId(2001);
@@ -159,17 +159,14 @@ fn domain_tree_row(base_id: u64, icon_name: &str, label: &str) -> TreeDisplayUpd
     let text_id = ComponentId(base_id + 2);
     TreeDisplayUpdate::Replace(Content::new(
         ComponentId(base_id),
-        StackContent {
-            model: Stack {
-                axis: Axis::Horizontal,
-                gap: Spacing::Tight.value(),
-            },
-            flexible_child: Some(text_id),
-            children: vec![
+        StackContent::horizontal(
+            Spacing::Tight.value(),
+            vec![
                 Content::new(ComponentId(base_id + 1), icon),
                 Content::new(text_id, TextContent::new(label)),
             ],
-        },
+        )
+        .with_flexible_child(text_id),
     ))
 }
 
@@ -229,54 +226,34 @@ pub fn build_domain_outliner() -> Result<LocalContainer> {
             Content::new(DOMAIN_OUTLINER_TREE_ID, tree),
         ),
     );
-    let caption = Content::new(
-        DOMAIN_OUTLINER_CAPTION_ID,
-        TextContent {
-            text: "ASSEMBLY".into(),
-            role: TextRole::UiCaption,
-        },
-    );
+    let caption = Content::new(DOMAIN_OUTLINER_CAPTION_ID, TextContent::caption("ASSEMBLY"));
     let root = Content::new(
         DOMAIN_OUTLINER_SHELL_ID,
-        StackContent {
-            model: Stack {
-                axis: Axis::Vertical,
-                gap: Spacing::Regular.value(),
-            },
-            flexible_child: Some(DOMAIN_OUTLINER_TREE_SCROLL_ID),
-            children: vec![
+        StackContent::vertical(
+            Spacing::Regular.value(),
+            vec![
                 Content::new(
                     DOMAIN_OUTLINER_HEADER_ID,
-                    TextContent {
-                        text: "Chassis-MK4".into(),
-                        role: TextRole::UiHeading,
-                    },
+                    TextContent::heading("Chassis-MK4"),
                 ),
                 caption,
                 scroll,
             ],
-        },
+        )
+        .with_flexible_child(DOMAIN_OUTLINER_TREE_SCROLL_ID),
     );
     Ok(LocalContainer::new("domain-outliner", root)?
         .title("Explorer")
         .switcher_icon("tekes-files")
+        .content_padding(Spacing::Loose.value())
         .toolbar_host(ContainerToolbarHost::Window))
 }
 
 pub fn build_domain_canvas(workbench: SharedAgentWorkbench) -> Result<LocalContainer> {
-    let header = Content::new(
-        DOMAIN_CANVAS_HEADER_ID,
-        TextContent {
-            text: "Chassis-MK4".into(),
-            role: TextRole::UiHeading,
-        },
-    );
+    let header = Content::new(DOMAIN_CANVAS_HEADER_ID, TextContent::heading("Chassis-MK4"));
     let metrics = Content::new(
         DOMAIN_CANVAS_METRICS_ID,
-        TextContent {
-            text: "Al-7075-T6 · 4.20 mm wall · SF 2.85 · ISO 2768-mK".into(),
-            role: TextRole::UiCaption,
-        },
+        TextContent::caption("Al-7075-T6 · 4.20 mm wall · SF 2.85 · ISO 2768-mK"),
     );
     let spec_rich = Content::new(
         DOMAIN_CANVAS_SPEC_RICH_ID,
@@ -295,40 +272,33 @@ pub fn build_domain_canvas(workbench: SharedAgentWorkbench) -> Result<LocalConta
     let spec_card = Content::new(DOMAIN_CANVAS_SPEC_PANEL_ID, spec_panel);
 
     let mut quote_btn = Button::new("Quote Spec to Agent");
-    quote_btn.variant = ButtonVariant::Primary;
+    quote_btn.set_variant(ButtonVariant::Primary);
     let mut open_spec_btn = Button::new("Inspect .cadspec");
-    open_spec_btn.variant = ButtonVariant::Panel;
+    open_spec_btn.set_variant(ButtonVariant::Panel);
     let actions = Content::new(
         DOMAIN_CANVAS_ACTIONS_ROW_ID,
-        StackContent {
-            model: Stack {
-                axis: Axis::Horizontal,
-                gap: Spacing::Tight.value(),
-            },
-            flexible_child: None,
-            children: vec![
+        StackContent::horizontal(
+            Spacing::Tight.value(),
+            vec![
                 Content::new(DOMAIN_CANVAS_QUOTE_BTN_ID, quote_btn),
                 Content::new(DOMAIN_CANVAS_OPEN_SPEC_BTN_ID, open_spec_btn),
             ],
-        },
+        ),
     );
 
     let root = Content::new(
         DOMAIN_CANVAS_SHELL_ID,
-        StackContent {
-            model: Stack {
-                axis: Axis::Vertical,
-                gap: Spacing::Relaxed.value(),
-            },
-            flexible_child: None,
-            children: vec![header, metrics, actions, spec_card],
-        },
+        StackContent::vertical(
+            Spacing::Relaxed.value(),
+            vec![header, metrics, actions, spec_card],
+        ),
     );
 
     let wb_action = workbench;
     Ok(LocalContainer::new("domain-canvas", root)?
         .title("Chassis-MK4")
         .switcher_icon("tekes-tab-summary")
+        .content_padding(Spacing::Loose.value())
         .on_action(
             move |_host: &mut ContentHost, records: Vec<ContentActionRecord>| {
                 for rec in records {

@@ -11,7 +11,6 @@ use tekes_ui_controls::{
         ContentHost, ScrollContent, SegmentedControlContent, StackContent, SwitchContent,
         TextContent,
     },
-    extended::{Axis, Stack},
 };
 use tekes_ui_tokens::{Spacing, proposal::layout::MainAxisDistribution};
 
@@ -83,28 +82,18 @@ impl HarnessSettingsSurface {
                 "Refresh settings",
             ),
         );
-        let header_row = StackContent {
-            model: Stack {
-                axis: Axis::Horizontal,
-                gap: Spacing::Tight.value(),
-            },
-            flexible_child: Some(SETTINGS_HEADER_ID),
-            children: vec![header, refresh],
-        }
-        .into_content_with_distribution(SETTINGS_HEADER_ROW_ID, MainAxisDistribution::SpaceBetween);
+        let header_row = StackContent::horizontal(Spacing::Tight.value(), vec![header, refresh])
+            .with_flexible_child(SETTINGS_HEADER_ID)
+            .into_content_with_distribution(
+                SETTINGS_HEADER_ROW_ID,
+                MainAxisDistribution::SpaceBetween,
+            );
 
         let banner = Content::new(SETTINGS_BANNER_ID, secondary_text(""));
 
         let fields_stack = Content::new(
             SETTINGS_FIELDS_STACK_ID,
-            StackContent {
-                model: Stack {
-                    axis: Axis::Vertical,
-                    gap: Spacing::Regular.value(),
-                },
-                flexible_child: None,
-                children: Vec::new(),
-            },
+            StackContent::vertical(Spacing::Regular.value(), Vec::new()),
         );
         let scroll = Content::new(
             SETTINGS_FIELDS_SCROLL_ID,
@@ -113,14 +102,8 @@ impl HarnessSettingsSurface {
 
         Content::new(
             SETTINGS_ROOT_ID,
-            StackContent {
-                model: Stack {
-                    axis: Axis::Vertical,
-                    gap: Spacing::Regular.value(),
-                },
-                flexible_child: Some(SETTINGS_FIELDS_SCROLL_ID),
-                children: vec![header_row, banner, scroll],
-            },
+            StackContent::vertical(Spacing::Regular.value(), vec![header_row, banner, scroll])
+                .with_flexible_child(SETTINGS_FIELDS_SCROLL_ID),
         )
     }
 
@@ -138,9 +121,9 @@ impl HarnessSettingsSurface {
         );
         if let Some(node) = host.get_mut(SETTINGS_HEADER_ID)
             && let Some(txt) = node.component_mut::<TextContent>()
-            && txt.text != header_text
+            && txt.text() != header_text
         {
-            txt.text = header_text;
+            txt.set_text(header_text);
         }
 
         let banner_text = if let Some(err) = &model.error {
@@ -152,9 +135,9 @@ impl HarnessSettingsSurface {
         };
         if let Some(node) = host.get_mut(SETTINGS_BANNER_ID)
             && let Some(txt) = node.component_mut::<TextContent>()
-            && txt.text != banner_text
+            && txt.text() != banner_text
         {
-            txt.text = banner_text;
+            txt.set_text(banner_text);
         }
 
         let sig = format!("{model:?}");
@@ -172,17 +155,14 @@ impl HarnessSettingsSurface {
             let ctrl_id = ComponentId(SETTINGS_CONTROL_BASE + idx_u64);
 
             if field.is_secret {
-                let row = StackContent {
-                    model: Stack {
-                        axis: Axis::Horizontal,
-                        gap: Spacing::Tight.value(),
-                    },
-                    flexible_child: Some(label_id),
-                    children: vec![
+                let row = StackContent::horizontal(
+                    Spacing::Tight.value(),
+                    vec![
                         Content::new(label_id, label_text(&field.label)),
                         Content::new(ctrl_id, secondary_text("••••••••")),
                     ],
-                }
+                )
+                .with_flexible_child(label_id)
                 .into_content_with_distribution(row_id, MainAxisDistribution::SpaceBetween);
                 children.push(row);
                 continue;
@@ -193,7 +173,7 @@ impl HarnessSettingsSurface {
                 SettingFieldKindModel::Boolean => {
                     let current = field.display_value == "true";
                     let mut sw = SwitchContent::new(&field.label, current);
-                    sw.model.disabled = !field_enabled;
+                    sw.set_disabled(!field_enabled);
                     if field_enabled {
                         self.controls.push((
                             ctrl_id,
@@ -224,14 +204,10 @@ impl HarnessSettingsSurface {
                     }
                     children.push(Content::new(
                         row_id,
-                        StackContent {
-                            model: Stack {
-                                axis: Axis::Vertical,
-                                gap: Spacing::Micro.value(),
-                            },
-                            flexible_child: None,
-                            children: vec![label, Content::new(ctrl_id, seg)],
-                        },
+                        StackContent::vertical(
+                            Spacing::Micro.value(),
+                            vec![label, Content::new(ctrl_id, seg)],
+                        ),
                     ));
                 }
                 SettingFieldKindModel::Integer => {
@@ -241,8 +217,8 @@ impl HarnessSettingsSurface {
                         TextContent::new(format!("{}: {}", field.label, field.display_value)),
                     );
                     let mut btn = Button::new("+1");
-                    btn.variant = ButtonVariant::Panel;
-                    btn.button.state.disabled = !field_enabled;
+                    btn.set_variant(ButtonVariant::Panel);
+                    btn.set_disabled(!field_enabled);
                     if field_enabled {
                         self.controls.push((
                             ctrl_id,
@@ -252,29 +228,23 @@ impl HarnessSettingsSurface {
                             },
                         ));
                     }
-                    let row = StackContent {
-                        model: Stack {
-                            axis: Axis::Horizontal,
-                            gap: Spacing::Tight.value(),
-                        },
-                        flexible_child: Some(label_id),
-                        children: vec![label, Content::new(ctrl_id, btn)],
-                    }
+                    let row = StackContent::horizontal(
+                        Spacing::Tight.value(),
+                        vec![label, Content::new(ctrl_id, btn)],
+                    )
+                    .with_flexible_child(label_id)
                     .into_content_with_distribution(row_id, MainAxisDistribution::SpaceBetween);
                     children.push(row);
                 }
                 _ => {
-                    let row = StackContent {
-                        model: Stack {
-                            axis: Axis::Horizontal,
-                            gap: Spacing::Tight.value(),
-                        },
-                        flexible_child: Some(label_id),
-                        children: vec![
+                    let row = StackContent::horizontal(
+                        Spacing::Tight.value(),
+                        vec![
                             Content::new(label_id, label_text(&field.label)),
                             Content::new(ctrl_id, secondary_text(&field.display_value)),
                         ],
-                    }
+                    )
+                    .with_flexible_child(label_id)
                     .into_content_with_distribution(row_id, MainAxisDistribution::SpaceBetween);
                     children.push(row);
                 }
@@ -301,13 +271,13 @@ impl HarnessSettingsSurface {
         for (id, target) in &mut self.controls {
             if let ControlTarget::Bool { key, current } = target
                 && let Some(sw) = host.get(*id).and_then(|c| c.component::<SwitchContent>())
-                && sw.model.checked != *current
+                && sw.is_checked() != *current
             {
-                *current = sw.model.checked;
+                *current = sw.is_checked();
                 toggled_ids.push(*id);
                 intents.push(HarnessSettingsIntent::ToggleBool {
                     key: key.clone(),
-                    next_value: sw.model.checked,
+                    next_value: sw.is_checked(),
                 });
             }
         }

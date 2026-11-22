@@ -14,7 +14,6 @@ use tekes_ui_controls::{
         RichContent, RichDocument, ScrollContent, StackContent, TextContent, TextFieldContent,
         TextSubmitPolicy, TextViewport,
     },
-    extended::{Axis, Stack},
     layout::Insets,
 };
 use tekes_ui_tokens::{Spacing, proposal::layout::MainAxisDistribution};
@@ -61,36 +60,26 @@ impl SideChatSurface {
         let error = Content::new(SIDECHAT_ERROR_ID, secondary_text(""));
 
         let mut create_btn = Button::new("New SideChat");
-        create_btn.variant = ButtonVariant::Panel;
+        create_btn.set_variant(ButtonVariant::Panel);
         let create = Content::new(SIDECHAT_CREATE_BTN_ID, create_btn);
 
         let mut close_btn = Button::new("Close");
-        close_btn.variant = ButtonVariant::Quiet;
+        close_btn.set_variant(ButtonVariant::Quiet);
         close_btn.set_transparent_chrome(true);
-        close_btn.button.state.disabled = true;
+        close_btn.set_disabled(true);
         let close = Content::new(SIDECHAT_CLOSE_BTN_ID, close_btn);
 
         let actions = Content::new(
             SIDECHAT_ACTIONS_ROW_ID,
-            StackContent {
-                model: Stack {
-                    axis: Axis::Horizontal,
-                    gap: Spacing::Tight.value(),
-                },
-                flexible_child: None,
-                children: vec![access_badge, create, close],
-            },
+            StackContent::horizontal(Spacing::Tight.value(), vec![access_badge, create, close]),
         );
 
-        let header_row = StackContent {
-            model: Stack {
-                axis: Axis::Horizontal,
-                gap: Spacing::Tight.value(),
-            },
-            flexible_child: Some(SIDECHAT_HEADER_ID),
-            children: vec![header, actions],
-        }
-        .into_content_with_distribution(SIDECHAT_HEADER_ROW_ID, MainAxisDistribution::SpaceBetween);
+        let header_row = StackContent::horizontal(Spacing::Tight.value(), vec![header, actions])
+            .with_flexible_child(SIDECHAT_HEADER_ID)
+            .into_content_with_distribution(
+                SIDECHAT_HEADER_ROW_ID,
+                MainAxisDistribution::SpaceBetween,
+            );
 
         let rich = Content::new(
             SIDECHAT_RICH_ID,
@@ -109,9 +98,7 @@ impl SideChatSurface {
         );
 
         let mut field = TextFieldContent::new("SideChat 独立输入", "");
-        field
-            .surface
-            .set_presentation(TextSurfacePresentation::Content);
+        field.set_surface_presentation(TextSurfacePresentation::Content);
         field.show_metadata = false;
         field.viewport = TextViewport::Grow {
             min: 28.0,
@@ -122,20 +109,14 @@ impl SideChatSurface {
         let editor = Content::new(SIDECHAT_EDITOR_ID, field);
 
         let mut send_btn = Button::new("↑").with_accessible_name("Send SideChat prompt");
-        send_btn.variant = ButtonVariant::Primary;
-        send_btn.button.state.disabled = true;
+        send_btn.set_variant(ButtonVariant::Primary);
+        send_btn.set_disabled(true);
         let send = Content::new(SIDECHAT_SEND_BTN_ID, send_btn);
 
         let composer_row = Content::new(
             SIDECHAT_COMPOSER_ROW_ID,
-            StackContent {
-                model: Stack {
-                    axis: Axis::Horizontal,
-                    gap: Spacing::Tight.value(),
-                },
-                flexible_child: Some(SIDECHAT_EDITOR_ID),
-                children: vec![editor, send],
-            },
+            StackContent::horizontal(Spacing::Tight.value(), vec![editor, send])
+                .with_flexible_child(SIDECHAT_EDITOR_ID),
         );
         let composer_panel = card_panel(
             SIDECHAT_COMPOSER_PANEL_ID,
@@ -145,14 +126,11 @@ impl SideChatSurface {
 
         Content::new(
             SIDECHAT_ROOT_ID,
-            StackContent {
-                model: Stack {
-                    axis: Axis::Vertical,
-                    gap: Spacing::Regular.value(),
-                },
-                flexible_child: Some(SIDECHAT_SCROLL_ID),
-                children: vec![header_row, error, scroll, composer_panel],
-            },
+            StackContent::vertical(
+                Spacing::Regular.value(),
+                vec![header_row, error, scroll, composer_panel],
+            )
+            .with_flexible_child(SIDECHAT_SCROLL_ID),
         )
     }
 
@@ -168,9 +146,9 @@ impl SideChatSurface {
             && !field.composing()
             && field.text() != text
         {
-            let baseline = field.surface.input().external_baseline();
+            let baseline = field.input().external_baseline();
             self.draft_rev = self.draft_rev.saturating_add(1).max(1);
-            let _ = field.surface.apply_external_value(
+            let _ = field.apply_external_value(
                 &baseline,
                 &DraftRevision {
                     identity: identity.to_owned(),
@@ -204,7 +182,7 @@ impl SideChatSurface {
             if let Some(node) = host.get_mut(SIDECHAT_HEADER_ID)
                 && let Some(txt) = node.component_mut::<TextContent>()
             {
-                txt.text = header_text;
+                txt.set_text(header_text);
             }
         }
 
@@ -222,7 +200,7 @@ impl SideChatSurface {
             if let Some(node) = host.get_mut(SIDECHAT_ACCESS_BADGE_ID)
                 && let Some(txt) = node.component_mut::<TextContent>()
             {
-                txt.text = access_label.to_owned();
+                txt.set_text(access_label);
             }
         }
 
@@ -235,7 +213,7 @@ impl SideChatSurface {
             if let Some(node) = host.get_mut(SIDECHAT_ERROR_ID)
                 && let Some(txt) = node.component_mut::<TextContent>()
             {
-                txt.text = err_str;
+                txt.set_text(err_str);
             }
         }
 
@@ -249,17 +227,17 @@ impl SideChatSurface {
         if let Some(node) = host.get_mut(SIDECHAT_CREATE_BTN_ID)
             && let Some(btn) = node.component_mut::<Button>()
         {
-            btn.button.state.disabled = !can_create;
+            btn.set_disabled(!can_create);
         }
         if let Some(node) = host.get_mut(SIDECHAT_CLOSE_BTN_ID)
             && let Some(btn) = node.component_mut::<Button>()
         {
-            btn.button.state.disabled = !can_send;
+            btn.set_disabled(!can_send);
         }
         if let Some(node) = host.get_mut(SIDECHAT_SEND_BTN_ID)
             && let Some(btn) = node.component_mut::<Button>()
         {
-            btn.button.state.disabled = !can_send;
+            btn.set_disabled(!can_send);
         }
 
         let md = match (run_snapshot, access) {

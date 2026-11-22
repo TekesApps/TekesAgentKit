@@ -3,7 +3,8 @@
 use std::sync::Arc;
 use std::time::Duration;
 use tekes_agent_apphost::{
-    AgentRunContainer, AppHostWakeHub, SessionSidebarContainer, SharedAgentWorkbench,
+    AgentRunContainer, AppHostWakeHub, RUN_TOOLBAR_APPROVAL_CMD, RUN_TOOLBAR_EFFORT_CMD,
+    RUN_TOOLBAR_HARNESS_CMD, RUN_TOOLBAR_MODEL_CMD, SessionSidebarContainer, SharedAgentWorkbench,
     SummaryContainer,
 };
 use tekes_agent_components_ui::{
@@ -12,8 +13,8 @@ use tekes_agent_components_ui::{
     COMPOSER_MODEL_SELECT_ID, COMPOSER_PRESET_SELECT_ID, COMPOSER_SEND_BTN_ID,
     RUN_SETUP_TOOLBAR_ROOT_ID, ResponsiveWidthMode, SIDEBAR_FILTER_ID, SIDEBAR_LIST_ID,
     SIDEBAR_PIN_BTN_ID, SUMMARY_HEADER_ID, TRANSCRIPT_EARLIER_BTN_ID, TRANSCRIPT_LATEST_BTN_ID,
-    TRANSCRIPT_READER_ID, TRANSCRIPT_RICH_BODY_ID, TRANSCRIPT_THINKING_DISC_ID, TranscriptReader,
-    TranscriptSurface,
+    TRANSCRIPT_READER_ID, TRANSCRIPT_RICH_BODY_ID, TRANSCRIPT_ROOT_ID, TRANSCRIPT_THINKING_DISC_ID,
+    TranscriptReader, TranscriptSurface,
 };
 use tekes_agent_contract::EndpointConnector;
 use tekes_agent_presentation::{ComposerDestination, RunController, RunScope};
@@ -22,12 +23,15 @@ use tekes_agent_ui_bindings::{
     DEFAULT_MAIN_SESSION_ID, FixtureSessionEndpoint, RunWorkbenchBinding, SECONDARY_SESSION_ID,
     SidebarFilterMode, UiWakeNotifier,
 };
-use tekes_ui_app_host::{AppWindow, Container, OthersOptions, PresentationOptions};
+use tekes_ui_app_host::{
+    AppWindow, Container, LocalToolbarAction, LocalToolbarItem, OthersOptions, PresentationOptions,
+};
 use tekes_ui_controls::{
     ReadingAnchorUpdate,
     composition::{
-        Button, ContentEvent, KeyedSelectableListContent, MenuContent, RichContent, StackContent,
-        TextContent, TextFieldContent,
+        AccessibilityAction, Button, Component, ComponentId, Content, ContentActionPayload,
+        ContentActionSource, ContentEvent, ContentHost, ContentRole, KeyedSelectableListContent,
+        MenuContent, MenuEntry, RichContent, StackContent, TextContent, TextFieldContent,
     },
     extended::Axis,
 };
@@ -384,8 +388,7 @@ fn phase1_streaming_load_earlier_anchor_compact_layout_and_gpu_render() {
             .unwrap()
             .component::<StackContent>()
             .unwrap()
-            .model
-            .axis,
+            .axis(),
         Axis::Vertical
     );
     setup_toolbar.sync(
@@ -403,8 +406,7 @@ fn phase1_streaming_load_earlier_anchor_compact_layout_and_gpu_render() {
             .unwrap()
             .component::<StackContent>()
             .unwrap()
-            .model
-            .axis,
+            .axis(),
         Axis::Horizontal
     );
 
@@ -414,17 +416,115 @@ fn phase1_streaming_load_earlier_anchor_compact_layout_and_gpu_render() {
         .unwrap()
         .component::<MenuContent>()
         .unwrap();
-    assert_eq!(harness_menu.trigger.label, "Tekes");
+    assert_eq!(harness_menu.trigger().label(), "Tekes");
     assert!(
-        format!("{:?}", harness_menu.menu).contains("disabled: true"),
+        format!("{harness_menu:?}").contains("disabled: true"),
         "expected locked harness items to be disabled"
     );
     assert_eq!(binding.selected_harness(), "Tekes");
     binding.set_harness(1);
     assert_eq!(binding.selected_harness(), "Tekes");
 
+    // Verify Window Toolbar dynamic menus & actions on AgentRunContainer.
+    fn menu_selection_payload(
+        value: &str,
+        text: &mut TestTextBackend,
+    ) -> Option<ContentActionPayload> {
+        let mut menu = MenuContent::new("toolbar-test", vec![value.to_owned()]);
+        menu.set_entries(vec![MenuEntry::item(value, value)])
+            .unwrap();
+        let mut h = ContentHost::new(Content::new(ComponentId(1), menu)).unwrap();
+        h.set_action_events(true);
+        let open_resp = h.accessibility_action(ComponentId(1), None, AccessibilityAction::Press);
+        assert!(open_resp.consumed);
+        let rect = Rect::new(0.0, 0.0, 240.0, 240.0);
+        h.render(
+            &mut Scene::new(),
+            text,
+            rect,
+            rect,
+            Palette::from(Theme::LIGHT),
+        )
+        .unwrap();
+        let part_id = h
+            .get(ComponentId(1))
+            .unwrap()
+            .component::<MenuContent>()
+            .unwrap()
+            .semantic_parts()
+            .into_iter()
+            .find(|p| p.semantics.role == ContentRole::MenuItem)
+            .expect("rendered MenuItem semantic part")
+            .index;
+        let pick_resp =
+            h.accessibility_action(ComponentId(1), Some(part_id), AccessibilityAction::Press);
+        assert!(pick_resp.activated);
+        h.drain_action_records().into_iter().find_map(|r| r.payload)
+    }
+
+    binding.set_effort(1);
+    let initial_items = AgentRunContainer::build_toolbar_items(&workbench);
+    assert_eq!(initial_items.len(), 4);
+    match &initial_items[0] {
+        LocalToolbarItem::Menu(m) => {
+            assert_eq!(m.id, RUN_TOOLBAR_HARNESS_CMD);
+            assert_eq!(m.title, "Tekes");
+            assert!(!m.dropdown_indicator);
+            assert!(
+                m.entries
+                    .iter()
+                    .all(|e| matches!(e, MenuEntry::Item { disabled: true, .. }))
+            );
+        }
+        other => panic!("expected Harness menu item, got {other:?}"),
+    }
+    match &initial_items[1] {
+        LocalToolbarItem::Menu(m) => {
+            assert_eq!(m.id, RUN_TOOLBAR_APPROVAL_CMD);
+            assert_eq!(m.title, "Workspace Write");
+            assert!(m.dropdown_indicator);
+        }
+        other => panic!("expected Approval menu item, got {other:?}"),
+    }
+    match &initial_items[2] {
+        LocalToolbarItem::Menu(m) => {
+            assert_eq!(m.id, RUN_TOOLBAR_MODEL_CMD);
+            assert_eq!(m.title, "claude-sonnet-4");
+            assert!(m.dropdown_indicator);
+        }
+        other => panic!("expected Model menu item, got {other:?}"),
+    }
+    match &initial_items[3] {
+        LocalToolbarItem::Menu(m) => {
+            assert_eq!(m.id, RUN_TOOLBAR_EFFORT_CMD);
+            assert_eq!(m.title, "Effort: Medium");
+            assert!(m.dropdown_indicator);
+        }
+        other => panic!("expected Effort menu item, got {other:?}"),
+    }
+
+    // Locked Harness ignores toolbar selection while keeping action handled.
+    let harness_action = LocalToolbarAction {
+        id: RUN_TOOLBAR_HARNESS_CMD,
+        source: ContentActionSource::Pointer,
+        payload: menu_selection_payload("Pi", &mut text),
+    };
+    assert!(AgentRunContainer::handle_toolbar_action(
+        &workbench,
+        &harness_action
+    ));
+    assert_eq!(binding.selected_harness(), "Tekes");
+
     // Effort selection updates binding & commits `reasoningEffort` to draft settings.
-    binding.set_effort(2);
+    let effort_action = LocalToolbarAction {
+        id: RUN_TOOLBAR_EFFORT_CMD,
+        source: ContentActionSource::Pointer,
+        payload: menu_selection_payload("High", &mut text),
+    };
+    assert!(AgentRunContainer::handle_toolbar_action(
+        &workbench,
+        &effort_action
+    ));
     assert_eq!(binding.selected_effort(), "High");
     assert_eq!(
         binding
@@ -436,16 +536,46 @@ fn phase1_streaming_load_earlier_anchor_compact_layout_and_gpu_render() {
         Some("high")
     );
 
+    // Model and Approval toolbar actions update binding & refreshed Window Toolbar titles.
+    let model_action = LocalToolbarAction {
+        id: RUN_TOOLBAR_MODEL_CMD,
+        source: ContentActionSource::Pointer,
+        payload: menu_selection_payload("gpt-5", &mut text),
+    };
+    assert!(AgentRunContainer::handle_toolbar_action(
+        &workbench,
+        &model_action
+    ));
+    assert_eq!(binding.selected_model(), "gpt-5");
+
+    let approval_action = LocalToolbarAction {
+        id: RUN_TOOLBAR_APPROVAL_CMD,
+        source: ContentActionSource::Pointer,
+        payload: menu_selection_payload("Read Only", &mut text),
+    };
+    assert!(AgentRunContainer::handle_toolbar_action(
+        &workbench,
+        &approval_action
+    ));
+    assert_eq!(binding.selected_preset(), "Read Only");
+
+    let refreshed_items = AgentRunContainer::build_toolbar_items(&workbench);
+    assert_eq!(refreshed_items[1].title(), "Read Only");
+    assert_eq!(refreshed_items[2].title(), "gpt-5");
+    assert_eq!(refreshed_items[3].title(), "Effort: High");
+
     // Assemble full 3-column AppWindow (`nav_bar`, `focus`, `others` List card) & render Metal GPU frame.
     let sidebar = SessionSidebarContainer::build("agent-sidebar", workbench.clone()).unwrap();
     let mut run = AgentRunContainer::build("agent-run", workbench.clone()).unwrap();
     run.with_host(&mut |h| {
-        assert!(h.get(RUN_SETUP_TOOLBAR_ROOT_ID).is_some());
-        assert!(h.get(COMPOSER_HARNESS_SELECT_ID).is_some());
-        assert!(h.get(COMPOSER_PRESET_SELECT_ID).is_some());
-        assert!(h.get(COMPOSER_MODEL_SELECT_ID).is_some());
-        assert!(h.get(COMPOSER_EFFORT_SELECT_ID).is_some());
+        assert!(h.get(TRANSCRIPT_ROOT_ID).is_some());
+        assert!(h.get(COMPOSER_CARD_ID).is_some());
         assert!(h.get(COMPOSER_INPUT_ROW_ID).is_some());
+        assert!(h.get(RUN_SETUP_TOOLBAR_ROOT_ID).is_none());
+        assert!(h.get(COMPOSER_HARNESS_SELECT_ID).is_none());
+        assert!(h.get(COMPOSER_PRESET_SELECT_ID).is_none());
+        assert!(h.get(COMPOSER_MODEL_SELECT_ID).is_none());
+        assert!(h.get(COMPOSER_EFFORT_SELECT_ID).is_none());
     });
     let summary =
         SummaryContainer::build_list_card("agent-summary", 280.0, workbench.clone()).unwrap();

@@ -27,17 +27,17 @@ tekes-agent-components-ui = { path = "components" }
 tekes-agent-ui-bindings = { path = "bindings" }
 tekes-agent-apphost = { path = "apphost" }
 
-tekes-ui-controls = { git = "https://github.com/TekesApps/TekesUI.git", rev = "4ed5b2912e34312a0e0d9e9780d09482b58a0cc6", features = ["svg-icons", "bitmap-images", "syntax-highlighting"] }
-tekes-ui-scene = { git = "https://github.com/TekesApps/TekesUI.git", rev = "4ed5b2912e34312a0e0d9e9780d09482b58a0cc6" }
-tekes-ui-tokens = { git = "https://github.com/TekesApps/TekesUI.git", rev = "4ed5b2912e34312a0e0d9e9780d09482b58a0cc6" }
-tekes-ui-text = { git = "https://github.com/TekesApps/TekesUI.git", rev = "4ed5b2912e34312a0e0d9e9780d09482b58a0cc6" }
-tekes-ui-motion = { git = "https://github.com/TekesApps/TekesUI.git", rev = "4ed5b2912e34312a0e0d9e9780d09482b58a0cc6" }
-tekes-ui-render = { git = "https://github.com/TekesApps/TekesUI.git", rev = "4ed5b2912e34312a0e0d9e9780d09482b58a0cc6", features = ["macos-shared-surface"] }
-tekes-ui-platform-macos = { git = "https://github.com/TekesApps/TekesUI.git", rev = "4ed5b2912e34312a0e0d9e9780d09482b58a0cc6" }
-tekes-ui-icons = { git = "https://github.com/TekesApps/TekesUI.git", rev = "4ed5b2912e34312a0e0d9e9780d09482b58a0cc6" }
-tekes-ui-app-protocol = { git = "https://github.com/TekesApps/TekesUI.git", rev = "4ed5b2912e34312a0e0d9e9780d09482b58a0cc6" }
-tekes-ui-app-host = { git = "https://github.com/TekesApps/TekesUI.git", rev = "4ed5b2912e34312a0e0d9e9780d09482b58a0cc6" }
-tekes-ui-settings = { git = "https://github.com/TekesApps/TekesUI.git", rev = "4ed5b2912e34312a0e0d9e9780d09482b58a0cc6", features = ["ui", "fs-store"] }
+tekes-ui-controls = { git = "https://github.com/TekesApps/TekesUI.git", rev = "563c2a505fe8bbf149930b1e3ae39778900c2d7f", features = ["svg-icons", "bitmap-images", "syntax-highlighting"] }
+tekes-ui-scene = { git = "https://github.com/TekesApps/TekesUI.git", rev = "563c2a505fe8bbf149930b1e3ae39778900c2d7f" }
+tekes-ui-tokens = { git = "https://github.com/TekesApps/TekesUI.git", rev = "563c2a505fe8bbf149930b1e3ae39778900c2d7f" }
+tekes-ui-text = { git = "https://github.com/TekesApps/TekesUI.git", rev = "563c2a505fe8bbf149930b1e3ae39778900c2d7f" }
+tekes-ui-motion = { git = "https://github.com/TekesApps/TekesUI.git", rev = "563c2a505fe8bbf149930b1e3ae39778900c2d7f" }
+tekes-ui-render = { git = "https://github.com/TekesApps/TekesUI.git", rev = "563c2a505fe8bbf149930b1e3ae39778900c2d7f", features = ["macos-shared-surface"] }
+tekes-ui-platform-macos = { git = "https://github.com/TekesApps/TekesUI.git", rev = "563c2a505fe8bbf149930b1e3ae39778900c2d7f" }
+tekes-ui-icons = { git = "https://github.com/TekesApps/TekesUI.git", rev = "563c2a505fe8bbf149930b1e3ae39778900c2d7f" }
+tekes-ui-app-protocol = { git = "https://github.com/TekesApps/TekesUI.git", rev = "563c2a505fe8bbf149930b1e3ae39778900c2d7f" }
+tekes-ui-app-host = { git = "https://github.com/TekesApps/TekesUI.git", rev = "563c2a505fe8bbf149930b1e3ae39778900c2d7f" }
+tekes-ui-settings = { git = "https://github.com/TekesApps/TekesUI.git", rev = "563c2a505fe8bbf149930b1e3ae39778900c2d7f", features = ["ui", "fs-store"] }
 
 anyhow = "1"
 async-trait = "0.1"

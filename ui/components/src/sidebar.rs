@@ -14,9 +14,7 @@ use tekes_ui_controls::{
         MenuContent, MenuEntry, ScrollContent, SearchCommandKind, SearchFieldContent,
         SelectableListContent, StackContent, TextFieldContent, TextSubmitPolicy,
     },
-    extended::{
-        Axis, KeyedListItem, KeyedListSnapshot, ListBudget, ListDatasetKey, ListItemKey, Stack,
-    },
+    extended::{KeyedListItem, KeyedListSnapshot, ListBudget, ListDatasetKey, ListItemKey},
     layout::Insets,
 };
 use tekes_ui_tokens::{Spacing, proposal::layout::MainAxisDistribution};
@@ -100,42 +98,27 @@ impl SidebarSurface {
 
         let top_actions = Content::new(
             SIDEBAR_TOP_ACTIONS_ID,
-            StackContent {
-                model: Stack {
-                    axis: Axis::Horizontal,
-                    gap: Spacing::Micro.value(),
-                },
-                flexible_child: None,
-                children: vec![
+            StackContent::horizontal(
+                Spacing::Micro.value(),
+                vec![
                     Content::new(SIDEBAR_NEW_BTN_ID, new_btn),
                     Content::new(SIDEBAR_SEARCH_TOGGLE_BTN_ID, search_toggle),
                 ],
-            },
+            ),
         );
 
-        let top_bar = StackContent {
-            model: Stack {
-                axis: Axis::Horizontal,
-                gap: Spacing::Tight.value(),
-            },
-            flexible_child: None,
-            children: vec![
+        let top_bar = StackContent::horizontal(
+            Spacing::Tight.value(),
+            vec![
                 Content::new(SIDEBAR_BRAND_LABEL_ID, heading_text("Tekes")),
                 top_actions,
             ],
-        }
+        )
         .into_content_with_distribution(SIDEBAR_TOP_BAR_ID, MainAxisDistribution::SpaceBetween);
 
         let search_slot = Content::new(
             SIDEBAR_SEARCH_SLOT_ID,
-            StackContent {
-                model: Stack {
-                    axis: Axis::Vertical,
-                    gap: 0.0,
-                },
-                flexible_child: None,
-                children: Vec::new(),
-            },
+            StackContent::vertical(0.0, Vec::new()),
         );
 
         let section_caption = Content::new(SIDEBAR_SECTION_CAPTION_ID, caption_text("Projects"));
@@ -162,14 +145,7 @@ impl SidebarSurface {
 
         let rename_slot = Content::new(
             SIDEBAR_RENAME_ROW_ID,
-            StackContent {
-                model: Stack {
-                    axis: Axis::Horizontal,
-                    gap: Spacing::Tight.value(),
-                },
-                flexible_child: None,
-                children: Vec::new(),
-            },
+            StackContent::horizontal(Spacing::Tight.value(), Vec::new()),
         );
 
         let settings_btn = icon_text_button(
@@ -193,13 +169,9 @@ impl SidebarSurface {
             .expect("valid sidebar context menu entries"),
         );
 
-        StackContent {
-            model: Stack {
-                axis: Axis::Vertical,
-                gap: Spacing::Regular.value(),
-            },
-            flexible_child: Some(SIDEBAR_LIST_SCROLL_ID),
-            children: vec![
+        StackContent::vertical(
+            Spacing::Regular.value(),
+            vec![
                 top_bar,
                 search_slot,
                 section_caption,
@@ -208,7 +180,8 @@ impl SidebarSurface {
                 Content::new(SIDEBAR_SETTINGS_BTN_ID, settings_btn),
                 context_menu,
             ],
-        }
+        )
+        .with_flexible_child(SIDEBAR_LIST_SCROLL_ID)
         .into_content_with_padding(SIDEBAR_ROOT_ID, Insets::new(12.0, 12.0, 12.0, 12.0))
     }
 
@@ -250,14 +223,14 @@ impl SidebarSurface {
             input.submit_policy = TextSubmitPolicy::Enter;
             input.set_placeholder(Some("Rename thread…".to_owned()));
             let mut save_btn = Button::new("Save");
-            save_btn.variant = ButtonVariant::Primary;
+            save_btn.set_variant(ButtonVariant::Primary);
             let mut cancel_btn = Button::new("×").with_accessible_name("Cancel rename");
-            cancel_btn.variant = ButtonVariant::Quiet;
+            cancel_btn.set_variant(ButtonVariant::Quiet);
             if let Some(slot) = host
                 .get_mut(SIDEBAR_RENAME_ROW_ID)
                 .and_then(|c| c.component_mut::<StackContent>())
             {
-                slot.flexible_child = Some(SIDEBAR_RENAME_INPUT_ID);
+                slot.set_flexible_child(Some(SIDEBAR_RENAME_INPUT_ID));
             }
             replace_stack_children(
                 host,
@@ -274,7 +247,7 @@ impl SidebarSurface {
                 .get_mut(SIDEBAR_RENAME_ROW_ID)
                 .and_then(|c| c.component_mut::<StackContent>())
             {
-                slot.flexible_child = None;
+                slot.set_flexible_child(None);
             }
             replace_stack_children(host, SIDEBAR_RENAME_ROW_ID, Vec::new());
         }

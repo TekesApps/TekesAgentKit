@@ -5,9 +5,13 @@ use anyhow::Result;
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 use tekes_agent_components_ui::{AgentContainerShell, ResponsiveWidthMode};
-use tekes_ui_app_host::{ContainerContent, ContainerRenderContext, LocalContainer, navigation};
+use tekes_ui_app_host::{
+    ContainerContent, ContainerRenderContext, LocalContainer, LocalToolbarAction, LocalToolbarItem,
+    navigation,
+};
 use tekes_ui_controls::composition::{ComponentId, Content, ContentActionRecord, ContentHost};
 use tekes_ui_platform_macos::WindowWake;
+use tekes_ui_tokens::Spacing;
 
 /// Optional GPU resource hook for containers owning decoded images (inline images, artifact previews).
 pub trait ResourceContextOps {
@@ -61,6 +65,24 @@ pub trait AgentContainerAdapter {
         _command_id: u64,
     ) -> Result<()> {
         Ok(())
+    }
+
+    /// Declare dynamic window/container toolbar items for this container.
+    fn toolbar_items(
+        &mut self,
+        _workbench: &SharedAgentWorkbench,
+    ) -> Option<Vec<LocalToolbarItem>> {
+        None
+    }
+
+    /// Handle activated button or dropdown menu actions from this container's toolbar.
+    fn handle_toolbar_action(
+        &mut self,
+        _host: &mut ContentHost,
+        _workbench: &SharedAgentWorkbench,
+        _action: &LocalToolbarAction,
+    ) -> Result<bool> {
+        Ok(false)
     }
 
     fn prepare_resources(
@@ -142,6 +164,7 @@ impl<A: AgentContainerAdapter + 'static> ManagedAgentContainer<A> {
         let cmd_adapter = adapter_rc;
 
         Ok(LocalContainer::from_source(id, source)
+            .content_padding(Spacing::Loose.value())
             .on_action(move |host, records| {
                 action_adapter
                     .borrow_mut()
@@ -257,5 +280,15 @@ impl<A: AgentContainerAdapter + 'static> ContainerContent for ManagedAgentContai
     fn start_process(&mut self, wake: WindowWake) -> Result<()> {
         self.workbench.register_wake(wake);
         Ok(())
+    }
+
+    fn toolbar_items(&mut self) -> Option<Vec<LocalToolbarItem>> {
+        self.adapter.borrow_mut().toolbar_items(&self.workbench)
+    }
+
+    fn on_toolbar_action(&mut self, action: &LocalToolbarAction) -> Result<bool> {
+        self.adapter
+            .borrow_mut()
+            .handle_toolbar_action(&mut self.host, &self.workbench, action)
     }
 }

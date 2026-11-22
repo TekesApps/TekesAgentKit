@@ -295,7 +295,8 @@ def main() -> None:
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
     args = parser.parse_args()
     check_ui_boundaries(args.root)
-    print("UI_BOUNDARIES_OK static-only; TekesUI v0.4.1 pin and five-crate AppHost boundaries verified")
+    tag = json.loads((args.root / "ui/tekesui-source.json").read_text())["tag"]
+    print(f"UI_BOUNDARIES_OK static-only; TekesUI {tag} pin and five-crate AppHost boundaries verified")
 
 
 if __name__ == "__main__":

@@ -38,10 +38,8 @@ pub use transcript::{TranscriptIntent, TranscriptReader, TranscriptSurface};
 use std::collections::BTreeMap;
 use tekes_agent_presentation::{ComposerDestination, RunScope, RunSnapshot};
 use tekes_ui_controls::{
-    ButtonTextRenderer, ReadingController, TextSurface,
-    composition::*,
-    extended::{Axis, Stack},
-    layout::MeasuredChild,
+    ButtonTextRenderer, ExternalSelection, ExternalUndo, ReadingController, TextSurface,
+    composition::*, layout::MeasuredChild,
 };
 use tekes_ui_scene::{Rect, Scene, Size};
 use tekes_ui_tokens::{Palette, Spacing};
@@ -87,11 +85,16 @@ pub struct AgentText {
 }
 impl AgentText {
     fn new(transcript: bool) -> Self {
-        let mut field = TextFieldContent::new(if transcript { "会话记录" } else { "消息" }, "");
-        if transcript {
-            field.surface = TextSurface::new("", true, true);
+        let field = if transcript {
+            let mut field =
+                TextFieldContent::from_surface("会话记录", TextSurface::new("", true, true));
             field.reading = Some(ReadingController::default());
-        }
+            field.viewport = TextViewport::Fill;
+            field.show_metadata = false;
+            field
+        } else {
+            TextFieldContent::new("消息", "")
+        };
         Self {
             field,
             transcript,
@@ -107,23 +110,7 @@ impl Component for AgentText {
         ))
     }
     fn arrange(&mut self, t: &mut dyn ButtonTextRenderer, f: Rect, c: Rect) {
-        if self.transcript {
-            let scale = t.backing_scale();
-            if let Some(host) = t.text_surface_host() {
-                let type_scale = host.type_scale();
-                let role = self.field.surface.role();
-                self.field.reading.as_mut().unwrap().layout_with(
-                    &mut self.field.surface,
-                    f,
-                    Some(c),
-                    scale,
-                    type_scale,
-                    |s, w| host.shape_surface(s, role, w),
-                );
-            }
-        } else {
-            self.field.arrange(t, f, c);
-        }
+        self.field.arrange(t, f, c);
     }
     fn paint(
         &mut self,
@@ -136,8 +123,8 @@ impl Component for AgentText {
         if self.transcript {
             if let Some(host) = t.text_surface_host() {
                 self.field
-                    .surface
-                    .draw(host, s, p.palette, self.focused, false);
+                    .surface()
+                    .draw(host, s, p.palette(), self.focused, false);
             }
         } else {
             self.field.paint(s, t, f, c, p);
@@ -160,7 +147,7 @@ impl Component for AgentText {
         true
     }
     fn text_surface(&self) -> Option<&TextSurface> {
-        Some(&self.field.surface)
+        Some(self.field.surface())
     }
     fn semantic_frame(&self, f: Rect) -> Rect {
         self.field.semantic_frame(f)
@@ -203,33 +190,26 @@ impl RunSurface {
         ];
         let actions = Content::new(
             ACTIONS,
-            StackContent {
-                model: Stack {
-                    axis: Axis::Horizontal,
-                    gap: Spacing::Tight.value(),
-                },
-                flexible_child: None,
-                children: buttons
+            StackContent::horizontal(
+                Spacing::Tight.value(),
+                buttons
                     .into_iter()
                     .map(|(id, label)| Content::new(id, Button::new(label)))
                     .collect(),
-            },
+            ),
         );
         let tree = ContentHost::new(Content::new(
             ROOT,
-            StackContent {
-                model: Stack {
-                    axis: Axis::Vertical,
-                    gap: Spacing::Regular.value(),
-                },
-                flexible_child: Some(TRANSCRIPT),
-                children: vec![
+            StackContent::vertical(
+                Spacing::Regular.value(),
+                vec![
                     Content::new(STATUS, TextContent::new("正在连接")),
                     Content::new(TRANSCRIPT, AgentText::new(true)),
                     Content::new(COMPOSER, AgentText::new(false)),
                     actions,
                 ],
-            },
+            )
+            .with_flexible_child(TRANSCRIPT),
         ))
         .expect("unique Agent component IDs");
         Self {
@@ -242,14 +222,13 @@ impl RunSurface {
         }
     }
     pub fn editor(&self) -> &TextSurface {
-        &self
-            .tree
+        self.tree
             .get(COMPOSER)
             .unwrap()
             .component::<AgentText>()
             .unwrap()
             .field
-            .surface
+            .surface()
     }
     pub fn composing(&self) -> bool {
         self.editor().marked().is_some()
@@ -274,9 +253,7 @@ impl RunSurface {
             .unwrap()
             .component_mut::<Button>()
             .unwrap()
-            .button
-            .state
-            .disabled = !on;
+            .set_disabled(!on);
     }
     pub fn sync(&mut self, s: &RunSnapshot) -> Result<(), &'static str> {
         let destination = s.selection.as_ref().map(|v| v.destination.clone());
@@ -317,8 +294,11 @@ impl RunSurface {
         // draft (e.g. accepted submit) updates only when there is no active composition.
         if !self.composing() && self.editor().text() != s.draft.text {
             let editor = self.text_mut(COMPOSER);
-            *editor.field.surface.input_mut() =
-                tekes_ui_controls::TextInput::new(&s.draft.text, false);
+            let _ = editor.field.replace_value(
+                &s.draft.text,
+                ExternalSelection::Preserve,
+                ExternalUndo::Reset,
+            );
         }
         self.committed = s.draft.text.clone();
         let text = s
@@ -339,15 +319,10 @@ impl RunSurface {
             .collect::<Vec<_>>()
             .join("\n\n");
         let field = &mut self.text_mut(TRANSCRIPT).field;
-        if field.surface.text() != text {
-            field.surface.input_mut().set_text(&text);
+        if field.text() != text {
+            let _ = field.replace_value(&text, ExternalSelection::Preserve, ExternalUndo::Reset);
         }
-        self.tree
-            .get_mut(STATUS)
-            .unwrap()
-            .component_mut::<TextContent>()
-            .unwrap()
-            .text = format!(
+        let status_text = format!(
             "连接：{:?}  ·  {}{}",
             s.connection.phase,
             self.selected
@@ -363,6 +338,12 @@ impl RunSurface {
                 ""
             }
         );
+        self.tree
+            .get_mut(STATUS)
+            .unwrap()
+            .component_mut::<TextContent>()
+            .unwrap()
+            .set_text(status_text);
         self.enabled(
             SEND,
             s.can_submit && !self.composing() && !s.run.as_ref().is_some_and(|r| r.can_cancel),
@@ -400,7 +381,7 @@ impl RunSurface {
                 .unwrap()
                 .component::<Button>()
                 .unwrap()
-                .activations;
+                .activations();
             let old = self.counts.insert(id, count).unwrap_or(0);
             if count > old {
                 match id {
@@ -435,12 +416,7 @@ impl RunSurface {
         out
     }
     pub fn follow_latest(&mut self) {
-        let t = self.text_mut(TRANSCRIPT);
-        t.field
-            .reading
-            .as_mut()
-            .unwrap()
-            .follow_latest(&mut t.field.surface);
+        self.text_mut(TRANSCRIPT).field.follow_latest();
     }
     pub fn render(
         &mut self,
@@ -460,37 +436,24 @@ pub(crate) mod ui_helpers {
         composition::{
             Button, ComponentId, Content, IconContent, PanelContent, StackContent, TextContent,
         },
-        extended::{Axis, Stack},
         layout::Insets,
     };
-    use tekes_ui_tokens::{Spacing, proposal::TextRole};
+    use tekes_ui_tokens::Spacing;
 
     pub(crate) fn heading_text(text: impl Into<String>) -> TextContent {
-        TextContent {
-            text: text.into(),
-            role: TextRole::UiHeading,
-        }
+        TextContent::heading(text)
     }
 
     pub(crate) fn label_text(text: impl Into<String>) -> TextContent {
-        TextContent {
-            text: text.into(),
-            role: TextRole::UiLabel,
-        }
+        TextContent::label(text)
     }
 
     pub(crate) fn caption_text(text: impl Into<String>) -> TextContent {
-        TextContent {
-            text: text.into(),
-            role: TextRole::UiCaption,
-        }
+        TextContent::caption(text)
     }
 
     pub(crate) fn secondary_text(text: impl Into<String>) -> TextContent {
-        TextContent {
-            text: text.into(),
-            role: TextRole::UiCaption,
-        }
+        TextContent::caption(text)
     }
 
     pub(crate) fn plain_icon(id: ComponentId, icon_name: &str) -> Content {
@@ -506,7 +469,7 @@ pub(crate) mod ui_helpers {
     ) -> Button {
         let mut btn =
             Button::new(plain_icon(icon_id, icon_name)).with_accessible_name(accessible_name);
-        btn.variant = ButtonVariant::Quiet;
+        btn.set_variant(ButtonVariant::Quiet);
         btn.set_transparent_chrome(true);
         btn.set_toolbar_icon_slot(true);
         btn
@@ -522,21 +485,17 @@ pub(crate) mod ui_helpers {
         let text_str = label.into();
         let row = Content::new(
             stack_id,
-            StackContent {
-                model: Stack {
-                    axis: Axis::Horizontal,
-                    gap: Spacing::Tight.value(),
-                },
-                flexible_child: None,
-                children: vec![
+            StackContent::horizontal(
+                Spacing::Tight.value(),
+                vec![
                     plain_icon(icon_id, icon_name),
                     Content::new(text_id, label_text(text_str.clone())),
                 ],
-            },
+            ),
         );
         let mut btn = Button::new(row).with_accessible_name(text_str);
-        btn.variant = ButtonVariant::Quiet;
-        btn.content_alignment = tekes_ui_tokens::proposal::layout::MainAxisDistribution::Start;
+        btn.set_variant(ButtonVariant::Quiet);
+        btn.set_content_alignment(tekes_ui_tokens::proposal::layout::MainAxisDistribution::Start);
         btn
     }
 
@@ -549,17 +508,14 @@ pub(crate) mod ui_helpers {
     ) -> Content {
         Content::new(
             row_id,
-            StackContent {
-                model: Stack {
-                    axis: Axis::Horizontal,
-                    gap: Spacing::Tight.value(),
-                },
-                flexible_child: Some(text_id),
-                children: vec![
+            StackContent::horizontal(
+                Spacing::Tight.value(),
+                vec![
                     plain_icon(icon_id, icon_name),
                     Content::new(text_id, TextContent::new(label)),
                 ],
-            },
+            )
+            .with_flexible_child(text_id),
         )
     }
 

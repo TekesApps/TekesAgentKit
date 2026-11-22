@@ -12,7 +12,6 @@ use tekes_ui_controls::{
         Button, Content, ContentActionKind, ContentActionRecord, ContentHost, StackContent,
         TextContent,
     },
-    extended::{Axis, Stack},
 };
 use tekes_ui_tokens::{Spacing, proposal::layout::MainAxisDistribution};
 
@@ -45,9 +44,9 @@ impl ChildRunSurface {
         let status = Content::new(CHILD_RUN_STATUS_ID, caption_text("Loading…"));
 
         let mut earlier_btn = Button::new("↑ Earlier");
-        earlier_btn.variant = ButtonVariant::Quiet;
+        earlier_btn.set_variant(ButtonVariant::Quiet);
         earlier_btn.set_transparent_chrome(true);
-        earlier_btn.button.state.disabled = true;
+        earlier_btn.set_disabled(true);
         let earlier = Content::new(CHILD_RUN_EARLIER_BTN_ID, earlier_btn);
 
         let refresh = Content::new(
@@ -57,41 +56,23 @@ impl ChildRunSurface {
 
         let actions_row = Content::new(
             CHILD_RUN_ACTIONS_ROW_ID,
-            StackContent {
-                model: Stack {
-                    axis: Axis::Horizontal,
-                    gap: Spacing::Tight.value(),
-                },
-                flexible_child: None,
-                children: vec![earlier, refresh],
-            },
+            StackContent::horizontal(Spacing::Tight.value(), vec![earlier, refresh]),
         );
 
-        let header_row = StackContent {
-            model: Stack {
-                axis: Axis::Horizontal,
-                gap: Spacing::Tight.value(),
-            },
-            flexible_child: Some(CHILD_RUN_HEADER_ID),
-            children: vec![header, actions_row],
-        }
-        .into_content_with_distribution(
-            CHILD_RUN_HEADER_ROW_ID,
-            MainAxisDistribution::SpaceBetween,
-        );
+        let header_row =
+            StackContent::horizontal(Spacing::Tight.value(), vec![header, actions_row])
+                .with_flexible_child(CHILD_RUN_HEADER_ID)
+                .into_content_with_distribution(
+                    CHILD_RUN_HEADER_ROW_ID,
+                    MainAxisDistribution::SpaceBetween,
+                );
 
         let reader = Content::new(CHILD_RUN_READER_ID, TranscriptReader::new());
 
         Content::new(
             CHILD_RUN_ROOT_ID,
-            StackContent {
-                model: Stack {
-                    axis: Axis::Vertical,
-                    gap: Spacing::Regular.value(),
-                },
-                flexible_child: Some(CHILD_RUN_READER_ID),
-                children: vec![header_row, status, reader],
-            },
+            StackContent::vertical(Spacing::Regular.value(), vec![header_row, status, reader])
+                .with_flexible_child(CHILD_RUN_READER_ID),
         )
     }
 
@@ -110,7 +91,7 @@ impl ChildRunSurface {
             if let Some(node) = host.get_mut(CHILD_RUN_HEADER_ID)
                 && let Some(txt) = node.component_mut::<TextContent>()
             {
-                txt.text = header_text;
+                txt.set_text(header_text);
             }
         }
 
@@ -124,15 +105,14 @@ impl ChildRunSurface {
             if let Some(node) = host.get_mut(CHILD_RUN_STATUS_ID)
                 && let Some(txt) = node.component_mut::<TextContent>()
             {
-                txt.text = status_text;
+                txt.set_text(status_text);
             }
         }
 
         if let Some(node) = host.get_mut(CHILD_RUN_EARLIER_BTN_ID)
             && let Some(btn) = node.component_mut::<Button>()
         {
-            btn.button.state.disabled =
-                !(can_load_earlier && matches!(status, ChildRunSurfaceStatus::Ready));
+            btn.set_disabled(!(can_load_earlier && matches!(status, ChildRunSurfaceStatus::Ready)));
         }
 
         let body = match status {
