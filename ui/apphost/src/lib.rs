@@ -23,7 +23,8 @@ pub use files::WorkspaceFilesContainer;
 pub use process_components::{AgentProcessComponentDescriptor, CORE_PROCESS_COMPONENTS};
 pub use run::{
     AgentRunContainer, ComposerContainer, FOCUS_SWITCH_COMMAND, RUN_TOOLBAR_APPROVAL_CMD,
-    RUN_TOOLBAR_EFFORT_CMD, RUN_TOOLBAR_HARNESS_CMD, RUN_TOOLBAR_MODEL_CMD, TranscriptContainer,
+    RUN_TOOLBAR_EFFORT_CMD, RUN_TOOLBAR_HARNESS_CMD, RUN_TOOLBAR_MODEL_CMD,
+    RUN_TOOLBAR_SETUP_GROUP_ID, TranscriptContainer,
 };
 pub use settings::{
     AGENT_SETTINGS_SCHEMA_TOML, HarnessSettingsContainer, build_agent_settings_owner,

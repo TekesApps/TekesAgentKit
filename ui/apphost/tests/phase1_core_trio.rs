@@ -4,8 +4,8 @@ use std::sync::Arc;
 use std::time::Duration;
 use tekes_agent_apphost::{
     AgentRunContainer, AppHostWakeHub, RUN_TOOLBAR_APPROVAL_CMD, RUN_TOOLBAR_EFFORT_CMD,
-    RUN_TOOLBAR_HARNESS_CMD, RUN_TOOLBAR_MODEL_CMD, SessionSidebarContainer, SharedAgentWorkbench,
-    SummaryContainer,
+    RUN_TOOLBAR_HARNESS_CMD, RUN_TOOLBAR_MODEL_CMD, RUN_TOOLBAR_SETUP_GROUP_ID,
+    SessionSidebarContainer, SharedAgentWorkbench, SummaryContainer,
 };
 use tekes_agent_components_ui::{
     COMPOSER_ATTACH_BTN_ID, COMPOSER_CARD_ID, COMPOSER_CONTROLS_STACK_ID, COMPOSER_EDITOR_ID,
@@ -24,7 +24,8 @@ use tekes_agent_ui_bindings::{
     SidebarFilterMode, UiWakeNotifier,
 };
 use tekes_ui_app_host::{
-    AppWindow, Container, LocalToolbarAction, LocalToolbarItem, OthersOptions, PresentationOptions,
+    AppWindow, Container, LocalToolbarAction, LocalToolbarGroupOverflow, LocalToolbarItem,
+    LocalToolbarTone, OthersOptions, PresentationOptions,
 };
 use tekes_ui_controls::{
     ReadingAnchorUpdate,
@@ -464,43 +465,61 @@ fn phase1_streaming_load_earlier_anchor_compact_layout_and_gpu_render() {
 
     binding.set_effort(1);
     let initial_items = AgentRunContainer::build_toolbar_items(&workbench);
-    assert_eq!(initial_items.len(), 4);
+    assert_eq!(initial_items.len(), 1);
     match &initial_items[0] {
-        LocalToolbarItem::Menu(m) => {
-            assert_eq!(m.id, RUN_TOOLBAR_HARNESS_CMD);
-            assert_eq!(m.title, "Tekes");
-            assert!(!m.dropdown_indicator);
-            assert!(
-                m.entries
-                    .iter()
-                    .all(|e| matches!(e, MenuEntry::Item { disabled: true, .. }))
-            );
+        LocalToolbarItem::Group(group) => {
+            assert_eq!(group.id, RUN_TOOLBAR_SETUP_GROUP_ID);
+            assert!(group.divided);
+            assert_eq!(group.overflow, LocalToolbarGroupOverflow::Together);
+            assert_eq!(group.label.as_deref(), Some("Conversation setup"));
+            assert_eq!(group.items.len(), 4);
+
+            match &group.items[0] {
+                LocalToolbarItem::Menu(m) => {
+                    assert_eq!(m.id, RUN_TOOLBAR_HARNESS_CMD);
+                    assert_eq!(m.title, "");
+                    assert!(!m.title.contains("Tekes"));
+                    assert_eq!(m.icon.as_deref(), Some("tekes-app-server"));
+                    assert!(!m.dropdown_indicator);
+                    assert_eq!(m.tone, LocalToolbarTone::Secondary);
+                    assert!(
+                        m.entries
+                            .iter()
+                            .all(|e| matches!(e, MenuEntry::Item { disabled: true, .. }))
+                    );
+                }
+                other => panic!("expected Harness menu segment, got {other:?}"),
+            }
+            match &group.items[1] {
+                LocalToolbarItem::Menu(m) => {
+                    assert_eq!(m.id, RUN_TOOLBAR_APPROVAL_CMD);
+                    assert_eq!(m.title, "");
+                    assert_eq!(m.icon.as_deref(), Some("tekes-access-workspace"));
+                    assert!(!m.dropdown_indicator);
+                    assert_eq!(m.tone, LocalToolbarTone::Secondary);
+                }
+                other => panic!("expected Approval menu segment, got {other:?}"),
+            }
+            match &group.items[2] {
+                LocalToolbarItem::Menu(m) => {
+                    assert_eq!(m.id, RUN_TOOLBAR_MODEL_CMD);
+                    assert_eq!(m.title, "claude-sonnet-4");
+                    assert!(!m.dropdown_indicator);
+                    assert_eq!(m.tone, LocalToolbarTone::Secondary);
+                }
+                other => panic!("expected Model menu segment, got {other:?}"),
+            }
+            match &group.items[3] {
+                LocalToolbarItem::Menu(m) => {
+                    assert_eq!(m.id, RUN_TOOLBAR_EFFORT_CMD);
+                    assert_eq!(m.title, "Medium");
+                    assert!(!m.dropdown_indicator);
+                    assert_eq!(m.tone, LocalToolbarTone::Secondary);
+                }
+                other => panic!("expected Effort menu segment, got {other:?}"),
+            }
         }
-        other => panic!("expected Harness menu item, got {other:?}"),
-    }
-    match &initial_items[1] {
-        LocalToolbarItem::Menu(m) => {
-            assert_eq!(m.id, RUN_TOOLBAR_APPROVAL_CMD);
-            assert_eq!(m.title, "Workspace Write");
-            assert!(m.dropdown_indicator);
-        }
-        other => panic!("expected Approval menu item, got {other:?}"),
-    }
-    match &initial_items[2] {
-        LocalToolbarItem::Menu(m) => {
-            assert_eq!(m.id, RUN_TOOLBAR_MODEL_CMD);
-            assert_eq!(m.title, "claude-sonnet-4");
-            assert!(m.dropdown_indicator);
-        }
-        other => panic!("expected Model menu item, got {other:?}"),
-    }
-    match &initial_items[3] {
-        LocalToolbarItem::Menu(m) => {
-            assert_eq!(m.id, RUN_TOOLBAR_EFFORT_CMD);
-            assert_eq!(m.title, "Effort: Medium");
-            assert!(m.dropdown_indicator);
-        }
-        other => panic!("expected Effort menu item, got {other:?}"),
+        other => panic!("expected segmented toolbar group, got {other:?}"),
     }
 
     // Locked Harness ignores toolbar selection while keeping action handled.
@@ -536,7 +555,7 @@ fn phase1_streaming_load_earlier_anchor_compact_layout_and_gpu_render() {
         Some("high")
     );
 
-    // Model and Approval toolbar actions update binding & refreshed Window Toolbar titles.
+    // Model and Approval toolbar actions update binding & refreshed Window Toolbar segment icons/labels.
     let model_action = LocalToolbarAction {
         id: RUN_TOOLBAR_MODEL_CMD,
         source: ContentActionSource::Pointer,
@@ -548,21 +567,52 @@ fn phase1_streaming_load_earlier_anchor_compact_layout_and_gpu_render() {
     ));
     assert_eq!(binding.selected_model(), "gpt-5");
 
-    let approval_action = LocalToolbarAction {
+    let approval_read_only = LocalToolbarAction {
         id: RUN_TOOLBAR_APPROVAL_CMD,
         source: ContentActionSource::Pointer,
         payload: menu_selection_payload("Read Only", &mut text),
     };
     assert!(AgentRunContainer::handle_toolbar_action(
         &workbench,
-        &approval_action
+        &approval_read_only
     ));
     assert_eq!(binding.selected_preset(), "Read Only");
 
-    let refreshed_items = AgentRunContainer::build_toolbar_items(&workbench);
-    assert_eq!(refreshed_items[1].title(), "Read Only");
-    assert_eq!(refreshed_items[2].title(), "gpt-5");
-    assert_eq!(refreshed_items[3].title(), "Effort: High");
+    let refreshed_read_only = AgentRunContainer::build_toolbar_items(&workbench);
+    let LocalToolbarItem::Group(ro_group) = &refreshed_read_only[0] else {
+        panic!("expected toolbar group after read-only switch");
+    };
+    match &ro_group.items[1] {
+        LocalToolbarItem::Menu(m) => {
+            assert_eq!(m.icon.as_deref(), Some("tekes-access-read"));
+            assert_eq!(m.tone, LocalToolbarTone::Secondary);
+        }
+        other => panic!("expected Approval segment, got {other:?}"),
+    }
+    assert_eq!(ro_group.items[2].title(), "gpt-5");
+    assert_eq!(ro_group.items[3].title(), "High");
+
+    let approval_full_access = LocalToolbarAction {
+        id: RUN_TOOLBAR_APPROVAL_CMD,
+        source: ContentActionSource::Pointer,
+        payload: menu_selection_payload("Full Access", &mut text),
+    };
+    assert!(AgentRunContainer::handle_toolbar_action(
+        &workbench,
+        &approval_full_access
+    ));
+    assert_eq!(binding.selected_preset(), "Full Access");
+    let refreshed_full = AgentRunContainer::build_toolbar_items(&workbench);
+    let LocalToolbarItem::Group(full_group) = &refreshed_full[0] else {
+        panic!("expected toolbar group after full-access switch");
+    };
+    match &full_group.items[1] {
+        LocalToolbarItem::Menu(m) => {
+            assert_eq!(m.icon.as_deref(), Some("tekes-access-full"));
+            assert_eq!(m.tone, LocalToolbarTone::Warning);
+        }
+        other => panic!("expected Full Access Approval segment, got {other:?}"),
+    }
 
     // Assemble full 3-column AppWindow (`nav_bar`, `focus`, `others` List card) & render Metal GPU frame.
     let sidebar = SessionSidebarContainer::build("agent-sidebar", workbench.clone()).unwrap();

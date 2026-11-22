@@ -12,13 +12,17 @@ use tekes_agent_ui_bindings::{
     AVAILABLE_EFFORTS, AVAILABLE_HARNESSES, AVAILABLE_MODELS, AVAILABLE_PRESETS,
     ArtifactOpenRequest, WorkbenchCommand,
 };
-use tekes_ui_app_host::{LocalContainer, LocalToolbarAction, LocalToolbarItem, LocalToolbarMenu};
+use tekes_ui_app_host::{
+    LocalContainer, LocalToolbarAction, LocalToolbarGroup, LocalToolbarGroupOverflow,
+    LocalToolbarItem, LocalToolbarMenu, LocalToolbarTone,
+};
 use tekes_ui_controls::composition::{
     Content, ContentActionRecord, ContentHost, MenuEntry, StackContent,
 };
 use tekes_ui_tokens::Spacing;
 
 pub const FOCUS_SWITCH_COMMAND: u64 = 9001;
+pub const RUN_TOOLBAR_SETUP_GROUP_ID: u64 = 9100;
 pub const RUN_TOOLBAR_HARNESS_CMD: u64 = 9101;
 pub const RUN_TOOLBAR_APPROVAL_CMD: u64 = 9102;
 pub const RUN_TOOLBAR_MODEL_CMD: u64 = 9103;
@@ -45,6 +49,14 @@ impl AgentRunAdapter {
 
     fn catalog_index(catalog: &[&str], name: &str) -> usize {
         catalog.iter().position(|item| *item == name).unwrap_or(0)
+    }
+}
+
+fn approval_icon_and_tone(preset_name: &str) -> (&'static str, LocalToolbarTone) {
+    match preset_name {
+        "Read Only" => ("tekes-access-read", LocalToolbarTone::Secondary),
+        "Full Access" => ("tekes-access-full", LocalToolbarTone::Warning),
+        _ => ("tekes-access-workspace", LocalToolbarTone::Secondary),
     }
 }
 
@@ -258,48 +270,64 @@ impl AgentRunContainer {
             .copied()
             .unwrap_or("Medium");
 
-        vec![
-            LocalToolbarItem::Menu(
-                LocalToolbarMenu::new(
-                    RUN_TOOLBAR_HARNESS_CMD,
-                    harness_name,
-                    catalog_menu_entries(&AVAILABLE_HARNESSES, harness_idx, harness_locked),
-                )
-                .tooltip(if harness_locked {
-                    "Harness (locked for this thread)"
-                } else {
-                    "Harness"
-                })
-                .dropdown_indicator(!harness_locked),
-            ),
-            LocalToolbarItem::Menu(
-                LocalToolbarMenu::new(
-                    RUN_TOOLBAR_APPROVAL_CMD,
-                    preset_name,
-                    catalog_menu_entries(&AVAILABLE_PRESETS, preset_idx, false),
-                )
-                .tooltip("Approval Preset")
-                .dropdown_indicator(true),
-            ),
-            LocalToolbarItem::Menu(
-                LocalToolbarMenu::new(
-                    RUN_TOOLBAR_MODEL_CMD,
-                    model_name,
-                    catalog_menu_entries(&AVAILABLE_MODELS, model_idx, false),
-                )
-                .tooltip("Model")
-                .dropdown_indicator(true),
-            ),
-            LocalToolbarItem::Menu(
-                LocalToolbarMenu::new(
-                    RUN_TOOLBAR_EFFORT_CMD,
-                    format!("Effort: {effort_name}"),
-                    catalog_menu_entries(&AVAILABLE_EFFORTS, effort_idx, false),
-                )
-                .tooltip("Reasoning Effort")
-                .dropdown_indicator(true),
-            ),
-        ]
+        let (approval_icon, approval_tone) = approval_icon_and_tone(preset_name);
+        vec![LocalToolbarItem::Group(
+            LocalToolbarGroup::new(
+                RUN_TOOLBAR_SETUP_GROUP_ID,
+                vec![
+                    LocalToolbarItem::Menu(
+                        LocalToolbarMenu::new(
+                            RUN_TOOLBAR_HARNESS_CMD,
+                            "",
+                            catalog_menu_entries(&AVAILABLE_HARNESSES, harness_idx, harness_locked),
+                        )
+                        .icon("tekes-app-server")
+                        .tooltip(if harness_locked {
+                            format!("Harness: {harness_name} (locked for this thread)")
+                        } else {
+                            format!("Harness: {harness_name}")
+                        })
+                        .dropdown_indicator(false)
+                        .tone(LocalToolbarTone::Secondary),
+                    ),
+                    LocalToolbarItem::Menu(
+                        LocalToolbarMenu::new(
+                            RUN_TOOLBAR_APPROVAL_CMD,
+                            "",
+                            catalog_menu_entries(&AVAILABLE_PRESETS, preset_idx, false),
+                        )
+                        .icon(approval_icon)
+                        .tooltip(format!("Approval: {preset_name}"))
+                        .dropdown_indicator(false)
+                        .tone(approval_tone),
+                    ),
+                    LocalToolbarItem::Menu(
+                        LocalToolbarMenu::new(
+                            RUN_TOOLBAR_MODEL_CMD,
+                            model_name,
+                            catalog_menu_entries(&AVAILABLE_MODELS, model_idx, false),
+                        )
+                        .tooltip(format!("Model: {model_name}"))
+                        .dropdown_indicator(false)
+                        .tone(LocalToolbarTone::Secondary),
+                    ),
+                    LocalToolbarItem::Menu(
+                        LocalToolbarMenu::new(
+                            RUN_TOOLBAR_EFFORT_CMD,
+                            effort_name,
+                            catalog_menu_entries(&AVAILABLE_EFFORTS, effort_idx, false),
+                        )
+                        .tooltip(format!("Reasoning Effort: {effort_name}"))
+                        .dropdown_indicator(false)
+                        .tone(LocalToolbarTone::Secondary),
+                    ),
+                ],
+            )
+            .divided(true)
+            .label("Conversation setup")
+            .tooltip("Conversation setup")
+            .overflow(LocalToolbarGroupOverflow::Together),
+        )]
     }
 
     pub fn handle_toolbar_action(
