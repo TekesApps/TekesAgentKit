@@ -381,6 +381,8 @@ pub fn build_topology_a_app(
         .unwrap_or_else(|| RunScope::main(rt.run_binding.endpoint_id(), DEFAULT_MAIN_SESSION_ID));
 
     let app = AppWindow::from_containers(containers, presentation)?
+        .app_name("Tekes")
+        .window_title("Tekes")
         .theme(options.theme)
         .navigation(NavigationOptions {
             directory: nav_dir,

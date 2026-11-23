@@ -1049,6 +1049,8 @@ pub fn build_showcase_app(
             vec![container.into()],
             PresentationOptions::new(focus_id),
         )?
+        .app_name("Tekes")
+        .window_title(format!("Tekes — {}", initial.label()))
         .theme(options.theme)
         .shared_settings(settings_owner));
     }
@@ -1072,10 +1074,12 @@ pub fn build_showcase_app(
     .content_padding(0.0);
 
     let mut presentation = PresentationOptions::new("showcase-stage").nav_bar("showcase-nav");
-    presentation.nav_width = 216.0;
+    presentation.nav_width = 224.0;
 
     Ok(
         AppWindow::from_containers(vec![nav.into(), stage.into()], presentation)?
+            .app_name("Tekes")
+            .window_title("Tekes Component Showcase")
             .theme(options.theme)
             .shared_settings(settings_owner),
     )

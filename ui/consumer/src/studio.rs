@@ -421,6 +421,8 @@ pub fn build_topology_b_app(rt: &DomainStudioRuntime, promote_agent: bool) -> Re
         .unwrap_or_else(|| RunScope::main("fixture", DEFAULT_MAIN_SESSION_ID));
 
     let app = AppWindow::from_containers(containers, presentation)?
+        .app_name("Tekes Studio")
+        .window_title("Tekes Studio")
         .theme(Theme::LIGHT)
         .navigation(NavigationOptions {
             directory: nav_dir,
