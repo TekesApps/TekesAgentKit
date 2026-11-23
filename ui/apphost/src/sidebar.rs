@@ -79,7 +79,7 @@ impl AgentContainerAdapter for SidebarAdapter {
                     });
                 }
                 SidebarIntent::CreateSession => {
-                    run.create_session("/fixture/tekes-agentkit");
+                    run.create_session(&run.default_cwd());
                 }
                 SidebarIntent::SearchChanged(q) => {
                     run.set_search_query(q);

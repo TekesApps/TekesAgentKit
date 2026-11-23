@@ -16,7 +16,8 @@ pub use fixture_sep::{
 pub use fixture_wse::{DeterministicWorkspaceEndpoint, ReadOnlyFsWorkspaceEndpoint};
 pub use run::{
     AVAILABLE_EFFORTS, AVAILABLE_HARNESSES, AVAILABLE_MODELS, AVAILABLE_PRESETS,
-    RunWorkbenchBinding, SidebarFilterMode, SidebarSessionRow,
+    ApprovalModeOption, ModelCatalogEntry, RunWorkbenchBinding, SidebarFilterMode,
+    SidebarSessionRow,
 };
 pub use settings::{
     HarnessSettingField, HarnessSettingKind, HarnessSettingsBinding, HarnessSettingsState,

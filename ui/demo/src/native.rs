@@ -128,10 +128,17 @@ pub fn run() {
         ]);
         app.run_with_args(&[args[0].clone()])
             .expect("Topology A native selftest AppWindow");
+        rt.executor.block_on(async {
+            let _ = tokio::time::timeout(Duration::from_secs(2), rt.runtime.stop()).await;
+        });
+        drop(rt);
         println!("SELFTEST_OK");
         return;
     }
 
     app.run_with_args(&[args[0].clone()])
         .expect("Topology A AppWindow run");
+    rt.executor.block_on(async {
+        let _ = tokio::time::timeout(Duration::from_secs(2), rt.runtime.stop()).await;
+    });
 }

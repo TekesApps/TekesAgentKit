@@ -276,7 +276,11 @@ fn phase1_sidebar_navigation_summary_and_actionable_respond_work() {
 fn phase1_streaming_load_earlier_anchor_compact_layout_and_gpu_render() {
     let (_rt, _endpoint, binding, workbench) = setup_workbench();
 
-    // Send a prompt on session-alpha and observe WindowWake + completed streamed response.
+    // Send a prompt on session-alpha after changing model/effort/preset toolbar settings
+    // so RunSubmissionPreparation handles non-empty draft.settings cleanly.
+    binding.set_model(1);
+    binding.set_effort(2);
+    binding.set_preset(1);
     let dest = ComposerDestination::run(RunScope::main("fixture", DEFAULT_MAIN_SESSION_ID));
     binding.set_draft_text(&dest, "测试流式推送".to_owned());
     binding.submit_destination(&dest);
@@ -294,6 +298,7 @@ fn phase1_streaming_load_earlier_anchor_compact_layout_and_gpu_render() {
         }
         std::thread::sleep(Duration::from_millis(20));
     }
+    assert_eq!(binding.last_error(), None);
     assert!(
         binding.run_snapshot().transcript.items.len() > initial_len,
         "streamed response must commit into transcript"
@@ -474,6 +479,8 @@ fn phase1_streaming_load_earlier_anchor_compact_layout_and_gpu_render() {
         h.drain_action_records().into_iter().find_map(|r| r.payload)
     }
 
+    binding.set_model(0);
+    binding.set_preset(0);
     binding.set_effort(1);
     let initial_items = AgentRunContainer::build_toolbar_items(&workbench);
     assert_eq!(initial_items.len(), 1);
@@ -841,6 +848,16 @@ fn transcript_structural_reading_anchor_and_activity_toggle_work() {
     assert!(surface.is_turn_activity_expanded(&latest_key));
     host.render(&mut scene, &mut text, area, area, palette)
         .unwrap();
+    let expanded_has_tool_details = host
+        .get(TRANSCRIPT_TURNS_STACK_ID)
+        .and_then(|c| c.component::<StackContent>())
+        .and_then(|s| s.children().last())
+        .and_then(|turn| turn.component::<StackContent>())
+        .is_some_and(|turn_stack| turn_stack.children().iter().any(|c| c.id().0 % 32 == 7));
+    assert!(
+        expanded_has_tool_details,
+        "expanded activity disclosure must mount tool/reasoning detail stack"
+    );
 
     let collapse_record = ContentActionRecord {
         action: ContentAction {

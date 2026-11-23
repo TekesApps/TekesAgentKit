@@ -8,10 +8,7 @@ use tekes_agent_components_ui::{
     ResponsiveWidthMode, TRANSCRIPT_ROOT_ID, TranscriptIntent, TranscriptSurface,
 };
 use tekes_agent_presentation::ActionablePrompt;
-use tekes_agent_ui_bindings::{
-    AVAILABLE_EFFORTS, AVAILABLE_HARNESSES, AVAILABLE_MODELS, AVAILABLE_PRESETS,
-    ArtifactOpenRequest, WorkbenchCommand,
-};
+use tekes_agent_ui_bindings::{AVAILABLE_HARNESSES, ArtifactOpenRequest, WorkbenchCommand};
 use tekes_ui_app_host::{
     LocalContainer, LocalToolbarAction, LocalToolbarGroup, LocalToolbarGroupOverflow,
     LocalToolbarItem, LocalToolbarMenu, LocalToolbarTone,
@@ -54,8 +51,12 @@ impl AgentRunAdapter {
 
 fn approval_icon_and_tone(preset_name: &str) -> (&'static str, LocalToolbarTone) {
     match preset_name {
-        "Read Only" => ("tekes-access-read", LocalToolbarTone::Secondary),
-        "Full Access" => ("tekes-access-full", LocalToolbarTone::Warning),
+        "Read Only" | "read-only" | "Deny Tools" | "deny-tools" => {
+            ("tekes-access-read", LocalToolbarTone::Secondary)
+        }
+        "Full Access" | "danger-full-access" | "Allow Tools" | "allow-tools" => {
+            ("tekes-access-full", LocalToolbarTone::Warning)
+        }
         _ => ("tekes-access-workspace", LocalToolbarTone::Secondary),
     }
 }
@@ -248,28 +249,32 @@ impl AgentRunContainer {
         let snapshot = run.run_snapshot();
         let harness_locked = snapshot.run.is_some() || !snapshot.transcript.items.is_empty();
 
+        let available_presets = run.available_presets();
+        let available_models = run.available_models();
+        let available_efforts = run.available_efforts();
+        let preset_refs: Vec<&str> = available_presets.iter().map(String::as_str).collect();
+        let model_refs: Vec<&str> = available_models.iter().map(String::as_str).collect();
+        let effort_refs: Vec<&str> = available_efforts.iter().map(String::as_str).collect();
+
         let harness_idx =
             AgentRunAdapter::catalog_index(&AVAILABLE_HARNESSES, &run.selected_harness());
-        let preset_idx = AgentRunAdapter::catalog_index(&AVAILABLE_PRESETS, &run.selected_preset());
-        let model_idx = AgentRunAdapter::catalog_index(&AVAILABLE_MODELS, &run.selected_model());
-        let effort_idx = AgentRunAdapter::catalog_index(&AVAILABLE_EFFORTS, &run.selected_effort());
+        let preset_idx = AgentRunAdapter::catalog_index(&preset_refs, &run.selected_preset());
+        let model_idx = AgentRunAdapter::catalog_index(&model_refs, &run.selected_model());
+        let effort_idx = AgentRunAdapter::catalog_index(&effort_refs, &run.selected_effort());
 
         let harness_name = AVAILABLE_HARNESSES
             .get(harness_idx)
             .copied()
             .unwrap_or("Tekes");
-        let preset_name = AVAILABLE_PRESETS
+        let preset_name = preset_refs
             .get(preset_idx)
             .copied()
             .unwrap_or("Workspace Write");
-        let model_name = AVAILABLE_MODELS
+        let model_name = model_refs
             .get(model_idx)
             .copied()
             .unwrap_or("claude-sonnet-4");
-        let effort_name = AVAILABLE_EFFORTS
-            .get(effort_idx)
-            .copied()
-            .unwrap_or("Medium");
+        let effort_name = effort_refs.get(effort_idx).copied().unwrap_or("Medium");
 
         let (approval_icon, approval_tone) = approval_icon_and_tone(preset_name);
         vec![LocalToolbarItem::Group(
@@ -295,7 +300,7 @@ impl AgentRunContainer {
                         LocalToolbarMenu::new(
                             RUN_TOOLBAR_APPROVAL_CMD,
                             "",
-                            catalog_menu_entries(&AVAILABLE_PRESETS, preset_idx, false),
+                            catalog_menu_entries(&preset_refs, preset_idx, false),
                         )
                         .icon(approval_icon)
                         .tooltip(format!("Approval: {preset_name}"))
@@ -306,7 +311,7 @@ impl AgentRunContainer {
                         LocalToolbarMenu::new(
                             RUN_TOOLBAR_MODEL_CMD,
                             model_name,
-                            catalog_menu_entries(&AVAILABLE_MODELS, model_idx, false),
+                            catalog_menu_entries(&model_refs, model_idx, false),
                         )
                         .tooltip(format!("Model: {model_name}"))
                         .dropdown_indicator(false)
@@ -316,7 +321,7 @@ impl AgentRunContainer {
                         LocalToolbarMenu::new(
                             RUN_TOOLBAR_EFFORT_CMD,
                             effort_name,
-                            catalog_menu_entries(&AVAILABLE_EFFORTS, effort_idx, false),
+                            catalog_menu_entries(&effort_refs, effort_idx, false),
                         )
                         .tooltip(format!("Reasoning Effort: {effort_name}"))
                         .dropdown_indicator(false)
@@ -352,21 +357,24 @@ impl AgentRunContainer {
                 true
             }
             RUN_TOOLBAR_APPROVAL_CMD => {
-                if let Some(idx) = AVAILABLE_PRESETS.iter().position(|&item| item == value) {
+                let presets = run.available_presets();
+                if let Some(idx) = presets.iter().position(|item| item == value) {
                     run.set_preset(idx);
                     workbench.bump_revision();
                 }
                 true
             }
             RUN_TOOLBAR_MODEL_CMD => {
-                if let Some(idx) = AVAILABLE_MODELS.iter().position(|&item| item == value) {
+                let models = run.available_models();
+                if let Some(idx) = models.iter().position(|item| item == value) {
                     run.set_model(idx);
                     workbench.bump_revision();
                 }
                 true
             }
             RUN_TOOLBAR_EFFORT_CMD => {
-                if let Some(idx) = AVAILABLE_EFFORTS.iter().position(|&item| item == value) {
+                let efforts = run.available_efforts();
+                if let Some(idx) = efforts.iter().position(|item| item == value) {
                     run.set_effort(idx);
                     workbench.bump_revision();
                 }

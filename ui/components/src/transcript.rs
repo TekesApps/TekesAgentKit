@@ -254,11 +254,19 @@ struct ActionableChoiceBinding {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+struct TurnToolModel {
+    icon_name: String,
+    header: String,
+    running: bool,
+    detail_sections: Vec<(String, String)>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
 struct TurnSignature {
     dest_key: String,
     user_text: String,
     reasoning_parts: Vec<String>,
-    tools: Vec<(String, String)>,
+    tools: Vec<TurnToolModel>,
     assistant_markdown: String,
     error_text: Option<String>,
     is_latest_settled: bool,
@@ -270,7 +278,7 @@ struct TurnRenderModel {
     turn_key: String,
     user_text: String,
     reasoning_parts: Vec<String>,
-    tools: Vec<(String, String)>,
+    tools: Vec<TurnToolModel>,
     assistant_markdown: String,
     error_text: Option<String>,
     is_latest_settled: bool,
@@ -293,14 +301,21 @@ impl TurnRenderModel {
     fn activity_title(&self) -> String {
         let has_reason = !self.reasoning_parts.is_empty();
         let tool_count = self.tools.len();
+        let any_running = self.tools.iter().any(|t| t.running);
         if has_reason && tool_count > 0 {
+            let prefix = if any_running {
+                "Thinking"
+            } else {
+                "Thought process"
+            };
             format!(
-                "Thought process · {tool_count} tool{}",
+                "{prefix} · {tool_count} tool{}",
                 if tool_count == 1 { "" } else { "s" }
             )
         } else if tool_count > 0 {
+            let verb = if any_running { "Working · " } else { "Used " };
             format!(
-                "Used {tool_count} tool{}",
+                "{verb}{tool_count} tool{}",
                 if tool_count == 1 { "" } else { "s" }
             )
         } else if has_reason {
@@ -543,7 +558,7 @@ impl TranscriptSurface {
                         secondary_text(turn.reasoning_parts.join("\n\n")),
                     ));
                 }
-                for (icon_name, header) in &turn.tools {
+                for tool in &turn.tools {
                     let row_id = ComponentId(self.next_tool_id);
                     let icon_id = ComponentId(self.next_tool_id + 1);
                     let text_id = ComponentId(self.next_tool_id + 2);
@@ -552,9 +567,28 @@ impl TranscriptSurface {
                         row_id,
                         icon_id,
                         text_id,
-                        icon_name,
-                        header.clone(),
+                        &tool.icon_name,
+                        tool.header.clone(),
                     ));
+                    if !tool.detail_sections.is_empty() {
+                        let mut sec_rows = Vec::new();
+                        for (title, body) in &tool.detail_sections {
+                            let sec_id = ComponentId(self.next_tool_id);
+                            self.next_tool_id = self.next_tool_id.saturating_add(2);
+                            sec_rows.push(Content::new(
+                                sec_id,
+                                secondary_text(format!("{title}: {body}")),
+                            ));
+                        }
+                        let sec_stack_id = ComponentId(self.next_tool_id);
+                        self.next_tool_id = self.next_tool_id.saturating_add(2);
+                        detail_children.push(
+                            StackContent::vertical(4.0, sec_rows).into_content_with_padding(
+                                sec_stack_id,
+                                Insets::new(0.0, 0.0, 4.0, 20.0),
+                            ),
+                        );
+                    }
                 }
                 let detail_stack = StackContent::vertical(6.0, detail_children)
                     .into_content_with_padding(
@@ -1108,6 +1142,16 @@ fn tool_icon_name(tool_name: &str) -> &'static str {
     }
 }
 
+fn truncate_tool_detail(text: &str, max_chars: usize) -> String {
+    let trimmed = text.trim();
+    if trimmed.chars().count() <= max_chars {
+        return trimmed.to_owned();
+    }
+    let mut out: String = trimmed.chars().take(max_chars).collect();
+    out.push_str("\n…");
+    out
+}
+
 fn collect_turn_models(snapshot: &RunSnapshot, search_query: &str) -> Vec<TurnRenderModel> {
     let query = search_query.trim().to_lowercase();
     let matches_query = |text: &str| query.is_empty() || text.to_lowercase().contains(&query);
@@ -1240,7 +1284,27 @@ fn collect_turn_models(snapshot: &RunSnapshot, search_query: &str) -> Vec<TurnRe
                 &TranscriptToolRowInputs::default(),
                 report_wording(),
             );
-            tools.push((tool_icon_name(&tool.name).to_owned(), header.text));
+            let details = tool.presentation_details(
+                tekes_agent_presentation::TranscriptToolDetailWording::default(),
+            );
+            let detail_sections = details
+                .sections
+                .into_iter()
+                .filter_map(|s| {
+                    let trimmed = s.text.trim();
+                    if trimmed.is_empty() {
+                        None
+                    } else {
+                        Some((s.title, truncate_tool_detail(trimmed, 1200)))
+                    }
+                })
+                .collect();
+            tools.push(TurnToolModel {
+                icon_name: tool_icon_name(&tool.name).to_owned(),
+                header: header.text,
+                running: details.running,
+                detail_sections,
+            });
         }
 
         let mut reasoning_parts = Vec::new();
@@ -1274,7 +1338,12 @@ fn collect_turn_models(snapshot: &RunSnapshot, search_query: &str) -> Vec<TurnRe
         if !query.is_empty() {
             let hit = matches_query(&user_text)
                 || reasoning_parts.iter().any(|r| matches_query(r))
-                || tools.iter().any(|(_, h)| matches_query(h))
+                || tools.iter().any(|t| {
+                    matches_query(&t.header)
+                        || t.detail_sections
+                            .iter()
+                            .any(|(title, body)| matches_query(title) || matches_query(body))
+                })
                 || matches_query(&assistant_markdown)
                 || error_text.as_deref().is_some_and(matches_query);
             if !hit {

@@ -3,6 +3,7 @@
 //! - Live `KernelConnector` + confined `ReadOnlyFsWorkspaceEndpoint` (`--endpoint-config <json>`)
 //! - macOS native AppKit/IME selftest (`--native-selftest` -> prints `SELFTEST_OK`)
 
+use crate::live_kernel::{LiveKernelOptions, LiveKernelProcess};
 use anyhow::{Context, Result, bail};
 use serde_json::json;
 use std::path::{Path, PathBuf};
@@ -91,6 +92,12 @@ pub struct TopologyALaunchOptions {
     pub component: Option<String>,
     pub offscreen: Option<PathBuf>,
     pub endpoint_config: Option<PathBuf>,
+    pub live_kernel: bool,
+    pub cwd: Option<PathBuf>,
+    pub kernel_data_root: Option<PathBuf>,
+    pub kernel_bin_dir: Option<PathBuf>,
+    pub settings_path: Option<PathBuf>,
+    pub credential_env: Option<String>,
     pub native_selftest: bool,
     pub data_dir: Option<PathBuf>,
 }
@@ -104,6 +111,12 @@ impl Default for TopologyALaunchOptions {
             component: None,
             offscreen: None,
             endpoint_config: None,
+            live_kernel: false,
+            cwd: None,
+            kernel_data_root: None,
+            kernel_bin_dir: None,
+            settings_path: None,
+            credential_env: None,
             native_selftest: false,
             data_dir: None,
         }
@@ -151,6 +164,40 @@ impl TopologyALaunchOptions {
                         .context("--endpoint-config expects a JSON path")?;
                     opts.endpoint_config = Some(PathBuf::from(path));
                 }
+                "--live-kernel" => {
+                    opts.live_kernel = true;
+                }
+                "--cwd" => {
+                    idx += 1;
+                    let path = args.get(idx).context("--cwd expects a directory path")?;
+                    opts.cwd = Some(PathBuf::from(path));
+                }
+                "--kernel-data-root" => {
+                    idx += 1;
+                    let path = args
+                        .get(idx)
+                        .context("--kernel-data-root expects a directory path")?;
+                    opts.kernel_data_root = Some(PathBuf::from(path));
+                }
+                "--kernel-bin-dir" => {
+                    idx += 1;
+                    let path = args
+                        .get(idx)
+                        .context("--kernel-bin-dir expects a directory path")?;
+                    opts.kernel_bin_dir = Some(PathBuf::from(path));
+                }
+                "--settings" => {
+                    idx += 1;
+                    let path = args.get(idx).context("--settings expects a JSON path")?;
+                    opts.settings_path = Some(PathBuf::from(path));
+                }
+                "--credential-env" => {
+                    idx += 1;
+                    let var_name = args
+                        .get(idx)
+                        .context("--credential-env expects an env var name")?;
+                    opts.credential_env = Some(var_name.clone());
+                }
                 "--native-selftest" => {
                     opts.native_selftest = true;
                 }
@@ -172,6 +219,7 @@ pub struct TopologyARuntime {
     pub workspace_binding: Arc<WorkspaceBinding>,
     pub workbench: SharedAgentWorkbench,
     pub data_root: PathBuf,
+    pub live_kernel_process: Option<LiveKernelProcess>,
 }
 
 fn resolve_data_root(custom: Option<&PathBuf>) -> Result<PathBuf> {
@@ -203,6 +251,9 @@ pub fn initialize_topology_a_runtime(options: &TopologyALaunchOptions) -> Result
         wse_endpoint: Arc<dyn WorkspaceServiceEndpoint>,
         initial_session_id: Option<String>,
         ws_id: String,
+        active_cwd: Option<String>,
+        live_tools: bool,
+        live_kernel_process: Option<LiveKernelProcess>,
     }
 
     let EndpointInputs {
@@ -211,8 +262,34 @@ pub fn initialize_topology_a_runtime(options: &TopologyALaunchOptions) -> Result
         wse_endpoint,
         initial_session_id,
         ws_id,
-    } = if let Some(cfg_path) = &options.endpoint_config {
+        active_cwd,
+        live_tools,
+        live_kernel_process,
+    } = if options.live_kernel {
+        let live_opts = LiveKernelOptions::with_defaults(
+            options.cwd.clone(),
+            options.kernel_data_root.clone(),
+            options.kernel_bin_dir.clone(),
+            options.settings_path.clone(),
+            options.credential_env.clone(),
+        )?;
+        let cwd_str = live_opts.cwd.to_string_lossy().into_owned();
+        let live = LiveKernelProcess::launch(&live_opts)?;
+        let kernel = KernelConnector::new("tekes-live", &live.url, live.bearer.clone())?;
+        let fs_wse = ReadOnlyFsWorkspaceEndpoint::open("ws-live-fs", &live_opts.cwd)?;
+        EndpointInputs {
+            endpoint_id: "tekes-live".to_owned(),
+            connector: Arc::new(kernel),
+            wse_endpoint: Arc::new(fs_wse),
+            initial_session_id: None,
+            ws_id: "ws-live-fs".to_owned(),
+            active_cwd: Some(cwd_str),
+            live_tools: true,
+            live_kernel_process: Some(live),
+        }
+    } else if let Some(cfg_path) = &options.endpoint_config {
         let cfg = EndpointJsonConfig::from_file(cfg_path)?;
+        let cwd_str = cfg.cwd.to_string_lossy().into_owned();
         let kernel = KernelConnector::new(&cfg.endpoint_id, &cfg.url, cfg.bearer.clone())?;
         let fs_wse = ReadOnlyFsWorkspaceEndpoint::open("ws-kernel-fs", &cfg.cwd)?;
         EndpointInputs {
@@ -221,6 +298,9 @@ pub fn initialize_topology_a_runtime(options: &TopologyALaunchOptions) -> Result
             wse_endpoint: Arc::new(fs_wse),
             initial_session_id: cfg.sessions.first().cloned(),
             ws_id: "ws-kernel-fs".to_owned(),
+            active_cwd: Some(cwd_str),
+            live_tools: true,
+            live_kernel_process: None,
         }
     } else {
         let sep = FixtureSessionEndpoint::with_timing(Duration::ZERO, Duration::from_millis(8));
@@ -231,6 +311,9 @@ pub fn initialize_topology_a_runtime(options: &TopologyALaunchOptions) -> Result
             wse_endpoint: d_wse as Arc<dyn WorkspaceServiceEndpoint>,
             initial_session_id: Some(DEFAULT_MAIN_SESSION_ID.to_owned()),
             ws_id: "ws-main".to_owned(),
+            active_cwd: None,
+            live_tools: false,
+            live_kernel_process: None,
         }
     };
 
@@ -252,13 +335,46 @@ pub fn initialize_topology_a_runtime(options: &TopologyALaunchOptions) -> Result
         )
     };
 
+    if let Some(cwd_str) = &active_cwd {
+        run_binding.set_default_cwd(cwd_str.clone());
+    }
+    if live_tools {
+        run_binding.set_live_kernel_tools(true);
+        run_binding.refresh_controls_blocking();
+    }
+
     if let Some(sid) = initial_session_id {
         run_binding.open_initial_session(&sid)?;
     } else {
-        let store = runtime.snapshot();
-        if let Some(first_sid) = store.sessions.keys().next().cloned() {
+        let first_non_child = {
+            let store = runtime.snapshot();
+            let mut candidates: Vec<(u64, String)> = store
+                .sessions
+                .iter()
+                .filter_map(|(id, proj)| {
+                    let summary = proj.summary.as_ref()?;
+                    if summary
+                        .get("parentSessionId")
+                        .and_then(|v| v.as_str())
+                        .is_some()
+                    {
+                        return None;
+                    }
+                    let updated = summary["updatedAt"].as_f64().unwrap_or(0.0).max(0.0) as u64;
+                    Some((updated, id.clone()))
+                })
+                .collect();
+            candidates.sort_by(|a, b| b.0.cmp(&a.0).then_with(|| a.1.cmp(&b.1)));
+            candidates.into_iter().next().map(|(_, id)| id)
+        };
+        if let Some(first_sid) = first_non_child {
             run_binding.open_initial_session(&first_sid)?;
+        } else if live_tools && let Some(cwd_str) = &active_cwd {
+            let _ = run_binding.create_session_blocking(cwd_str)?;
         }
+    }
+    if live_tools {
+        run_binding.refresh_controls_blocking();
     }
     workbench.attach_run_binding(Arc::clone(&run_binding));
 
@@ -278,7 +394,7 @@ pub fn initialize_topology_a_runtime(options: &TopologyALaunchOptions) -> Result
     let _ = hs_binding.refresh_blocking();
     workbench.attach_harness_settings_binding(hs_binding);
 
-    if options.endpoint_config.is_some() {
+    if options.endpoint_config.is_some() || options.live_kernel {
         executor.block_on(async {
             tokio::time::sleep(Duration::from_millis(80)).await;
         });
@@ -291,6 +407,7 @@ pub fn initialize_topology_a_runtime(options: &TopologyALaunchOptions) -> Result
         workspace_binding: ws_binding,
         workbench,
         data_root,
+        live_kernel_process,
     })
 }
 
