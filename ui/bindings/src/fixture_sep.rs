@@ -159,7 +159,7 @@ impl FixtureSessionEndpoint {
                     "outputTokens": 380
                 }),
             };
-            for n in 1..=25 {
+            for n in 1..=23 {
                 append_row(&mut line, "turn/start", json!({ "turn": n }));
                 append_row(
                     &mut line,
@@ -189,6 +189,97 @@ impl FixtureSessionEndpoint {
                     json!({ "turn": n, "reason": "completed" }),
                 );
             }
+            // Turn 24: multi-turn Tekes transcript alignment discussion.
+            append_row(&mut line, "turn/start", json!({ "turn": 24 }));
+            append_row(
+                &mut line,
+                "user/message",
+                json!({
+                    "turn": 24,
+                    "id": "alpha-u-24",
+                    "content": [{
+                        "type": "text",
+                        "text": "请对照 Swift 版 Tekes 核对 Transcript 阅读流宽度、用户气泡和活动摘要的排版细节。"
+                    }]
+                }),
+            );
+            append_row(
+                &mut line,
+                "assistant/message",
+                json!({
+                    "turn": 24,
+                    "step": 1,
+                    "message": {
+                        "id": "alpha-a-24",
+                        "content": [{
+                            "type": "text",
+                            "text": "已对齐三处关键布局规范：\n\n- 阅读流与底部 Composer 共用居中列宽 770 pt，视觉左右边界对齐\n- 用户消息采用无边框柔和填充右对齐气泡（最大宽度 460 pt，圆角 12 pt）\n- 工具与思考摘要收起为无底框轻量文本触发器（Used N tools ›），展开后缩进展示明细"
+                        }],
+                        "usage": { "inputTokens": 92, "outputTokens": 68 }
+                    }
+                }),
+            );
+            append_row(
+                &mut line,
+                "turn/end",
+                json!({ "turn": 24, "reason": "completed" }),
+            );
+            // Turn 25: tool call verification entry.
+            append_row(&mut line, "turn/start", json!({ "turn": 25 }));
+            append_row(
+                &mut line,
+                "user/message",
+                json!({
+                    "turn": 25,
+                    "id": "alpha-u-25",
+                    "content": [{
+                        "type": "text",
+                        "text": "顺便运行一次快速检查，确认工具栏胶囊分组与侧边栏导航记录切换正常。"
+                    }]
+                }),
+            );
+            append_row(
+                &mut line,
+                "tool/call",
+                json!({
+                    "turn": 25,
+                    "callId": "call-verify-nav",
+                    "name": "shell",
+                    "arguments": { "command": "cargo test -p tekes-agent-apphost --locked" }
+                }),
+            );
+            append_row(
+                &mut line,
+                "tool/result",
+                json!({
+                    "turn": 25,
+                    "message": {
+                        "source": { "callId": "call-verify-nav" },
+                        "content": [{ "type": "text", "text": "exit 0 (all AppHost checks passed)" }]
+                    }
+                }),
+            );
+            append_row(
+                &mut line,
+                "assistant/message",
+                json!({
+                    "turn": 25,
+                    "step": 1,
+                    "message": {
+                        "id": "alpha-a-25",
+                        "content": [{
+                            "type": "text",
+                            "text": "验证通过：Window Toolbar 胶囊组显示正常，反复切换侧边栏会话也不会触发重复导航条目。"
+                        }],
+                        "usage": { "inputTokens": 74, "outputTokens": 42 }
+                    }
+                }),
+            );
+            append_row(
+                &mut line,
+                "turn/end",
+                json!({ "turn": 25, "reason": "completed" }),
+            );
             // Rich turn 26 with thinking, tool call, tool result, markdown + Rust code fence.
             append_row(&mut line, "turn/start", json!({ "turn": 26 }));
             append_row(

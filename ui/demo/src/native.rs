@@ -2,6 +2,7 @@
 //! Zero `unsafe` code; Metal rendering, CoreText, and macOS AX live strictly in TekesUI.
 
 use std::time::Duration;
+use tekes_agent_ui_demo::showcase::build_showcase_app;
 use tekes_agent_ui_demo::workbench_app::{
     TopologyALaunchOptions, build_topology_a_app, initialize_topology_a_runtime,
     render_topology_a_offscreen_png,
@@ -18,7 +19,11 @@ pub fn run() {
 
     let options = TopologyALaunchOptions::parse_args(&args).expect("parse demo CLI flags");
     let rt = initialize_topology_a_runtime(&options).expect("initialize Topology A runtime");
-    let app = build_topology_a_app(&rt, &options).expect("build Topology A AppWindow");
+    let app = if options.showcase || options.component.is_some() {
+        build_showcase_app(&rt, &options).expect("build showcase AppWindow")
+    } else {
+        build_topology_a_app(&rt, &options).expect("build Topology A AppWindow")
+    };
 
     if let Some(path) = &options.offscreen {
         render_topology_a_offscreen_png(app, path, 1440, 900)

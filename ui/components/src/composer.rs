@@ -6,7 +6,9 @@
 
 use crate::ResponsiveWidthMode;
 use crate::ids::*;
-use crate::ui_helpers::{card_panel, secondary_text};
+use crate::ui_helpers::{
+    CONVERSATION_COLUMN_MAX_WIDTH, CenteredColumn, card_panel, secondary_text,
+};
 use std::collections::BTreeMap;
 use tekes_agent_presentation::{ComposerArtifact, ComposerDestination, RunScope, RunSnapshot};
 use tekes_ui_controls::{
@@ -642,10 +644,19 @@ impl ComposerSurface {
             Insets::new(6.0, 10.0, 6.0, 10.0),
         );
 
-        Content::new(
-            COMPOSER_ROOT_ID,
+        let column_body = Content::new(
+            ComponentId(426),
             StackContent::vertical(0.0, vec![queued_slot, card]),
-        )
+        );
+        let centered = CenteredColumn::content(
+            COMPOSER_CENTER_COLUMN_ID,
+            CONVERSATION_COLUMN_MAX_WIDTH,
+            20.0,
+            column_body,
+        );
+
+        StackContent::vertical(0.0, vec![centered])
+            .into_content_with_padding(COMPOSER_ROOT_ID, Insets::new(0.0, 0.0, 12.0, 0.0))
     }
 
     pub fn composing(host: &ContentHost) -> bool {

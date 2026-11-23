@@ -432,13 +432,273 @@ impl RunSurface {
 
 pub(crate) mod ui_helpers {
     use tekes_ui_controls::{
-        ButtonVariant,
+        ButtonTextRenderer, ButtonVariant,
         composition::{
-            Button, ComponentId, Content, IconContent, PanelContent, StackContent, TextContent,
+            Button, Component, ComponentId, CompositionError, Content, ContentRole,
+            ContentSemantics, ContentTheme, CurveSubtreeCapability, IconContent, Lifecycle,
+            PanelContent, StackContent, TextContent,
         },
-        layout::Insets,
+        layout::{Insets, MeasuredChild},
     };
+    use tekes_ui_scene::{Quad, Rect, Scene, Size};
     use tekes_ui_tokens::Spacing;
+
+    pub(crate) const CONVERSATION_COLUMN_MAX_WIDTH: f32 = 770.0;
+
+    /// Centers a single child constrained to `max_width` inside the container with outer padding.
+    #[derive(Debug)]
+    pub(crate) struct CenteredColumn {
+        max_width: f32,
+        horizontal_padding: f32,
+        children: Vec<Content>,
+        arranged_child: Option<(ComponentId, u64)>,
+    }
+
+    impl CenteredColumn {
+        pub(crate) fn content(
+            id: ComponentId,
+            max_width: f32,
+            horizontal_padding: f32,
+            child: Content,
+        ) -> Content {
+            Content::new(
+                id,
+                Self {
+                    max_width,
+                    horizontal_padding,
+                    children: vec![child],
+                    arranged_child: None,
+                },
+            )
+        }
+
+        fn inner_width(&self, total_width: f32) -> f32 {
+            if total_width.is_finite() {
+                (total_width - self.horizontal_padding * 2.0)
+                    .max(1.0)
+                    .min(self.max_width)
+            } else {
+                self.max_width
+            }
+        }
+    }
+
+    impl Component for CenteredColumn {
+        fn lifecycle(&mut self, event: Lifecycle) {
+            if event == Lifecycle::Unmounted {
+                self.arranged_child = None;
+            }
+        }
+
+        fn host_reveal_passthrough(&self) -> bool {
+            self.children.len() == 1
+                && self.arranged_child.is_some_and(|identity| {
+                    let child = &self.children[0];
+                    (child.id(), child.mount_identity()) == identity
+                })
+        }
+
+        fn fixed_slots(&self) -> bool {
+            true
+        }
+
+        fn validate(&self) -> Result<(), CompositionError> {
+            if self.children.len() != 1 {
+                Err(CompositionError::InvalidSlotCount)
+            } else {
+                Ok(())
+            }
+        }
+
+        fn curve_subtree_capability(&self) -> CurveSubtreeCapability {
+            CurveSubtreeCapability::Recursive
+        }
+
+        fn has_stable_hooks(&self) -> bool {
+            true
+        }
+
+        fn supports_prepared_lifecycle(&self) -> bool {
+            true
+        }
+
+        fn ignores_pointer_actions(&self) -> bool {
+            true
+        }
+
+        fn semantics(&self) -> ContentSemantics {
+            ContentSemantics::new(ContentRole::Group, "")
+        }
+
+        fn children(&self) -> &[Content] {
+            &self.children
+        }
+
+        fn children_mut(&mut self) -> Option<&mut Vec<Content>> {
+            Some(&mut self.children)
+        }
+
+        fn measure(&mut self, text: &mut dyn ButtonTextRenderer, available: Size) -> MeasuredChild {
+            self.arranged_child = None;
+            let inner_w = self.inner_width(available.width);
+            let child = self.children[0].measure(text, Size::new(inner_w, available.height));
+            let outer_w = if available.width.is_finite() {
+                available.width.max(0.0)
+            } else {
+                child.size.width.min(self.max_width) + self.horizontal_padding * 2.0
+            };
+            MeasuredChild::new(Size::new(outer_w, child.size.height))
+        }
+
+        fn arrange(&mut self, text: &mut dyn ButtonTextRenderer, frame: Rect, clip: Rect) {
+            let inner_w = self.inner_width(frame.size.width).min(frame.size.width);
+            let x = frame.min_x() + ((frame.size.width - inner_w) * 0.5).floor().max(0.0);
+            let child_frame = Rect::new(x, frame.min_y(), inner_w, frame.size.height);
+            self.children[0].arrange(text, child_frame, clip);
+            self.arranged_child = self
+                .children
+                .first()
+                .filter(|child| !child.frame().is_empty())
+                .map(|child| (child.id(), child.mount_identity()));
+        }
+    }
+
+    /// Soft borderless tonal user-message bubble aligned with Swift Tekes `MetalNativeInputBubbleView`.
+    #[derive(Debug)]
+    pub(crate) struct UserBubble {
+        max_width: f32,
+        padding: Insets,
+        corner_radius: f32,
+        children: Vec<Content>,
+        arranged_child: Option<(ComponentId, u64)>,
+    }
+
+    impl UserBubble {
+        pub(crate) fn content(id: ComponentId, child: Content) -> Content {
+            Content::new(
+                id,
+                Self {
+                    max_width: 460.0,
+                    padding: Insets::new(10.0, 14.0, 10.0, 14.0),
+                    corner_radius: 12.0,
+                    children: vec![child],
+                    arranged_child: None,
+                },
+            )
+        }
+
+        fn width_cap(&self, available_width: f32) -> f32 {
+            if !available_width.is_finite() {
+                return self.max_width;
+            }
+            let ratio_cap = (available_width * 0.78).max(200.0).min(available_width);
+            available_width.min(self.max_width).min(ratio_cap).max(1.0)
+        }
+    }
+
+    impl Component for UserBubble {
+        fn lifecycle(&mut self, event: Lifecycle) {
+            if event == Lifecycle::Unmounted {
+                self.arranged_child = None;
+            }
+        }
+
+        fn host_reveal_passthrough(&self) -> bool {
+            self.children.len() == 1
+                && self.arranged_child.is_some_and(|identity| {
+                    let child = &self.children[0];
+                    (child.id(), child.mount_identity()) == identity
+                })
+        }
+
+        fn fixed_slots(&self) -> bool {
+            true
+        }
+
+        fn validate(&self) -> Result<(), CompositionError> {
+            if self.children.len() != 1 {
+                Err(CompositionError::InvalidSlotCount)
+            } else {
+                Ok(())
+            }
+        }
+
+        fn curve_subtree_capability(&self) -> CurveSubtreeCapability {
+            CurveSubtreeCapability::Recursive
+        }
+
+        fn has_stable_hooks(&self) -> bool {
+            true
+        }
+
+        fn supports_prepared_lifecycle(&self) -> bool {
+            true
+        }
+
+        fn ignores_pointer_actions(&self) -> bool {
+            true
+        }
+
+        fn semantics(&self) -> ContentSemantics {
+            ContentSemantics::new(ContentRole::Group, "")
+        }
+
+        fn children(&self) -> &[Content] {
+            &self.children
+        }
+
+        fn children_mut(&mut self) -> Option<&mut Vec<Content>> {
+            Some(&mut self.children)
+        }
+
+        fn measure(&mut self, text: &mut dyn ButtonTextRenderer, available: Size) -> MeasuredChild {
+            self.arranged_child = None;
+            let cap_w = self.width_cap(available.width);
+            let pad_h = self.padding.left + self.padding.right;
+            let pad_v = self.padding.top + self.padding.bottom;
+            let inner_max_w = (cap_w - pad_h).max(1.0);
+            let child = self.children[0].measure(text, Size::new(inner_max_w, available.height));
+            let text_w = child.size.width.ceil().min(inner_max_w);
+            let bubble_w = (text_w + pad_h).min(cap_w);
+            let bubble_h = child.size.height + pad_v;
+            MeasuredChild::new(Size::new(bubble_w, bubble_h))
+        }
+
+        fn arrange(&mut self, text: &mut dyn ButtonTextRenderer, frame: Rect, clip: Rect) {
+            let inner_w = (frame.size.width - self.padding.left - self.padding.right).max(0.0);
+            let inner_h = (frame.size.height - self.padding.top - self.padding.bottom).max(0.0);
+            let child_frame = Rect::new(
+                frame.min_x() + self.padding.left,
+                frame.min_y() + self.padding.top,
+                inner_w,
+                inner_h,
+            );
+            self.children[0].arrange(text, child_frame, clip);
+            self.arranged_child = self
+                .children
+                .first()
+                .filter(|child| !child.frame().is_empty())
+                .map(|child| (child.id(), child.mount_identity()));
+        }
+
+        fn paint(
+            &mut self,
+            scene: &mut Scene,
+            _: &mut dyn ButtonTextRenderer,
+            frame: Rect,
+            _: Rect,
+            theme: ContentTheme,
+        ) {
+            let palette = theme.palette();
+            let fill = palette
+                .color("user-message-surface")
+                .or_else(|| palette.color("surface-2"))
+                .or_else(|| palette.color("surface-1"))
+                .or_else(|| palette.color("surface-0"))
+                .unwrap_or_else(|| tekes_ui_tokens::Rgba::new(0.94, 0.94, 0.96, 1.0));
+            scene.push_quad(Quad::new(frame, fill).with_corner_radius(self.corner_radius));
+        }
+    }
 
     pub(crate) fn heading_text(text: impl Into<String>) -> TextContent {
         TextContent::heading(text)
@@ -453,7 +713,7 @@ pub(crate) mod ui_helpers {
     }
 
     pub(crate) fn secondary_text(text: impl Into<String>) -> TextContent {
-        TextContent::caption(text)
+        TextContent::secondary(text)
     }
 
     pub(crate) fn plain_icon(id: ComponentId, icon_name: &str) -> Content {
@@ -513,6 +773,26 @@ pub(crate) mod ui_helpers {
                 vec![
                     plain_icon(icon_id, icon_name),
                     Content::new(text_id, TextContent::new(label)),
+                ],
+            )
+            .with_flexible_child(text_id),
+        )
+    }
+
+    pub(crate) fn secondary_icon_row(
+        row_id: ComponentId,
+        icon_id: ComponentId,
+        text_id: ComponentId,
+        icon_name: &str,
+        label: impl Into<String>,
+    ) -> Content {
+        Content::new(
+            row_id,
+            StackContent::horizontal(
+                Spacing::Tight.value(),
+                vec![
+                    plain_icon(icon_id, icon_name),
+                    Content::new(text_id, secondary_text(label)),
                 ],
             )
             .with_flexible_child(text_id),

@@ -51,7 +51,15 @@ pub const TRANSCRIPT_LATEST_SLOT_ID: ComponentId = ComponentId(137);
 pub const TRANSCRIPT_LATEST_ICON_ID: ComponentId = ComponentId(138);
 pub const TRANSCRIPT_ACTIONABLES_STACK_ID: ComponentId = ComponentId(140);
 pub const TRANSCRIPT_SPACER_ID: ComponentId = ComponentId(141);
+pub const TRANSCRIPT_SCROLL_ID: ComponentId = ComponentId(142);
+pub const TRANSCRIPT_SCROLL_COLUMN_ID: ComponentId = ComponentId(143);
+pub const TRANSCRIPT_SCROLL_INNER_ID: ComponentId = ComponentId(144);
+pub const TRANSCRIPT_TURNS_STACK_ID: ComponentId = ComponentId(145);
+pub const TRANSCRIPT_EARLIER_ROW_ID: ComponentId = ComponentId(146);
+pub const TRANSCRIPT_EMPTY_STATE_ID: ComponentId = ComponentId(147);
 pub const TRANSCRIPT_ACTIONABLE_BASE: u64 = 150;
+pub const TRANSCRIPT_TURN_BASE: u64 = 200_000;
+pub const TRANSCRIPT_TOOL_ROW_BASE: u64 = 400_000;
 
 // Composer surface: 400..=599
 pub const COMPOSER_ROOT_ID: ComponentId = ComponentId(400);
@@ -78,6 +86,7 @@ pub const COMPOSER_QUEUED_REMOVE_BTN_ID: ComponentId = ComponentId(420);
 pub const COMPOSER_INPUT_ROW_ID: ComponentId = ComponentId(422);
 pub const COMPOSER_EFFORT_SELECT_ID: ComponentId = ComponentId(423);
 pub const COMPOSER_HARNESS_SELECT_ID: ComponentId = ComponentId(424);
+pub const COMPOSER_CENTER_COLUMN_ID: ComponentId = ComponentId(425);
 pub const COMPOSER_CHIP_BASE: u64 = 450;
 
 // Sidebar surface: 600..=699 (+ passive rows 10_000+, row decor 50_000+)

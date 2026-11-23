@@ -2,7 +2,7 @@
 //! Enforces zero-sibling-borrow coordination across `nav_bar`, `focus`, and `others`.
 
 use std::cell::{Cell, RefCell};
-use std::collections::{BTreeMap, VecDeque};
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 use tekes_agent_contract::{ArtifactSelectionReference, SessionAddress};
@@ -51,6 +51,8 @@ struct WorkbenchInner {
     artifact_targets: BTreeMap<String, String>,
     latest_quote: Option<ArtifactSelectionReference>,
     pending_navigation: VecDeque<navigation::Entry>,
+    next_navigation_seq: u64,
+    seen_navigation_ids: BTreeSet<String>,
     pending_commands: VecDeque<WorkbenchCommand>,
     pending_quotes: VecDeque<ComposerQuoteRequest>,
     pending_artifacts: VecDeque<ArtifactOpenRequest>,
@@ -103,6 +105,8 @@ impl SharedAgentWorkbench {
                 artifact_targets: BTreeMap::new(),
                 latest_quote: None,
                 pending_navigation: VecDeque::new(),
+                next_navigation_seq: 1,
+                seen_navigation_ids: BTreeSet::new(),
                 pending_commands: VecDeque::new(),
                 pending_quotes: VecDeque::new(),
                 pending_artifacts: VecDeque::new(),
@@ -398,6 +402,24 @@ impl SharedAgentWorkbench {
         self.inner.borrow().active_session.clone()
     }
 
+    fn allocate_unique_nav_id(inner: &mut WorkbenchInner, base: String) -> String {
+        if !base.is_empty() && inner.seen_navigation_ids.insert(base.clone()) {
+            return base;
+        }
+        loop {
+            let seq = inner.next_navigation_seq;
+            inner.next_navigation_seq = inner.next_navigation_seq.saturating_add(1);
+            let candidate = if base.is_empty() {
+                format!("visit-{seq}")
+            } else {
+                format!("{base}#{seq}")
+            };
+            if inner.seen_navigation_ids.insert(candidate.clone()) {
+                return candidate;
+            }
+        }
+    }
+
     pub fn set_active_session(&self, address: SessionAddress) {
         {
             let mut inner = self.inner.borrow_mut();
@@ -405,8 +427,17 @@ impl SharedAgentWorkbench {
             inner.active_session = Some(address.clone());
             if changed {
                 inner.revision = inner.revision.saturating_add(1);
+                let nav_id = loop {
+                    let seq = inner.next_navigation_seq;
+                    inner.next_navigation_seq = inner.next_navigation_seq.saturating_add(1);
+                    let candidate =
+                        format!("visit-{seq}:{}:{}", address.endpoint_id, address.session_id);
+                    if inner.seen_navigation_ids.insert(candidate.clone()) {
+                        break candidate;
+                    }
+                };
                 inner.pending_navigation.push_back(navigation::Entry {
-                    id: format!("session:{}:{}", address.endpoint_id, address.session_id),
+                    id: nav_id,
                     route: "agent-session".to_owned(),
                     params: serde_json::json!({
                         "endpointId": address.endpoint_id,
@@ -433,9 +464,11 @@ impl SharedAgentWorkbench {
         self.notify_wakes();
     }
 
-    pub fn enqueue_navigation(&self, entry: navigation::Entry) {
+    pub fn enqueue_navigation(&self, mut entry: navigation::Entry) {
         {
             let mut inner = self.inner.borrow_mut();
+            let base = std::mem::take(&mut entry.id);
+            entry.id = Self::allocate_unique_nav_id(&mut inner, base);
             inner.pending_navigation.push_back(entry);
             inner.revision = inner.revision.saturating_add(1);
         }

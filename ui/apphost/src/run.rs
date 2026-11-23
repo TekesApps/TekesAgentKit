@@ -237,7 +237,8 @@ impl AgentRunContainer {
         )?;
         Ok(container
             .title("Conversation")
-            .switcher_icon("tekes-side-chat"))
+            .switcher_icon("tekes-side-chat")
+            .content_padding(0.0))
     }
 
     pub fn build_toolbar_items(workbench: &SharedAgentWorkbench) -> Vec<LocalToolbarItem> {
@@ -376,12 +377,7 @@ impl AgentRunContainer {
     }
 
     pub fn follow_latest_in_host(host: &mut ContentHost) {
-        if let Some(reader) = host
-            .get_mut(tekes_agent_components_ui::TRANSCRIPT_READER_ID)
-            .and_then(|c| c.component_mut::<tekes_agent_components_ui::TranscriptReader>())
-        {
-            reader.follow_latest();
-        }
+        TranscriptSurface::follow_latest(host);
     }
 }
 
@@ -399,7 +395,8 @@ impl TranscriptContainer {
         )?;
         Ok(container
             .title("Conversation")
-            .switcher_icon("tekes-side-chat"))
+            .switcher_icon("tekes-side-chat")
+            .content_padding(0.0))
     }
 }
 
@@ -415,6 +412,9 @@ impl ComposerContainer {
             AgentRunAdapter::new(false, false, true),
             false,
         )?;
-        Ok(container.title("Composer").switcher_icon("tekes-send"))
+        Ok(container
+            .title("Composer")
+            .switcher_icon("tekes-send")
+            .content_padding(0.0))
     }
 }

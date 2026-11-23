@@ -87,6 +87,8 @@ impl EndpointJsonConfig {
 pub struct TopologyALaunchOptions {
     pub theme: Theme,
     pub swap_focus: bool,
+    pub showcase: bool,
+    pub component: Option<String>,
     pub offscreen: Option<PathBuf>,
     pub endpoint_config: Option<PathBuf>,
     pub native_selftest: bool,
@@ -98,6 +100,8 @@ impl Default for TopologyALaunchOptions {
         Self {
             theme: Theme::LIGHT,
             swap_focus: false,
+            showcase: false,
+            component: None,
             offscreen: None,
             endpoint_config: None,
             native_selftest: false,
@@ -129,6 +133,17 @@ impl TopologyALaunchOptions {
                 "--swap-focus" => {
                     opts.swap_focus = true;
                 }
+                "--showcase" => {
+                    opts.showcase = true;
+                }
+                "--component" => {
+                    idx += 1;
+                    let name = args
+                        .get(idx)
+                        .context("--component expects a component name")?;
+                    crate::showcase::ShowcaseComponent::from_name(name)?;
+                    opts.component = Some(name.clone());
+                }
                 "--endpoint-config" => {
                     idx += 1;
                     let path = args
@@ -139,6 +154,7 @@ impl TopologyALaunchOptions {
                 "--native-selftest" => {
                     opts.native_selftest = true;
                 }
+                psn if psn.starts_with("-psn_") => {}
                 unknown => {
                     bail!("unknown demo flag `{unknown}`");
                 }
@@ -370,7 +386,10 @@ pub fn build_topology_a_app(
             directory: nav_dir,
             history_id: "topology-a-workbench".to_owned(),
             initial_entries: vec![navigation::Entry {
-                id: format!("session:{}", initial_session.session_id),
+                id: format!(
+                    "visit-0:{}:{}",
+                    initial_session.endpoint_id, initial_session.session_id
+                ),
                 route: "agent-session".to_owned(),
                 params: json!({
                     "endpointId": initial_session.endpoint_id,

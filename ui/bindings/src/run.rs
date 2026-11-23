@@ -232,12 +232,13 @@ impl RunWorkbenchBinding {
     pub fn select_session(&self, session_id: &str) {
         let endpoint_id = self.endpoint_id();
         let scope = RunScope::main(endpoint_id, session_id);
-        let dest = ComposerDestination::run(scope.clone());
+        let dest = ComposerDestination::run(scope);
         let _ = self.controller.select(dest);
-        let controller = Arc::clone(&self.controller);
+        let runtime = Arc::clone(&self.runtime);
+        let session_id = session_id.to_owned();
         let wake = Arc::clone(&self.wake);
         self.handle.spawn(async move {
-            let _ = controller.open(scope).await;
+            let _ = runtime.open_session(&session_id).await;
             wake.wake();
         });
         self.bump_ui();

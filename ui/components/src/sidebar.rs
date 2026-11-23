@@ -307,6 +307,7 @@ impl SidebarSurface {
             });
         }
 
+        let mut list_replaced = false;
         if sig != self.last_sig {
             let snap = KeyedListSnapshot {
                 dataset: ListDatasetKey(1),
@@ -318,11 +319,12 @@ impl SidebarSurface {
                 .is_ok()
             {
                 self.last_sig = sig;
+                list_replaced = true;
             }
         }
 
         let sel_owned = selected_session_id.map(str::to_owned);
-        if self.last_selected_session != sel_owned || !self.last_sig.is_empty() {
+        if list_replaced || self.last_selected_session != sel_owned {
             let key = sel_owned
                 .as_deref()
                 .and_then(|id| self.id_to_key.get(id).copied());

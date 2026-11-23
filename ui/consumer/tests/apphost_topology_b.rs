@@ -11,7 +11,7 @@ use std::time::Duration;
 use tekes_agent_apphost::{AgentRunContainer, ArtifactViewerContainer, ArtifactViewerProvider};
 use tekes_agent_components_ui::{
     ARTIFACT_HEADER_ID, COMPOSER_EDITOR_ID, RUN_CONTAINER_SHELL_ID, ResponsiveWidthMode,
-    TRANSCRIPT_READER_ID, TranscriptReader,
+    TRANSCRIPT_SCROLL_ID, TranscriptSurface,
 };
 use tekes_agent_presentation::ComposerDestination;
 use tekes_agent_ui_consumer_check::studio::{
@@ -121,21 +121,16 @@ fn topology_b_domain_first_cad_viewer_and_zero_rebuild_focus_swap() {
     // 3. Prove persistent AgentRunContainer keeps mount_identity(), non-bottom reading state,
     //    and active CJK Preedit across simulated `Others (Compact) <-> Focus (Expanded)` swaps!
     let mut persistent_agent = AgentRunContainer::build("agent-run", rt.workbench.clone()).unwrap();
-    let (shell_id_before, reader_id_before, editor_id_before) = {
+    let (shell_id_before, scroll_id_before, editor_id_before) = {
         let mut ids = (0u64, 0u64, 0u64);
         persistent_agent.with_host(&mut |h| {
             ids.0 = h.get(RUN_CONTAINER_SHELL_ID).unwrap().mount_identity();
-            ids.1 = h.get(TRANSCRIPT_READER_ID).unwrap().mount_identity();
+            ids.1 = h.get(TRANSCRIPT_SCROLL_ID).unwrap().mount_identity();
             ids.2 = h.get(COMPOSER_EDITOR_ID).unwrap().mount_identity();
 
-            // Put TranscriptReader in non-following reading mode (scrolled up in history).
-            let reader = h
-                .get_mut(TRANSCRIPT_READER_ID)
-                .unwrap()
-                .component_mut::<TranscriptReader>()
-                .unwrap();
-            reader.stop_following();
-            assert!(!reader.reading.is_following_latest());
+            // Put TranscriptSurface in non-following reading mode (scrolled up in history).
+            TranscriptSurface::stop_following(h);
+            assert_eq!(TranscriptSurface::is_following_latest(h), Some(false));
 
             layout_host_for_focus(h);
 
@@ -166,20 +161,15 @@ fn topology_b_domain_first_cad_viewer_and_zero_rebuild_focus_swap() {
             shell_id_before
         );
         assert_eq!(
-            h.get(TRANSCRIPT_READER_ID).unwrap().mount_identity(),
-            reader_id_before
+            h.get(TRANSCRIPT_SCROLL_ID).unwrap().mount_identity(),
+            scroll_id_before
         );
         assert_eq!(
             h.get(COMPOSER_EDITOR_ID).unwrap().mount_identity(),
             editor_id_before
         );
 
-        let reader = h
-            .get(TRANSCRIPT_READER_ID)
-            .unwrap()
-            .component::<TranscriptReader>()
-            .unwrap();
-        assert!(!reader.reading.is_following_latest());
+        assert_eq!(TranscriptSurface::is_following_latest(h), Some(false));
 
         let field = h
             .get_mut(COMPOSER_EDITOR_ID)

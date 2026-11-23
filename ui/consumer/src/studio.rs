@@ -426,7 +426,7 @@ pub fn build_topology_b_app(rt: &DomainStudioRuntime, promote_agent: bool) -> Re
             directory: nav_dir,
             history_id: "topology-b-studio".to_owned(),
             initial_entries: vec![navigation::Entry {
-                id: "cad-chassis-mk4".to_owned(),
+                id: format!("visit-0:cad-chassis-mk4:{}", scope.session_id),
                 route: "domain-cad".to_owned(),
                 params: serde_json::json!({ "model": "chassis-mk4", "sessionId": scope.session_id }),
             }],
