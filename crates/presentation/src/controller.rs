@@ -398,6 +398,64 @@ impl RunController {
         self.shared.refresh();
         Ok(())
     }
+    pub fn append_artifact(
+        &self,
+        destination: &ComposerDestination,
+        artifact: ComposerArtifact,
+    ) -> Result<()> {
+        self.shared.validate_destination(destination)?;
+        self.shared
+            .core
+            .lock()
+            .expect("presentation lock poisoned")
+            .append_artifact(destination, artifact)?;
+        self.shared.refresh();
+        Ok(())
+    }
+    pub fn append_annotation(
+        &self,
+        destination: &ComposerDestination,
+        annotation: ComposerAnnotation,
+    ) -> Result<()> {
+        self.shared.validate_destination(destination)?;
+        self.shared
+            .core
+            .lock()
+            .expect("presentation lock poisoned")
+            .append_annotation(destination, annotation)?;
+        self.shared.refresh();
+        Ok(())
+    }
+    pub fn remove_artifact(
+        &self,
+        destination: &ComposerDestination,
+        artifact_id: &str,
+    ) -> Result<bool> {
+        self.shared.validate_destination(destination)?;
+        let removed = self
+            .shared
+            .core
+            .lock()
+            .expect("presentation lock poisoned")
+            .remove_artifact(destination, artifact_id)?;
+        self.shared.refresh();
+        Ok(removed)
+    }
+    pub fn remove_annotation(
+        &self,
+        destination: &ComposerDestination,
+        annotation_id: &str,
+    ) -> Result<bool> {
+        self.shared.validate_destination(destination)?;
+        let removed = self
+            .shared
+            .core
+            .lock()
+            .expect("presentation lock poisoned")
+            .remove_annotation(destination, annotation_id)?;
+        self.shared.refresh();
+        Ok(removed)
+    }
     pub fn patch_context(
         &self,
         expected: &ComposerContextBaseline,
@@ -537,7 +595,7 @@ impl RunController {
             self.shared.core.lock().expect("presentation lock poisoned").materialize(&ticket,scope.clone())?;
             self.shared.refresh();
             host.prepare(&self.shared.runtime,&ticket,&scope).await?;
-            self.shared.runtime.open_session(&scope.session_id).await?;
+            let _history_lease = self.shared.runtime.acquire_history(&scope.session_id).await?;
             let child_parent = self.shared.child_parent(&scope)?;
             if child_parent.is_some() {
                 require(matches!(ticket.plan, SubmissionPlan::Prompt { .. }), "child commands unavailable")?;
@@ -569,20 +627,40 @@ impl RunController {
         self.shared.runtime.load_earlier(&scope.session_id).await
     }
     pub async fn cancel(&self, scope: &RunScope) -> Result<()> {
-        let valid = self
-            .shared
-            .runtime
-            .inspect(|s| RunPresentation::read(s, scope, true).can_cancel);
-        require(valid, "Run is not cancellable")?;
+        let expected_epoch = self.shared.runtime.inspect(|s| s.connection_epoch);
+        self.cancel_at_epoch(expected_epoch, scope).await
+    }
+    pub async fn cancel_at_epoch(&self, expected_epoch: u64, scope: &RunScope) -> Result<()> {
+        let valid = self.shared.runtime.inspect(|s| {
+            if s.connection != tekes_agent_session::ConnectionState::Ready
+                || s.connection_epoch != expected_epoch
+            {
+                return Err(Error::Disconnected);
+            }
+            require(
+                RunPresentation::read(s, scope, true).can_cancel,
+                "Run is not cancellable",
+            )
+        });
+        valid?;
         if let Some(parent) = self.shared.child_parent(scope)? {
             self.shared
                 .runtime
-                .cancel_child(parent, &scope.session_id, &uuid::Uuid::new_v4().to_string())
+                .cancel_child_at_epoch(
+                    expected_epoch,
+                    parent,
+                    &scope.session_id,
+                    &uuid::Uuid::new_v4().to_string(),
+                )
                 .await
         } else {
             self.shared
                 .runtime
-                .cancel(&scope.session_id, &uuid::Uuid::new_v4().to_string())
+                .cancel_at_epoch(
+                    expected_epoch,
+                    &scope.session_id,
+                    &uuid::Uuid::new_v4().to_string(),
+                )
                 .await
         }
     }

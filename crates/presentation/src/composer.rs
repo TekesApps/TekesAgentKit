@@ -488,6 +488,72 @@ impl PresentationStore {
             .text = text;
         Ok(())
     }
+    pub fn append_artifact(
+        &mut self,
+        destination: &ComposerDestination,
+        artifact: ComposerArtifact,
+    ) -> Result<()> {
+        destination.validate()?;
+        let destination = self.resolve(destination);
+        self.drafts
+            .entry(destination.clone())
+            .or_default()
+            .artifacts
+            .push(artifact);
+        self.advance_context(&destination);
+        Ok(())
+    }
+    pub fn append_annotation(
+        &mut self,
+        destination: &ComposerDestination,
+        annotation: ComposerAnnotation,
+    ) -> Result<()> {
+        destination.validate()?;
+        let destination = self.resolve(destination);
+        self.drafts
+            .entry(destination.clone())
+            .or_default()
+            .annotations
+            .push(annotation);
+        self.advance_context(&destination);
+        Ok(())
+    }
+    pub fn remove_artifact(
+        &mut self,
+        destination: &ComposerDestination,
+        artifact_id: &str,
+    ) -> Result<bool> {
+        destination.validate()?;
+        let destination = self.resolve(destination);
+        let Some(draft) = self.drafts.get_mut(&destination) else {
+            return Ok(false);
+        };
+        let before = draft.artifacts.len();
+        draft.artifacts.retain(|item| item.id() != artifact_id);
+        let removed = draft.artifacts.len() != before;
+        if removed {
+            self.advance_context(&destination);
+        }
+        Ok(removed)
+    }
+    pub fn remove_annotation(
+        &mut self,
+        destination: &ComposerDestination,
+        annotation_id: &str,
+    ) -> Result<bool> {
+        destination.validate()?;
+        let destination = self.resolve(destination);
+        let Some(draft) = self.drafts.get_mut(&destination) else {
+            return Ok(false);
+        };
+        let before = draft.annotations.len();
+        draft.annotations.retain(|item| item.id != annotation_id);
+        let removed = draft.annotations.len() != before;
+        if removed {
+            self.advance_context(&destination);
+        }
+        Ok(removed)
+    }
     /// Asynchronous model/catalog reads must carry both scope and generation (A -> B -> A is stale).
     pub fn commit_settings(
         &mut self,

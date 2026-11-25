@@ -106,7 +106,7 @@ async fn ime_is_not_a_submission_and_editor_instances_keep_destination_undo() {
     assert!(intents.is_empty());
     assert!(c.snapshot().draft.text.is_empty());
     ui.sync(&c.snapshot()).unwrap();
-    assert_eq!(ui.editor().input.text, "zhongwen");
+    assert_eq!(ui.editor().text(), "zhongwen");
     assert!(
         ui.event(&ContentEvent::Key {
             key: ControlKey::Enter,
@@ -147,10 +147,14 @@ async fn ime_is_not_a_submission_and_editor_instances_keep_destination_undo() {
         .unwrap();
     ui.sync(&c.snapshot()).unwrap();
     ui.tree.focus(Some(COMPOSER), true);
-    assert_eq!(ui.editor().input.text, "中文草稿 A");
-    edit(&mut ui, &c, ContentEvent::TextCommand("undo:".into()));
+    assert_eq!(ui.editor().text(), "中文草稿 A");
+    edit(
+        &mut ui,
+        &c,
+        ContentEvent::TextCommand(tekes_ui_controls::TextEditCommand::Undo),
+    );
     assert!(
-        ui.editor().input.text.is_empty(),
+        ui.editor().text().is_empty(),
         "retained native undo must restore the original empty draft"
     );
     runtime.stop().await.unwrap();

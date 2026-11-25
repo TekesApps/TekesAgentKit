@@ -1,19 +1,20 @@
-# TekesUI 消费侧缺口
+# TekesUI 消费侧缺口与上游闭环状态
 
-可直接交给 TekesUI 开发的优先级、接口需求和验收标准见 [七项开发任务](tekesui-development-tasks.md)。
+更新日期：2026-11-20。基准从开发快照迁移至不可变公开版本：`TekesUI v0.4.1`（commit `4ed5b2912e34312a0e0d9e9780d09482b58a0cc6`，`ui/tekesui-source.json`）。
 
-只列需求与证据，不修改 TekesUI，不在 AgentKit 内补通用实现。基准是 ui/tekesui-source.json 的冻结开发快照。
-
-| ID | 当前公开 API / 缺口 | 需要的事件或属性 | 对本轮影响 |
+| ID | 历史缺口 | 上游状态 (`TekesUI v0.4.1`) | AgentKit `ui/` 消费方式与剩余边界 |
 |---|---|---|---|
-| TKUI-001 | Window 只有 UI 线程的 request_redraw；Rc/非 Send，没有后台唤醒代理 | Send + Clone 的 EventLoopProxy/WindowWake，后台请求合并为 UI Event；窗口关闭后安全失效 | 生产阻塞。异步网络变化无法在空闲窗口主动显示；demo 仅显式 --frame-pump 演示，不能作为修复或空闲性能验收 |
-| TKUI-002 | ReadingController 支持尾追加与 UTF-16 重排锚点，但非尾追加视为新文档 | capture/restore 阅读锚点；支持 keyed item/message ID + 行内偏移，或带 prepend range 的内容更新 API | 生产阻塞。Earlier 的数据闭环可做，头部插入后的阅读位置连续性不可承诺；不另写滚动锚点算法 |
-| TKUI-003 | TextFieldContent 使用 TextCommand，当前不处理 insertNewline:/insertTab:/insertBacktab:；ContentEvent::Key 没有完整修饰键/文本服务处理标识 | 多行编辑器的标准文本命令处理；明确的 IME-consumed/提交意图与 modifiers；composition-safe Tab 焦点导航 | demo 限单行、显式 Send。Enter 不发送，不在 AgentKit 内添加通用文本编辑行为 |
-| TKUI-004 | 组合 Button 的 activated 是聚合结果，宿主通过公开 activations 计数取得具体动作 | 带 ComponentId 的 typed action/event callback，保留键盘/指针/AX 来源 | 当前可用稳定 ID 查询计数，不阻塞试点；扩展复杂组件前希望上游提供 |
-| TKUI-005 | 可公开修改 TextInput 字段，但缺少受控值同步事务 | 外部值/版本更新 API，说明如何保留或重置 selection、undo、preedit，返回 applied/deferred | 当前按 destination 保留实例，组字期间拒绝外部替换；复杂外部草稿同步前需正式契约 |
-| TKUI-006 | composition 指针事件未携带 modifiers/clickCount，TextFieldContent 内部固定 shift=false/clickCount=1 | 指针事件传递修饰键与点击次数，保留原生选择语义 | Shift-click、双击/三击选择未验收，不在消费侧实现选择算法 |
-| TKUI-007 | TextFieldContent 使用固定表单视口，缺少可配置多行视口高度 | 多行文本视口尺寸/约束属性，与 TextSurface 阅读布局一致 | 不阻塞原型：Transcript 消费公开 TextSurface 完整视口；Composer 仅单行 |
+| TKUI-001 | 缺少后台 `Send + Clone` UI 唤醒代理 | **已关闭** ([TekesUI #15](https://github.com/TekesApps/TekesUI/issues/15))：`tekes_ui_platform_macos::WindowWake` 与 `ContainerContent::start_process(&mut self, wake: WindowWake)` 已公开可用 | `SharedAgentWorkbench` 注册 `WindowWake`，流式输出、状态变更与异步读回按需唤醒窗口，**正式移除 `--frame-pump` 轮询** |
+| TKUI-002 | 历史前插阅读锚点缺失 | **已关闭** ([TekesUI #16](https://github.com/TekesApps/TekesUI/issues/16))：`ReadingController::set_document` / `update_document` + `ReadingDocumentVersion` + `TextRangeMapping` 已公开 | `LoadEarlier` 前插旧历史时计算保留段 UTF-16 区间映射，交由 `ReadingController` 保持逻辑阅读锚点，AgentKit 不自算像素补偿 |
+| TKUI-003 | 文本命令、修饰键与 IME 消费语义 | **已关闭** ([TekesUI #17](https://github.com/TekesApps/TekesUI/issues/17))：`TextFieldContent` 公开 `TextSubmitPolicy` / `TextTabPolicy`、`ContentKeyEvent` 与 IME disposition | `Composer` 支持多行输入、`Cmd+Enter` 发送（可配置）及 `composing()` 保护；真机物理拼音/日文 IME 体验仍独立于合成测试单列 |
+| TKUI-004 | 带目标与来源的控件动作事件 | **已关闭** ([TekesUI #21](https://github.com/TekesApps/TekesUI/issues/21))：`ContentHost::set_action_events(true)` 与 `drain_action_records()` 输出 `ContentActionRecord { action, mount, payload }` | `ManagedAgentContainer` 统一通过 `LocalContainer::on_action` 消费类型化动作，移除按钮 `activations` 计数轮询 |
+| TKUI-005 | 受控编辑值同步事务 | **已关闭** ([TekesUI #18](https://github.com/TekesApps/TekesUI/issues/18))：`TextSurface::apply_external_value`、`DraftRevision`、`TextEditBaseline`、`ExternalSelection`、`ExternalUndo`、`ExternalValueResult` | 远端草稿与发送清空经基线/版本事务同步，组字期间安全拒绝外部替换并保留原生撤销栈 |
+| TKUI-006 | 指针选择元数据透传 | **已关闭** ([TekesUI #19](https://github.com/TekesApps/TekesUI/issues/19))：`PointerEvent` 携带 `PointerButton`、`InputModifiers`、`click_count` | 直接委托 `TextFieldContent` / `RichContent` 执行 Shift-click 与多击词段选择，真机鼠标手感单列记录 |
+| TKUI-007 | 可配置文本视口与多行尺寸约束 | **已关闭** ([TekesUI #20](https://github.com/TekesApps/TekesUI/issues/20))：`TextViewport::{Form, Fixed, Fill, Grow { min, max }}` 与 `TextFieldContent::read_only_content` / `RichContent` | `Composer` 消费 `TextViewport::Grow`，阅读器消费 `RichContent` / `ReadingController`，不再手写高度覆盖 |
 
-已有能力不列为缺失：TextInput 的 preedit/UTF-16、选择、undo/redo；ContentHost focus；TextInputState 原生候选位置；ReadingController 尾追加保护；AX 节点/动作桥接。它们存在不等于真实物理输入法、VoiceOver 或性能已经验收。
+## 仍需独立分列报告的验证边界
 
-不在本轮扩展：富 Markdown/工具卡片/附件、任务/子代理/SideChat/Summary UI；正式虚拟化、大历史增量投影、生产 launcher。先完成基础 Run 可验证部分，再以缺口清单协调 TekesUI。
+即使上述 7 项通用 UI API 已在 `TekesUI v0.4.1` 闭合并被 `TekesAgentKit` 消费，下列人工/硬件维度仍**不可由合成事件或离屏渲染替代**，报告证据时必须严格区分：
+- 人类真实系统中文/日文物理输入法候选窗联调（Synthetic `Preedit`/`Commit` 通过 ≠ 物理输入法已验收）；
+- macOS 系统 VoiceOver 真实朗读与焦点走查（AX 节点语义树完整性校验 ≠ 真人 VoiceOver 验收）；
+- 120Hz ProMotion 真机物理帧率 pacing 与长会话人工体感滚动。

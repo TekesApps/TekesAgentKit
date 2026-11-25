@@ -286,6 +286,17 @@ impl SessionRuntime {
         .await
     }
     pub async fn cancel_child(&self, parent: &str, child: &str, rpc_id: &str) -> Result<()> {
+        let expected_epoch = self.inspect(|state| state.connection_epoch);
+        self.cancel_child_at_epoch(expected_epoch, parent, child, rpc_id)
+            .await
+    }
+    pub async fn cancel_child_at_epoch(
+        &self,
+        expected_epoch: u64,
+        parent: &str,
+        child: &str,
+        rpc_id: &str,
+    ) -> Result<()> {
         require(
             parent != child && !child.is_empty(),
             "invalid child identity",
@@ -293,10 +304,12 @@ impl SessionRuntime {
         self.subagent_catalog(parent)
             .await?
             .require_continuable(child)?;
-        self.call_optional(
+        self.call_optional_at_epoch_with_validation(
+            expected_epoch,
             "subagents.cancel",
             json!({"parentSessionId":parent,"childSessionId":child}),
             rpc_id,
+            || Ok(()),
         )
         .await?;
         Ok(())

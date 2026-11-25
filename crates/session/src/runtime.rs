@@ -137,6 +137,7 @@ pub struct SessionRuntime {
     shared: Arc<SharedProjection>,
     revision: watch::Receiver<u64>,
     abort: tokio::task::AbortHandle,
+    handle: tokio::runtime::Handle,
     history_owners: HistoryOwners,
 }
 impl Drop for SessionRuntime {
@@ -156,12 +157,14 @@ impl SessionRuntime {
             }),
             publish,
         });
-        let task = tokio::spawn(run(connector, receiver, shared.clone()));
+        let handle = tokio::runtime::Handle::current();
+        let task = handle.spawn(run(connector, receiver, shared.clone()));
         Self {
             commands,
             shared,
             revision,
             abort: task.abort_handle(),
+            handle,
             history_owners: std::sync::Mutex::new(Default::default()),
         }
     }
@@ -301,14 +304,16 @@ impl SessionRuntime {
     ) -> Result<SessionHistoryLease> {
         require(!id.is_empty(), "empty history session")?;
         let owner = rpc_id();
-        let lease = SessionHistoryLease {
+        let mut lease = SessionHistoryLease {
             runtime: self.clone(),
+            handle: self.handle.clone(),
             id: id.into(),
             owner: owner.clone(),
+            released: false,
         };
         let owners = self.history_owners_for(id);
         let mut owners = owners.lock().await;
-        owners.insert(owner);
+        owners.insert(owner.clone());
         let epoch = self.inspect(|state| state.connection_epoch);
         if let Err(error) = self.open_history(id).await {
             let scoped_failure = allow_history_failure
@@ -324,6 +329,14 @@ impl SessionRuntime {
                         })
                 });
             if !scoped_failure {
+                owners.remove(&owner);
+                let should_close = owners.is_empty();
+                drop(owners);
+                lease.released = true;
+                if should_close {
+                    let (reply, result) = oneshot::channel();
+                    let _ = self.send(Command::Close(id.into(), reply), result).await;
+                }
                 return Err(error);
             }
         }
@@ -727,6 +740,9 @@ async fn run(
                 command = commands.recv() => match command {
                     Some(Command::Stop(reply)) => { store.update(|s| s.connection = ConnectionState::Stopped); let _ = reply.send(Ok(())); return; }
                     Some(Command::Reconnect(reply)) => { let _ = reply.send(Ok(())); }
+                    Some(Command::Close(id, reply)) => {
+                        close_while_disconnected(id, reply, &mut wanted, &mut deferred_closes, &store);
+                    }
                     Some(command) => reject(command),
                     None => return,
                 }
@@ -800,6 +816,9 @@ async fn run(
                         command = commands.recv() => match command {
                             Some(Command::Reconnect(reply)) => { failures = 0; let _ = reply.send(Ok(())); continue 'connections; }
                             Some(Command::Stop(reply)) => { store.update(|s| s.connection = ConnectionState::Stopped); let _ = reply.send(Ok(())); return; }
+                            Some(Command::Close(id, reply)) => {
+                                close_while_disconnected(id, reply, &mut wanted, &mut deferred_closes, &store);
+                            }
                             Some(command) => reject(command),
                             None => return,
                         }
@@ -808,6 +827,22 @@ async fn run(
             }
         }
     }
+}
+fn close_while_disconnected(
+    id: String,
+    reply: Reply<()>,
+    wanted: &mut BTreeSet<String>,
+    deferred_closes: &mut BTreeSet<String>,
+    store: &Arc<SharedProjection>,
+) {
+    if store.read(|s| s.sessions.get(&id).is_some_and(|session| session.run_open)) {
+        deferred_closes.insert(id);
+    } else {
+        deferred_closes.remove(&id);
+        wanted.remove(&id);
+        store.update(|s| s.reset_journal(&id));
+    }
+    let _ = reply.send(Ok(()));
 }
 fn reject(command: Command) {
     match command {
@@ -1421,27 +1456,32 @@ fn remember_recovery(
 /// Drop releases only this consumer. Runtime shutdown does not require a live executor.
 pub struct SessionHistoryLease {
     runtime: Arc<SessionRuntime>,
+    handle: tokio::runtime::Handle,
     id: String,
     owner: String,
+    released: bool,
 }
 impl SessionHistoryLease {
     pub fn session_id(&self) -> &str {
         &self.id
     }
-    pub async fn release(self) -> Result<()> {
+    pub async fn release(mut self) -> Result<()> {
+        self.released = true;
         self.runtime.release_history(&self.id, &self.owner).await
     }
 }
 impl Drop for SessionHistoryLease {
     fn drop(&mut self) {
-        if let Ok(handle) = tokio::runtime::Handle::try_current() {
-            let runtime = self.runtime.clone();
-            let id = self.id.clone();
-            let owner = self.owner.clone();
-            handle.spawn(async move {
-                let _ = runtime.release_history(&id, &owner).await;
-            });
+        if self.released {
+            return;
         }
+        self.released = true;
+        let runtime = self.runtime.clone();
+        let id = self.id.clone();
+        let owner = self.owner.clone();
+        self.handle.spawn(async move {
+            let _ = runtime.release_history(&id, &owner).await;
+        });
     }
 }
 
