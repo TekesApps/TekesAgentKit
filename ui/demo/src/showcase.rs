@@ -734,7 +734,10 @@ fn apply_composer_intents(
                 run.set_draft_text(&destination, text)
             }
             ComposerIntent::Send { destination } => run.submit_destination(&destination),
-            ComposerIntent::Cancel { scope } => run.cancel_scope(&scope),
+            ComposerIntent::Cancel {
+                scope,
+                connection_epoch,
+            } => run.cancel_scope_at_epoch(connection_epoch, &scope),
             ComposerIntent::Reconnect => run.reconnect(),
             ComposerIntent::AttachDemoFile { destination } => {
                 run.attach_file_path(

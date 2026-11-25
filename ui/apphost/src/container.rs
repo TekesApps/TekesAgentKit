@@ -57,6 +57,15 @@ pub trait AgentContainerAdapter {
     ) {
     }
 
+    /// Drain deferred widget-local actions right before render without mutating `ContentHost`
+    /// during pointer/keyboard dispatch.
+    fn drain_deferred_intents(
+        &mut self,
+        _host: &mut ContentHost,
+        _workbench: &SharedAgentWorkbench,
+    ) {
+    }
+
     /// Handle AppHost toolbar/menu commands routed to this container.
     fn handle_command(
         &mut self,
@@ -238,6 +247,11 @@ impl<A: AgentContainerAdapter + 'static> ContainerContent for ManagedAgentContai
     }
 
     fn prepare_for_render(&mut self) {
+        if self.active_flag.get() {
+            self.adapter
+                .borrow_mut()
+                .drain_deferred_intents(&mut self.host, &self.workbench);
+        }
         let current_rev = self.workbench.sync_background_revision();
         let current_width_mode = self.width_mode.get();
         if !self.active_flag.get() {

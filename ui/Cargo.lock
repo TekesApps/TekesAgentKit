@@ -2176,7 +2176,7 @@ dependencies = [
 
 [[package]]
 name = "tekes-agent-contract"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "async-trait",
  "base64",
@@ -2188,7 +2188,7 @@ dependencies = [
 
 [[package]]
 name = "tekes-agent-endpoint-dsh"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "async-trait",
  "base64",
@@ -2204,7 +2204,7 @@ dependencies = [
 
 [[package]]
 name = "tekes-agent-endpoint-kernel"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "async-trait",
  "futures-util",
@@ -2217,7 +2217,7 @@ dependencies = [
 
 [[package]]
 name = "tekes-agent-endpoint-pi"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "async-trait",
  "base64",
@@ -2236,7 +2236,7 @@ dependencies = [
 
 [[package]]
 name = "tekes-agent-presentation"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "async-trait",
  "iri-string",
@@ -2256,7 +2256,7 @@ dependencies = [
 
 [[package]]
 name = "tekes-agent-session"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "base64",
  "futures-util",
@@ -2341,7 +2341,7 @@ dependencies = [
 
 [[package]]
 name = "tekes-agent-web"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "async-trait",
  "base64",

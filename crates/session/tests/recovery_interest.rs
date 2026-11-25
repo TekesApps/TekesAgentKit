@@ -358,3 +358,320 @@ async fn failed_epoch_preflight_does_not_suppress_the_first_real_recovery_dispat
     lease.release().await.unwrap();
     r.stop().await.unwrap();
 }
+
+#[derive(Clone)]
+struct ControlledReconnectConnector {
+    connects: Arc<AtomicUsize>,
+    connect2_gate: Arc<tokio::sync::Notify>,
+    followed_journals: Arc<Mutex<Vec<(usize, String)>>>,
+    recovery_calls: Arc<Mutex<Vec<Value>>>,
+    drop_inventory: Arc<tokio::sync::Notify>,
+    journal_tx: Arc<Mutex<Option<tokio::sync::mpsc::UnboundedSender<Result<Value>>>>>,
+    active_run: Arc<std::sync::atomic::AtomicBool>,
+}
+
+impl ControlledReconnectConnector {
+    fn new() -> Self {
+        Self {
+            connects: Arc::new(AtomicUsize::new(0)),
+            connect2_gate: Arc::new(tokio::sync::Notify::new()),
+            followed_journals: Arc::new(Mutex::new(Vec::new())),
+            recovery_calls: Arc::new(Mutex::new(Vec::new())),
+            drop_inventory: Arc::new(tokio::sync::Notify::new()),
+            journal_tx: Arc::new(Mutex::new(None)),
+            active_run: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+        }
+    }
+}
+
+struct ControlledReconnectEndpoint {
+    host: HostDescription,
+    source: ControlledReconnectConnector,
+    connection: usize,
+}
+
+#[async_trait]
+impl EndpointConnector for ControlledReconnectConnector {
+    async fn connect(&self) -> Result<Arc<dyn SessionEndpoint>> {
+        let connection = self.connects.fetch_add(1, Ordering::SeqCst) + 1;
+        if connection == 2 {
+            self.connect2_gate.notified().await;
+        }
+        Ok(Arc::new(ControlledReconnectEndpoint {
+            connection,
+            host: serde_json::from_value(json!({
+                "protocolVersion": 4,
+                "product": {"name": "Kernel", "version": "0.9.23"},
+                "capabilities": [
+                    "session-journal",
+                    "actionable-sync",
+                    "session-control-sync",
+                    "session-inventory-sync"
+                ],
+                "cwd": "/fixture",
+                "home": "/fixture",
+                "attachedSessions": 0,
+                "canOpenPath": false
+            }))
+            .unwrap(),
+            source: self.clone(),
+        }))
+    }
+}
+
+#[async_trait]
+impl SessionEndpoint for ControlledReconnectEndpoint {
+    fn identity(&self) -> &str {
+        "controlled-reconnect"
+    }
+    fn host(&self) -> &HostDescription {
+        &self.host
+    }
+    fn supports_recovery(&self) -> bool {
+        true
+    }
+    fn capabilities(&self) -> EndpointCapabilities {
+        EndpointCapabilities::methods(&["sessions.recover"])
+    }
+    async fn follow(&self, target: StreamTarget) -> Result<FrameStream> {
+        match target {
+            StreamTarget::SessionInventory => {
+                let frame = json!({
+                    "type": "baseline",
+                    "generation": "g",
+                    "snapshot": {
+                        "items": [
+                            {"sessionId": "a", "running": self.source.active_run.load(Ordering::SeqCst), "blank": false, "updatedAt": 1},
+                            {"sessionId": "b", "running": false, "blank": false, "updatedAt": 1}
+                        ]
+                    }
+                });
+                if self.connection == 1 {
+                    let drop_inv = self.source.drop_inventory.clone();
+                    return Ok(Box::pin(stream::once(async { Ok(frame) }).chain(
+                        stream::once(async move {
+                            drop_inv.notified().await;
+                            Err(Error::Disconnected)
+                        }),
+                    )));
+                }
+                Ok(Box::pin(
+                    stream::once(async { Ok(frame) }).chain(stream::pending()),
+                ))
+            }
+            StreamTarget::SessionControl => {
+                let frame = json!({"type": "baseline", "generation": "g", "snapshot": {"queues": [], "jobs": [], "projections": []}});
+                Ok(Box::pin(
+                    stream::once(async { Ok(frame) }).chain(stream::pending()),
+                ))
+            }
+            StreamTarget::Actionables => {
+                let frame = json!({"type": "reset", "generation": "g"});
+                Ok(Box::pin(
+                    stream::once(async { Ok(frame) }).chain(stream::pending()),
+                ))
+            }
+            StreamTarget::SessionJournal { address, .. } => {
+                self.source
+                    .followed_journals
+                    .lock()
+                    .unwrap()
+                    .push((self.connection, address.session_id.clone()));
+                let running = self.source.active_run.load(Ordering::SeqCst);
+                let entries = if running {
+                    vec![
+                        json!({"event": {"type": "user/message", "seq": 0, "time": 1, "data": {"text": "hi"}}}),
+                        json!({"event": {"type": "turn/start", "seq": 1, "time": 2, "data": {"turn": 1}}}),
+                    ]
+                } else {
+                    vec![
+                        json!({"event": {"type": "user/message", "seq": 0, "time": 1, "data": {"text": "hi"}}}),
+                    ]
+                };
+                let through = entries.len().saturating_sub(1);
+                let snapshot = json!({
+                    "type": "snapshot",
+                    "snapshot": {
+                        "sessionId": address.session_id,
+                        "generation": "g",
+                        "throughSequence": through,
+                        "windowLimit": 50,
+                        "entries": entries,
+                        "hasMoreBefore": false
+                    }
+                });
+                let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
+                *self.source.journal_tx.lock().unwrap() = Some(tx);
+                let tail = stream::unfold(rx, |mut rx| async move {
+                    rx.recv().await.map(|item| (item, rx))
+                });
+                Ok(Box::pin(stream::once(async { Ok(snapshot) }).chain(tail)))
+            }
+            _ => Err(unsupported("controlled stream")),
+        }
+    }
+    async fn history_page(&self, _: HistoryRequest) -> Result<HistoryPage> {
+        Err(unsupported("controlled history"))
+    }
+    async fn respond(&self, _: &str, _: i64, _: Value) -> Result<()> {
+        Err(unsupported("controlled respond"))
+    }
+    async fn call(&self, method: &str, payload: Value, _: &str) -> Result<Value> {
+        assert_eq!(method, "sessions.recover");
+        self.source
+            .recovery_calls
+            .lock()
+            .unwrap()
+            .push(payload.clone());
+        Ok(json!({"recoveredSessionIds": payload["sessionIds"]}))
+    }
+    async fn close(&self) {}
+}
+
+#[tokio::test]
+async fn releasing_last_idle_observer_while_disconnected_suppresses_follow_and_recovery_on_reconnect()
+ {
+    let source = ControlledReconnectConnector::new();
+    let r = Arc::new(SessionRuntime::spawn(
+        "controlled-reconnect",
+        Arc::new(source.clone()),
+    ));
+    r.wait_ready(Duration::from_secs(2)).await.unwrap();
+
+    let lease_a = r.acquire_history("a").await.unwrap();
+    assert!(r.inspect(|s| s.sessions["a"].journal_ready));
+
+    // Trigger disconnect and hold reconnect behind connect2_gate.
+    source.drop_inventory.notify_one();
+    let mut sub = r.subscribe();
+    tokio::time::timeout(Duration::from_secs(2), async {
+        loop {
+            if r.inspect(|s| s.connection != ConnectionState::Ready) {
+                break;
+            }
+            sub.changed().await.unwrap();
+        }
+    })
+    .await
+    .unwrap();
+
+    // Release last idle observer while disconnected -> must return Ok(()) and remove from wanted.
+    lease_a.release().await.unwrap();
+
+    // Unblock reconnect and wait for Ready.
+    source.connect2_gate.notify_one();
+    tokio::time::timeout(Duration::from_secs(3), async {
+        loop {
+            if source.connects.load(Ordering::SeqCst) >= 2
+                && r.inspect(|s| s.connection == ConnectionState::Ready)
+            {
+                break;
+            }
+            sub.changed().await.unwrap();
+        }
+    })
+    .await
+    .unwrap();
+
+    let follows_conn2: Vec<_> = source
+        .followed_journals
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|(conn, sid)| *conn == 2 && sid == "a")
+        .cloned()
+        .collect();
+    assert!(
+        follows_conn2.is_empty(),
+        "released idle session A must not be re-followed on reconnect: {follows_conn2:?}"
+    );
+    assert!(
+        source.recovery_calls.lock().unwrap().is_empty(),
+        "released idle session A must not be recovered on reconnect"
+    );
+    assert!(!r.inspect(|s| s.sessions.get("a").is_some_and(|sess| sess.journal_ready)));
+    r.stop().await.unwrap();
+}
+
+async fn wait_store(r: &SessionRuntime, pred: impl Fn(&MemoryProjectionStore) -> bool) {
+    let mut sub = r.subscribe();
+    tokio::time::timeout(Duration::from_secs(2), async {
+        loop {
+            if r.inspect(&pred) {
+                return;
+            }
+            sub.changed().await.unwrap();
+        }
+    })
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn two_observers_keep_stream_on_partial_release_and_settle_running_session_before_close() {
+    let source = ControlledReconnectConnector::new();
+    source.active_run.store(true, Ordering::SeqCst);
+    let r = Arc::new(SessionRuntime::spawn(
+        "controlled-reconnect",
+        Arc::new(source.clone()),
+    ));
+    r.wait_ready(Duration::from_secs(2)).await.unwrap();
+
+    let lease1 = r.acquire_history("a").await.unwrap();
+    let lease2 = r.acquire_history("a").await.unwrap();
+
+    // Releasing first observer leaves second observer active and receiving events.
+    lease1.release().await.unwrap();
+    assert!(r.inspect(|s| s.sessions["a"].journal_ready && s.sessions["a"].run_open));
+
+    let tx = source.journal_tx.lock().unwrap().clone().unwrap();
+    tx.send(Ok(json!({
+        "type": "event",
+        "generation": "g",
+        "sessionId": "a",
+        "entry": {
+            "event": {
+                "type": "assistant/message",
+                "seq": 2,
+                "time": 3,
+                "data": {"turn": 1, "step": 1, "message": {"id": "m1", "content": [{"type": "text", "text": "still-alive"}]}}
+            }
+        }
+    })))
+    .unwrap();
+    wait_store(&r, |s| {
+        s.sessions.get("a").is_some_and(|sess| {
+            sess.entries
+                .iter()
+                .any(|(_, e)| e.event.data["message"]["content"][0]["text"] == "still-alive")
+        })
+    })
+    .await;
+
+    // Releasing last observer while A is still running defers close until A settles.
+    lease2.release().await.unwrap();
+    assert!(r.inspect(|s| s.sessions["a"].journal_ready && s.sessions["a"].run_open));
+
+    tx.send(Ok(json!({
+        "type": "event",
+        "generation": "g",
+        "sessionId": "a",
+        "entry": {
+            "event": {
+                "type": "turn/end",
+                "seq": 3,
+                "time": 4,
+                "data": {"turn": 1, "reason": "completed"}
+            }
+        }
+    })))
+    .unwrap();
+
+    wait_store(&r, |s| {
+        s.sessions
+            .get("a")
+            .is_some_and(|sess| !sess.journal_ready && !sess.run_open)
+    })
+    .await;
+    r.stop().await.unwrap();
+}

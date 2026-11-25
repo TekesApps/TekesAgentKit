@@ -57,6 +57,7 @@ pub const TRANSCRIPT_SCROLL_INNER_ID: ComponentId = ComponentId(144);
 pub const TRANSCRIPT_TURNS_STACK_ID: ComponentId = ComponentId(145);
 pub const TRANSCRIPT_EARLIER_ROW_ID: ComponentId = ComponentId(146);
 pub const TRANSCRIPT_EMPTY_STATE_ID: ComponentId = ComponentId(147);
+pub const TRANSCRIPT_ERROR_PANEL_ID: ComponentId = ComponentId(149);
 pub const TRANSCRIPT_ACTIONABLE_BASE: u64 = 150;
 pub const TRANSCRIPT_TURN_BASE: u64 = 200_000;
 pub const TRANSCRIPT_TOOL_ROW_BASE: u64 = 400_000;

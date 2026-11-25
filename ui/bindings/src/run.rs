@@ -9,10 +9,10 @@ use std::{
 };
 use tekes_agent_contract::{ComposerAnnotation, PromptMode, Result, SessionAddress};
 use tekes_agent_presentation::{
-    ActionablePrompt, ComposerArtifact, ComposerContextBaseline, ComposerDestination,
-    RunController, RunScope, RunSnapshot, SummaryFacts, TranscriptDocument, thread_activity,
+    ActionablePrompt, ComposerArtifact, ComposerDestination, RunController, RunScope, RunSnapshot,
+    SummaryFacts, TranscriptDocument, thread_activity,
 };
-use tekes_agent_session::SessionRuntime;
+use tekes_agent_session::{ConnectionState, SessionHistoryLease, SessionRuntime};
 use tokio::runtime::Handle;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -52,13 +52,7 @@ pub struct ApprovalModeOption {
 }
 
 #[derive(Clone, Debug)]
-struct RunUiState {
-    endpoint_id: String,
-    default_cwd: String,
-    live_kernel_tools: bool,
-    filter_mode: SidebarFilterMode,
-    search_query: String,
-    selected_harness: String,
+struct SessionControlState {
     selected_provider: Option<String>,
     selected_model: String,
     selected_preset: String,
@@ -66,12 +60,86 @@ struct RunUiState {
     selected_effort: String,
     models_catalog: Vec<ModelCatalogEntry>,
     approval_options: Vec<ApprovalModeOption>,
+    model_generation: u64,
+    approval_generation: u64,
+}
+
+impl Default for SessionControlState {
+    fn default() -> Self {
+        Self {
+            selected_provider: None,
+            selected_model: AVAILABLE_MODELS[0].to_owned(),
+            selected_preset: AVAILABLE_PRESETS[0].to_owned(),
+            selected_approval_value: Some("workspace-write".to_owned()),
+            selected_effort: AVAILABLE_EFFORTS[1].to_owned(),
+            models_catalog: Vec::new(),
+            approval_options: Vec::new(),
+            model_generation: 0,
+            approval_generation: 0,
+        }
+    }
+}
+
+impl SessionControlState {
+    fn to_preparation(&self) -> RunSubmissionPreparation {
+        let efforts = self
+            .models_catalog
+            .iter()
+            .find(|m| {
+                m.id == self.selected_model
+                    && self
+                        .selected_provider
+                        .as_deref()
+                        .is_none_or(|p| p == m.provider)
+            })
+            .map(|m| m.efforts.as_slice())
+            .unwrap_or(&[]);
+        RunSubmissionPreparation {
+            provider: self.selected_provider.clone(),
+            model: self.selected_model.clone(),
+            effort_id: effort_id_from_label(&self.selected_effort, efforts),
+            approval_mode: self.selected_approval_value.clone(),
+        }
+    }
+}
+
+struct RunUiState {
+    endpoint_id: String,
+    default_cwd: String,
+    live_kernel_tools: bool,
+    filter_mode: SidebarFilterMode,
+    search_query: String,
+    selected_harness: String,
+    default_controls: SessionControlState,
+    session_controls: BTreeMap<String, SessionControlState>,
+    history_lease: Option<SessionHistoryLease>,
+    history_lease_generation: u64,
     local_pins: BTreeSet<String>,
     local_titles: BTreeMap<String, String>,
     local_archived: BTreeSet<String>,
     host_summary_sections: Vec<(String, Vec<(String, String)>)>,
     last_error: Option<String>,
+    session_errors: BTreeMap<String, String>,
     revision: u64,
+}
+
+impl RunUiState {
+    fn controls_for_read(&self, session_id: Option<&str>) -> &SessionControlState {
+        session_id
+            .and_then(|sid| self.session_controls.get(sid))
+            .unwrap_or(&self.default_controls)
+    }
+
+    fn controls_for_mut(&mut self, session_id: Option<&str>) -> &mut SessionControlState {
+        if let Some(sid) = session_id {
+            let defaults = self.default_controls.clone();
+            self.session_controls
+                .entry(sid.to_owned())
+                .or_insert(defaults)
+        } else {
+            &mut self.default_controls
+        }
+    }
 }
 
 pub const AVAILABLE_HARNESSES: [&str; 3] = ["Tekes", "Pi", "DSH"];
@@ -320,6 +388,9 @@ pub struct RunWorkbenchBinding {
 impl Drop for RunWorkbenchBinding {
     fn drop(&mut self) {
         self._watcher.abort();
+        if let Ok(mut guard) = self.ui.lock() {
+            guard.history_lease.take();
+        }
     }
 }
 
@@ -381,18 +452,16 @@ impl RunWorkbenchBinding {
                 filter_mode: SidebarFilterMode::All,
                 search_query: String::new(),
                 selected_harness,
-                selected_provider: None,
-                selected_model: AVAILABLE_MODELS[0].to_owned(),
-                selected_preset: AVAILABLE_PRESETS[0].to_owned(),
-                selected_approval_value: Some("workspace-write".to_owned()),
-                selected_effort: AVAILABLE_EFFORTS[1].to_owned(),
-                models_catalog: Vec::new(),
-                approval_options: Vec::new(),
+                default_controls: SessionControlState::default(),
+                session_controls: BTreeMap::new(),
+                history_lease: None,
+                history_lease_generation: 0,
                 local_pins: BTreeSet::new(),
                 local_titles: BTreeMap::new(),
                 local_archived: BTreeSet::new(),
                 host_summary_sections: Vec::new(),
                 last_error: None,
+                session_errors: BTreeMap::new(),
                 revision: 1,
             })),
             _watcher: watcher,
@@ -438,6 +507,32 @@ impl RunWorkbenchBinding {
         self.bump_ui();
     }
 
+    pub fn session_error(&self, session_id: &str) -> Option<String> {
+        self.ui
+            .lock()
+            .expect("run ui lock")
+            .session_errors
+            .get(session_id)
+            .cloned()
+    }
+
+    pub fn clear_session_error(&self, session_id: &str) {
+        let removed = self
+            .ui
+            .lock()
+            .expect("run ui lock")
+            .session_errors
+            .remove(session_id)
+            .is_some();
+        if removed {
+            self.bump_ui();
+        }
+    }
+
+    fn active_session_id(&self) -> Option<String> {
+        self.current_scope().map(|scope| scope.session_id)
+    }
+
     pub fn set_host_summary_sections(&self, sections: Vec<(String, Vec<(String, String)>)>) {
         self.ui.lock().expect("run ui lock").host_summary_sections = sections;
         self.bump_ui();
@@ -477,9 +572,26 @@ impl RunWorkbenchBinding {
     pub fn open_initial_session(&self, session_id: &str) -> Result<()> {
         let scope = RunScope::main(self.endpoint_id(), session_id);
         let controller = Arc::clone(&self.controller);
+        let runtime = Arc::clone(&self.runtime);
+        let ui = Arc::clone(&self.ui);
+        let sid = session_id.to_owned();
+        let lease_gen = {
+            let mut guard = self.ui.lock().expect("run ui lock");
+            guard.history_lease_generation = guard.history_lease_generation.saturating_add(1);
+            guard.history_lease_generation
+        };
         self.handle.block_on(async move {
-            controller.open(scope.clone()).await?;
             controller.select(ComposerDestination::run(scope))?;
+            let lease = runtime.acquire_history(&sid).await?;
+            let old_lease = {
+                let mut guard = ui.lock().expect("run ui lock");
+                if guard.history_lease_generation == lease_gen {
+                    guard.history_lease.replace(lease)
+                } else {
+                    Some(lease)
+                }
+            };
+            drop(old_lease);
             Ok(())
         })
     }
@@ -497,19 +609,27 @@ impl RunWorkbenchBinding {
     }
 
     pub fn available_models(&self) -> Vec<String> {
+        let active_sid = self.active_session_id();
         let ui = self.ui.lock().expect("run ui lock");
-        if ui.models_catalog.is_empty() {
+        let controls = ui.controls_for_read(active_sid.as_deref());
+        if controls.models_catalog.is_empty() {
             AVAILABLE_MODELS.iter().map(|s| (*s).to_owned()).collect()
         } else {
-            ui.models_catalog.iter().map(|m| m.id.clone()).collect()
+            controls
+                .models_catalog
+                .iter()
+                .map(|m| m.id.clone())
+                .collect()
         }
     }
 
     pub fn available_efforts(&self) -> Vec<String> {
+        let active_sid = self.active_session_id();
         let ui = self.ui.lock().expect("run ui lock");
-        if let Some(entry) = ui.models_catalog.iter().find(|m| {
-            m.id == ui.selected_model
-                && ui
+        let controls = ui.controls_for_read(active_sid.as_deref());
+        if let Some(entry) = controls.models_catalog.iter().find(|m| {
+            m.id == controls.selected_model
+                && controls
                     .selected_provider
                     .as_deref()
                     .is_none_or(|p| p == m.provider)
@@ -525,11 +645,14 @@ impl RunWorkbenchBinding {
     }
 
     pub fn available_presets(&self) -> Vec<String> {
+        let active_sid = self.active_session_id();
         let ui = self.ui.lock().expect("run ui lock");
-        if ui.approval_options.is_empty() {
+        let controls = ui.controls_for_read(active_sid.as_deref());
+        if controls.approval_options.is_empty() {
             AVAILABLE_PRESETS.iter().map(|s| (*s).to_owned()).collect()
         } else {
-            ui.approval_options
+            controls
+                .approval_options
                 .iter()
                 .map(|o| o.label.clone())
                 .collect()
@@ -541,8 +664,9 @@ impl RunWorkbenchBinding {
         let controller = Arc::clone(&self.controller);
         let ui = Arc::clone(&self.ui);
         let wake = Arc::clone(&self.wake);
+        let target_session = self.active_session_id();
         self.handle.spawn(async move {
-            refresh_controls_async(runtime, controller, ui, wake).await;
+            refresh_controls_async(runtime, controller, ui, wake, target_session).await;
         });
     }
 
@@ -551,31 +675,22 @@ impl RunWorkbenchBinding {
         let controller = Arc::clone(&self.controller);
         let ui = Arc::clone(&self.ui);
         let wake = Arc::clone(&self.wake);
+        let target_session = self.active_session_id();
         self.handle.block_on(async move {
-            refresh_controls_async(runtime, controller, ui, wake).await;
+            refresh_controls_async(runtime, controller, ui, wake, target_session).await;
         });
     }
 
-    fn current_preparation(&self) -> RunSubmissionPreparation {
+    fn preparation_for_destination(
+        &self,
+        destination: &ComposerDestination,
+    ) -> RunSubmissionPreparation {
+        let session_id = match destination {
+            ComposerDestination::Run { scope } => Some(scope.session_id.as_str()),
+            _ => None,
+        };
         let ui = self.ui.lock().expect("run ui lock");
-        let efforts = ui
-            .models_catalog
-            .iter()
-            .find(|m| {
-                m.id == ui.selected_model
-                    && ui
-                        .selected_provider
-                        .as_deref()
-                        .is_none_or(|p| p == m.provider)
-            })
-            .map(|m| m.efforts.as_slice())
-            .unwrap_or(&[]);
-        RunSubmissionPreparation {
-            provider: ui.selected_provider.clone(),
-            model: ui.selected_model.clone(),
-            effort_id: effort_id_from_label(&ui.selected_effort, efforts),
-            approval_mode: ui.selected_approval_value.clone(),
-        }
+        ui.controls_for_read(session_id).to_preparation()
     }
 
     pub fn select_session(&self, session_id: &str) {
@@ -583,14 +698,40 @@ impl RunWorkbenchBinding {
         let scope = RunScope::main(endpoint_id, session_id);
         let dest = ComposerDestination::run(scope);
         let _ = self.controller.select(dest);
+        let (lease_gen, need_acquire, old_lease) = {
+            let mut guard = self.ui.lock().expect("run ui lock");
+            guard.history_lease_generation = guard.history_lease_generation.saturating_add(1);
+            let lease_gen = guard.history_lease_generation;
+            let same_lease = guard
+                .history_lease
+                .as_ref()
+                .is_some_and(|lease| lease.session_id() == session_id);
+            let old_lease = if same_lease {
+                None
+            } else {
+                guard.history_lease.take()
+            };
+            (lease_gen, !same_lease, old_lease)
+        };
+        drop(old_lease);
         let runtime = Arc::clone(&self.runtime);
         let controller = Arc::clone(&self.controller);
         let ui = Arc::clone(&self.ui);
-        let session_id = session_id.to_owned();
+        let sid = session_id.to_owned();
         let wake = Arc::clone(&self.wake);
         self.handle.spawn(async move {
-            let _ = runtime.open_session(&session_id).await;
-            refresh_controls_async(runtime, controller, ui, Arc::clone(&wake)).await;
+            if need_acquire && let Ok(lease) = runtime.acquire_history(&sid).await {
+                let displaced = {
+                    let mut guard = ui.lock().expect("run ui lock");
+                    if guard.history_lease_generation == lease_gen {
+                        guard.history_lease.replace(lease)
+                    } else {
+                        Some(lease)
+                    }
+                };
+                drop(displaced);
+            }
+            refresh_controls_async(runtime, controller, ui, Arc::clone(&wake), Some(sid)).await;
             wake.wake();
         });
         self.bump_ui();
@@ -636,31 +777,15 @@ impl RunWorkbenchBinding {
         else {
             return;
         };
-        if let Some(baseline) = ComposerContextBaseline::read(&snapshot)
-            && baseline.selection.destination == target
-        {
-            let mut artifacts = baseline.artifacts.clone();
-            let id = format!("file:{}", uuid::Uuid::new_v4());
-            artifacts.push(ComposerArtifact::Reference {
-                id,
-                mention: None,
-                path: Some(path),
-                excerpt: None,
-            });
-            let _ =
-                self.controller
-                    .patch_context(&baseline, artifacts, baseline.annotations.clone());
-        } else {
-            let mut draft = snapshot.draft.clone();
-            draft.artifacts.push(ComposerArtifact::Reference {
-                id: format!("file:{}", uuid::Uuid::new_v4()),
-                mention: None,
-                path: Some(path),
-                excerpt: None,
-            });
-            let _ = self.controller.edit(&target, draft);
+        let artifact = ComposerArtifact::Reference {
+            id: format!("file:{}", uuid::Uuid::new_v4()),
+            mention: None,
+            path: Some(path),
+            excerpt: None,
+        };
+        if self.controller.append_artifact(&target, artifact).is_ok() {
+            self.bump_ui();
         }
-        self.bump_ui();
     }
 
     pub fn apply_quote(&self, request: crate::ComposerQuoteRequest) {
@@ -679,54 +804,31 @@ impl RunWorkbenchBinding {
             source_locator: None,
             artifact_reference: Some(Box::new(request.reference)),
         };
-        if let Some(baseline) = ComposerContextBaseline::read(&snapshot)
-            && baseline.selection.destination == target
+        if self
+            .controller
+            .append_annotation(&target, annotation)
+            .is_ok()
         {
-            let mut annotations = baseline.annotations.clone();
-            annotations.push(annotation);
-            let _ =
-                self.controller
-                    .patch_context(&baseline, baseline.artifacts.clone(), annotations);
-        } else {
-            let mut draft = snapshot.draft.clone();
-            draft.annotations.push(annotation);
-            let _ = self.controller.edit(&target, draft);
+            self.bump_ui();
         }
-        self.bump_ui();
     }
 
     pub fn remove_artifact(&self, destination: &ComposerDestination, artifact_id: &str) {
-        let snapshot = self.controller.snapshot();
-        if let Some(baseline) = ComposerContextBaseline::read(&snapshot)
-            && &baseline.selection.destination == destination
+        if self
+            .controller
+            .remove_artifact(destination, artifact_id)
+            .unwrap_or(false)
         {
-            let artifacts: Vec<_> = baseline
-                .artifacts
-                .iter()
-                .filter(|item| item.id() != artifact_id)
-                .cloned()
-                .collect();
-            let _ =
-                self.controller
-                    .patch_context(&baseline, artifacts, baseline.annotations.clone());
             self.bump_ui();
         }
     }
 
     pub fn remove_annotation(&self, destination: &ComposerDestination, annotation_id: &str) {
-        let snapshot = self.controller.snapshot();
-        if let Some(baseline) = ComposerContextBaseline::read(&snapshot)
-            && &baseline.selection.destination == destination
+        if self
+            .controller
+            .remove_annotation(destination, annotation_id)
+            .unwrap_or(false)
         {
-            let annotations: Vec<_> = baseline
-                .annotations
-                .iter()
-                .filter(|item| item.id != annotation_id)
-                .cloned()
-                .collect();
-            let _ =
-                self.controller
-                    .patch_context(&baseline, baseline.artifacts.clone(), annotations);
             self.bump_ui();
         }
     }
@@ -735,7 +837,11 @@ impl RunWorkbenchBinding {
         let Ok(ticket) = self.controller.prepare(destination, PromptMode::Queue) else {
             return;
         };
-        let prep = self.current_preparation();
+        let prep = self.preparation_for_destination(destination);
+        let target_session = match destination {
+            ComposerDestination::Run { scope } => Some(scope.session_id.clone()),
+            _ => None,
+        };
         let controller = Arc::clone(&self.controller);
         let ui = Arc::clone(&self.ui);
         let wake = Arc::clone(&self.wake);
@@ -743,13 +849,20 @@ impl RunWorkbenchBinding {
             match controller.dispatch_with(ticket, None, &prep).await {
                 Ok(_) => {
                     let mut guard = ui.lock().expect("run ui lock");
+                    if let Some(sid) = &target_session {
+                        guard.session_errors.remove(sid);
+                    }
                     guard.last_error = None;
                     guard.revision = guard.revision.saturating_add(1);
                 }
                 Err(err) => {
                     eprintln!("AgentKit submit failed: {err:#}");
                     let mut guard = ui.lock().expect("run ui lock");
-                    guard.last_error = Some(err.to_string());
+                    let msg = err.to_string();
+                    if let Some(sid) = &target_session {
+                        guard.session_errors.insert(sid.clone(), msg.clone());
+                    }
+                    guard.last_error = Some(msg);
                     guard.revision = guard.revision.saturating_add(1);
                 }
             }
@@ -759,11 +872,32 @@ impl RunWorkbenchBinding {
     }
 
     pub fn cancel_scope(&self, scope: &RunScope) {
+        let expected_epoch = self.runtime.inspect(|s| s.connection_epoch);
+        self.cancel_scope_at_epoch(expected_epoch, scope);
+    }
+
+    pub fn cancel_scope_at_epoch(&self, expected_epoch: u64, scope: &RunScope) {
         let controller = Arc::clone(&self.controller);
         let scope = scope.clone();
+        let ui = Arc::clone(&self.ui);
         let wake = Arc::clone(&self.wake);
         self.handle.spawn(async move {
-            let _ = controller.cancel(&scope).await;
+            match controller.cancel_at_epoch(expected_epoch, &scope).await {
+                Ok(()) => {
+                    let mut guard = ui.lock().expect("run ui lock");
+                    guard.session_errors.remove(&scope.session_id);
+                    guard.revision = guard.revision.saturating_add(1);
+                }
+                Err(err) => {
+                    let msg = format!("Cancel failed: {err}");
+                    let mut guard = ui.lock().expect("run ui lock");
+                    guard
+                        .session_errors
+                        .insert(scope.session_id.clone(), msg.clone());
+                    guard.last_error = Some(msg);
+                    guard.revision = guard.revision.saturating_add(1);
+                }
+            }
             wake.wake();
         });
     }
@@ -886,7 +1020,20 @@ impl RunWorkbenchBinding {
     fn commit_draft_setting(&self, key: &str, value: Value) {
         let snap = self.controller.snapshot();
         if let Some(token) = &snap.selection {
-            let mut settings = snap.draft.settings.clone();
+            self.commit_draft_setting_on(Some(token), &snap.draft.settings, key, value);
+        }
+        self.wake.wake();
+    }
+
+    fn commit_draft_setting_on(
+        &self,
+        token: Option<&tekes_agent_presentation::SelectionToken>,
+        base_settings: &BTreeMap<String, Value>,
+        key: &str,
+        value: Value,
+    ) {
+        if let Some(token) = token {
+            let mut settings = base_settings.clone();
             settings.insert(key.to_owned(), value);
             self.controller.commit_settings(token, settings, false);
         }
@@ -918,7 +1065,13 @@ impl RunWorkbenchBinding {
     }
 
     pub fn selected_model(&self) -> String {
-        self.ui.lock().expect("run ui lock").selected_model.clone()
+        let active_sid = self.active_session_id();
+        self.ui
+            .lock()
+            .expect("run ui lock")
+            .controls_for_read(active_sid.as_deref())
+            .selected_model
+            .clone()
     }
 
     pub fn set_model(&self, index: usize) {
@@ -926,15 +1079,29 @@ impl RunWorkbenchBinding {
         let Some(model) = models.get(index).cloned() else {
             return;
         };
-        {
+        let snap = self.controller.snapshot();
+        let target_scope = snap.selection.as_ref().and_then(|t| match &t.destination {
+            ComposerDestination::Run { scope } => Some(scope.clone()),
+            _ => None,
+        });
+        let target_sid = target_scope.as_ref().map(|s| s.session_id.clone());
+        let expected_epoch = self.runtime.inspect(|s| s.connection_epoch);
+        let prep = {
             let mut guard = self.ui.lock().expect("run ui lock");
-            guard.selected_model = model.clone();
-            if let Some(entry) = guard.models_catalog.iter().find(|m| m.id == model).cloned() {
-                guard.selected_provider = Some(entry.provider.clone());
+            let controls = guard.controls_for_mut(target_sid.as_deref());
+            controls.selected_model = model.clone();
+            controls.model_generation = controls.model_generation.saturating_add(1);
+            if let Some(entry) = controls
+                .models_catalog
+                .iter()
+                .find(|m| m.id == model)
+                .cloned()
+            {
+                controls.selected_provider = Some(entry.provider.clone());
                 if entry.efforts.is_empty() {
-                    guard.selected_effort = "Default".to_owned();
+                    controls.selected_effort = "Default".to_owned();
                 } else {
-                    let cur_valid = effort_id_from_label(&guard.selected_effort, &entry.efforts)
+                    let cur_valid = effort_id_from_label(&controls.selected_effort, &entry.efforts)
                         .is_some_and(|raw| entry.efforts.iter().any(|e| e == &raw));
                     if !cur_valid {
                         let next_raw = entry
@@ -942,18 +1109,33 @@ impl RunWorkbenchBinding {
                             .as_deref()
                             .or_else(|| entry.efforts.first().map(String::as_str))
                             .unwrap_or("medium");
-                        guard.selected_effort = effort_label(next_raw);
+                        controls.selected_effort = effort_label(next_raw);
                     }
                 }
             }
+            let prep = controls.to_preparation();
             guard.revision = guard.revision.saturating_add(1);
+            prep
+        };
+        self.commit_draft_setting_on(
+            snap.selection.as_ref(),
+            &snap.draft.settings,
+            "model",
+            json!(model),
+        );
+        if let Some(scope) = target_scope {
+            self.sync_selected_model_to_session(scope, expected_epoch, prep);
         }
-        self.commit_draft_setting("model", json!(model));
-        self.sync_selected_model_to_session();
     }
 
     pub fn selected_preset(&self) -> String {
-        self.ui.lock().expect("run ui lock").selected_preset.clone()
+        let active_sid = self.active_session_id();
+        self.ui
+            .lock()
+            .expect("run ui lock")
+            .controls_for_read(active_sid.as_deref())
+            .selected_preset
+            .clone()
     }
 
     pub fn set_preset(&self, index: usize) {
@@ -961,10 +1143,19 @@ impl RunWorkbenchBinding {
         let Some(preset) = presets.get(index).cloned() else {
             return;
         };
+        let snap = self.controller.snapshot();
+        let target_scope = snap.selection.as_ref().and_then(|t| match &t.destination {
+            ComposerDestination::Run { scope } => Some(scope.clone()),
+            _ => None,
+        });
+        let target_sid = target_scope.as_ref().map(|s| s.session_id.clone());
+        let expected_epoch = self.runtime.inspect(|s| s.connection_epoch);
         let approval_value = {
             let mut guard = self.ui.lock().expect("run ui lock");
-            guard.selected_preset = preset.clone();
-            let raw_val = guard
+            let controls = guard.controls_for_mut(target_sid.as_deref());
+            controls.selected_preset = preset.clone();
+            controls.approval_generation = controls.approval_generation.saturating_add(1);
+            let raw_val = controls
                 .approval_options
                 .get(index)
                 .map(|o| o.value.clone())
@@ -974,26 +1165,42 @@ impl RunWorkbenchBinding {
                     "Full Access" => Some("danger-full-access".to_owned()),
                     _ => None,
                 });
-            guard.selected_approval_value = raw_val.clone();
+            controls.selected_approval_value = raw_val.clone();
             guard.revision = guard.revision.saturating_add(1);
             raw_val
         };
-        self.commit_draft_setting("preset", json!(preset));
+        self.commit_draft_setting_on(
+            snap.selection.as_ref(),
+            &snap.draft.settings,
+            "preset",
+            json!(preset),
+        );
         if let Some(mode) = approval_value
-            && let Some(scope) = self.current_scope()
+            && let Some(scope) = target_scope
             && self
                 .runtime
                 .inspect(|s| s.endpoint_capabilities.supports("approvals.select"))
         {
             let runtime = Arc::clone(&self.runtime);
+            let runtime_check = Arc::clone(&self.runtime);
             let wake = Arc::clone(&self.wake);
             self.handle.spawn(async move {
                 let rpc = format!("approvals-select-{}", uuid::Uuid::new_v4());
                 let _ = runtime
-                    .call(
+                    .call_optional_at_epoch_with_validation(
+                        expected_epoch,
                         "approvals.select",
                         json!({ "sessionId": scope.session_id, "mode": mode }),
                         &rpc,
+                        move || {
+                            runtime_check.inspect(|state| {
+                                tekes_agent_contract::require(
+                                    state.connection == ConnectionState::Ready
+                                        && state.connection_epoch == expected_epoch,
+                                    "stale connection epoch at approval update",
+                                )
+                            })
+                        },
                     )
                     .await;
                 wake.wake();
@@ -1002,7 +1209,13 @@ impl RunWorkbenchBinding {
     }
 
     pub fn selected_effort(&self) -> String {
-        self.ui.lock().expect("run ui lock").selected_effort.clone()
+        let active_sid = self.active_session_id();
+        self.ui
+            .lock()
+            .expect("run ui lock")
+            .controls_for_read(active_sid.as_deref())
+            .selected_effort
+            .clone()
     }
 
     pub fn set_effort(&self, index: usize) {
@@ -1010,35 +1223,54 @@ impl RunWorkbenchBinding {
         let Some(effort) = efforts.get(index).cloned() else {
             return;
         };
-        let raw_effort = {
+        let snap = self.controller.snapshot();
+        let target_scope = snap.selection.as_ref().and_then(|t| match &t.destination {
+            ComposerDestination::Run { scope } => Some(scope.clone()),
+            _ => None,
+        });
+        let target_sid = target_scope.as_ref().map(|s| s.session_id.clone());
+        let expected_epoch = self.runtime.inspect(|s| s.connection_epoch);
+        let (raw_effort, prep) = {
             let mut guard = self.ui.lock().expect("run ui lock");
-            guard.selected_effort = effort.clone();
-            guard.revision = guard.revision.saturating_add(1);
-            let catalog_efforts = guard
+            let controls = guard.controls_for_mut(target_sid.as_deref());
+            controls.selected_effort = effort.clone();
+            controls.model_generation = controls.model_generation.saturating_add(1);
+            let catalog_efforts = controls
                 .models_catalog
                 .iter()
-                .find(|m| m.id == guard.selected_model)
+                .find(|m| m.id == controls.selected_model)
                 .map(|m| m.efforts.as_slice())
                 .unwrap_or(&[]);
-            effort_id_from_label(&effort, catalog_efforts)
+            let raw = effort_id_from_label(&effort, catalog_efforts);
+            let prep = controls.to_preparation();
+            guard.revision = guard.revision.saturating_add(1);
+            (raw, prep)
         };
         if let Some(raw) = raw_effort {
-            self.commit_draft_setting("reasoningEffort", json!(raw));
+            self.commit_draft_setting_on(
+                snap.selection.as_ref(),
+                &snap.draft.settings,
+                "reasoningEffort",
+                json!(raw),
+            );
         }
-        self.sync_selected_model_to_session();
+        if let Some(scope) = target_scope {
+            self.sync_selected_model_to_session(scope, expected_epoch, prep);
+        }
     }
 
-    fn sync_selected_model_to_session(&self) {
-        let Some(scope) = self.current_scope() else {
-            return;
-        };
+    fn sync_selected_model_to_session(
+        &self,
+        scope: RunScope,
+        expected_epoch: u64,
+        prep: RunSubmissionPreparation,
+    ) {
         if !self
             .runtime
             .inspect(|s| s.endpoint_capabilities.supports("session.selectModel"))
         {
             return;
         }
-        let prep = self.current_preparation();
         let Some(provider) = prep.provider else {
             return;
         };
@@ -1046,6 +1278,7 @@ impl RunWorkbenchBinding {
             return;
         }
         let runtime = Arc::clone(&self.runtime);
+        let runtime_check = Arc::clone(&self.runtime);
         let wake = Arc::clone(&self.wake);
         self.handle.spawn(async move {
             let mut payload = json!({
@@ -1057,7 +1290,23 @@ impl RunWorkbenchBinding {
                 payload["reasoningEffort"] = json!(effort);
             }
             let rpc = format!("select-model-{}", uuid::Uuid::new_v4());
-            let _ = runtime.call("session.selectModel", payload, &rpc).await;
+            let _ = runtime
+                .call_at_epoch_with_validation(
+                    expected_epoch,
+                    "session.selectModel",
+                    payload,
+                    &rpc,
+                    move || {
+                        runtime_check.inspect(|state| {
+                            tekes_agent_contract::require(
+                                state.connection == ConnectionState::Ready
+                                    && state.connection_epoch == expected_epoch,
+                                "stale connection epoch at model update",
+                            )
+                        })
+                    },
+                )
+                .await;
             wake.wake();
         });
     }
@@ -1377,22 +1626,33 @@ impl RunWorkbenchBinding {
     }
 }
 
+fn current_selected_session_id(controller: &RunController) -> Option<String> {
+    controller
+        .snapshot()
+        .selection
+        .as_ref()
+        .and_then(|token| match &token.destination {
+            ComposerDestination::Run { scope } => Some(scope.session_id.clone()),
+            _ => None,
+        })
+}
+
 async fn refresh_controls_async(
     runtime: Arc<SessionRuntime>,
     controller: Arc<RunController>,
     ui: Arc<Mutex<RunUiState>>,
     wake: Arc<dyn UiWakeNotifier>,
+    target_session: Option<String>,
 ) {
     let caps = runtime.inspect(|s| s.endpoint_capabilities.clone());
-    let session_id =
-        controller
-            .snapshot()
-            .selection
-            .as_ref()
-            .and_then(|token| match &token.destination {
-                ComposerDestination::Run { scope } => Some(scope.session_id.clone()),
-                _ => None,
-            });
+    let start_epoch = runtime.inspect(|s| s.connection_epoch);
+    let session_id = target_session.or_else(|| current_selected_session_id(&controller));
+    let (start_model_gen, start_approval_gen) = {
+        let guard = ui.lock().expect("run ui lock");
+        let controls = guard.controls_for_read(session_id.as_deref());
+        (controls.model_generation, controls.approval_generation)
+    };
+    let mut should_wake = false;
 
     if caps.supports("session.models") || caps.supports("models.list") {
         let (method, payload) = if let Some(sid) = &session_id
@@ -1403,45 +1663,55 @@ async fn refresh_controls_async(
             ("models.list", json!({}))
         };
         let rpc_id = format!("models-list-{}", uuid::Uuid::new_v4());
-        if let Ok(val) = runtime.call(method, payload, &rpc_id).await {
+        if let Ok(val) = runtime.call(method, payload, &rpc_id).await
+            && (start_epoch == 0 || runtime.inspect(|s| s.connection_epoch == start_epoch))
+        {
             let (entries, cur_provider, cur_model, cur_effort) = parse_models_catalog(&val);
-            let mut guard = ui.lock().expect("run ui lock");
             if !entries.is_empty() {
-                let matched = cur_model
-                    .as_deref()
-                    .and_then(|mid| {
-                        entries.iter().find(|e| {
-                            e.id == mid
-                                && cur_provider.as_deref().is_none_or(|pid| e.provider == pid)
-                        })
-                    })
-                    .or_else(|| {
-                        entries.iter().find(|e| {
-                            e.id == guard.selected_model
-                                && guard
-                                    .selected_provider
-                                    .as_deref()
-                                    .is_none_or(|pid| e.provider == pid)
-                        })
-                    })
-                    .or_else(|| entries.first())
-                    .cloned();
-                guard.models_catalog = entries;
-                if let Some(entry) = matched {
-                    guard.selected_provider = Some(entry.provider.clone());
-                    guard.selected_model = entry.id.clone();
-                    if let Some(eff) = cur_effort
+                let active_now = current_selected_session_id(&controller);
+                let mut guard = ui.lock().expect("run ui lock");
+                let cur_controls = guard.controls_for_read(session_id.as_deref()).clone();
+                if cur_controls.model_generation == start_model_gen {
+                    let matched = cur_model
                         .as_deref()
-                        .filter(|s| !s.is_empty())
-                        .or(entry.default_effort.as_deref())
-                        .or_else(|| entry.efforts.first().map(String::as_str))
-                    {
-                        guard.selected_effort = effort_label(eff);
-                    } else if entry.efforts.is_empty() {
-                        guard.selected_effort = "Default".to_owned();
+                        .and_then(|mid| {
+                            entries.iter().find(|e| {
+                                e.id == mid
+                                    && cur_provider.as_deref().is_none_or(|pid| e.provider == pid)
+                            })
+                        })
+                        .or_else(|| {
+                            entries.iter().find(|e| {
+                                e.id == cur_controls.selected_model
+                                    && cur_controls
+                                        .selected_provider
+                                        .as_deref()
+                                        .is_none_or(|pid| e.provider == pid)
+                            })
+                        })
+                        .or_else(|| entries.first())
+                        .cloned();
+                    let controls = guard.controls_for_mut(session_id.as_deref());
+                    controls.models_catalog = entries;
+                    if let Some(entry) = matched {
+                        controls.selected_provider = Some(entry.provider.clone());
+                        controls.selected_model = entry.id.clone();
+                        if let Some(eff) = cur_effort
+                            .as_deref()
+                            .filter(|s| !s.is_empty())
+                            .or(entry.default_effort.as_deref())
+                            .or_else(|| entry.efforts.first().map(String::as_str))
+                        {
+                            controls.selected_effort = effort_label(eff);
+                        } else if entry.efforts.is_empty() {
+                            controls.selected_effort = "Default".to_owned();
+                        }
+                    }
+                    if session_id.is_none() || active_now == session_id {
+                        guard.revision = guard.revision.saturating_add(1);
+                        should_wake = true;
                     }
                 }
-                guard.revision = guard.revision.saturating_add(1);
             }
         }
     }
@@ -1454,6 +1724,7 @@ async fn refresh_controls_async(
         if let Ok(policy) = runtime
             .call("approvals.policy", policy_payload, &rpc_id)
             .await
+            && (start_epoch == 0 || runtime.inspect(|s| s.connection_epoch == start_epoch))
         {
             let mode_str = if let Some(sid) = &session_id
                 && caps.supports("approvals.mode")
@@ -1472,32 +1743,49 @@ async fn refresh_controls_async(
             } else {
                 None
             };
-            let fallback_selected = ui
-                .lock()
-                .expect("run ui lock")
-                .selected_approval_value
-                .clone();
-            let chosen_mode = if session_id.is_some() {
-                mode_str.as_deref().or(fallback_selected.as_deref())
-            } else {
-                fallback_selected.as_deref()
-            };
-            let (options, sel_val, sel_label) = parse_approval_policy(&policy, chosen_mode);
-            if !options.is_empty() {
-                let mut guard = ui.lock().expect("run ui lock");
-                guard.approval_options = options;
-                if let Some(val) = sel_val {
-                    guard.selected_approval_value = Some(val);
+            if start_epoch == 0 || runtime.inspect(|s| s.connection_epoch == start_epoch) {
+                let fallback_selected = {
+                    let guard = ui.lock().expect("run ui lock");
+                    guard
+                        .controls_for_read(session_id.as_deref())
+                        .selected_approval_value
+                        .clone()
+                };
+                let chosen_mode = if session_id.is_some() {
+                    mode_str.as_deref().or(fallback_selected.as_deref())
+                } else {
+                    fallback_selected.as_deref()
+                };
+                let (options, sel_val, sel_label) = parse_approval_policy(&policy, chosen_mode);
+                if !options.is_empty() {
+                    let active_now = current_selected_session_id(&controller);
+                    let mut guard = ui.lock().expect("run ui lock");
+                    if guard
+                        .controls_for_read(session_id.as_deref())
+                        .approval_generation
+                        == start_approval_gen
+                    {
+                        let controls = guard.controls_for_mut(session_id.as_deref());
+                        controls.approval_options = options;
+                        if let Some(val) = sel_val {
+                            controls.selected_approval_value = Some(val);
+                        }
+                        if let Some(label) = sel_label {
+                            controls.selected_preset = label;
+                        }
+                        if session_id.is_none() || active_now == session_id {
+                            guard.revision = guard.revision.saturating_add(1);
+                            should_wake = true;
+                        }
+                    }
                 }
-                if let Some(label) = sel_label {
-                    guard.selected_preset = label;
-                }
-                guard.revision = guard.revision.saturating_add(1);
             }
         }
     }
 
-    wake.wake();
+    if should_wake || session_id.is_none() {
+        wake.wake();
+    }
 }
 
 async fn create_session_async(
@@ -1507,29 +1795,13 @@ async fn create_session_async(
     wake: Arc<dyn UiWakeNotifier>,
     cwd: String,
 ) -> Result<String> {
-    let (endpoint_id, live_tools, prep) = {
+    let (endpoint_id, live_tools, default_controls_snap, prep) = {
         let guard = ui.lock().expect("run ui lock");
-        let efforts = guard
-            .models_catalog
-            .iter()
-            .find(|m| {
-                m.id == guard.selected_model
-                    && guard
-                        .selected_provider
-                        .as_deref()
-                        .is_none_or(|p| p == m.provider)
-            })
-            .map(|m| m.efforts.as_slice())
-            .unwrap_or(&[]);
         (
             guard.endpoint_id.clone(),
             guard.live_kernel_tools,
-            RunSubmissionPreparation {
-                provider: guard.selected_provider.clone(),
-                model: guard.selected_model.clone(),
-                effort_id: effort_id_from_label(&guard.selected_effort, efforts),
-                approval_mode: guard.selected_approval_value.clone(),
-            },
+            guard.default_controls.clone(),
+            guard.default_controls.to_preparation(),
         )
     };
     let rpc_id = format!("create-{}", uuid::Uuid::new_v4());
@@ -1555,6 +1827,13 @@ async fn create_session_async(
     } else {
         runtime.create_session(&cwd, &rpc_id).await?
     };
+    {
+        let mut guard = ui.lock().expect("run ui lock");
+        guard
+            .session_controls
+            .entry(session_id.clone())
+            .or_insert(default_controls_snap);
+    }
     let caps = runtime.inspect(|s| s.endpoint_capabilities.clone());
     if caps.supports("session.selectModel")
         && let Some(provider) = &prep.provider
@@ -1590,8 +1869,30 @@ async fn create_session_async(
             .await;
     }
     let scope = RunScope::main(endpoint_id, session_id.clone());
-    let _ = controller.open(scope.clone()).await;
+    let lease_gen = {
+        let mut guard = ui.lock().expect("run ui lock");
+        guard.history_lease_generation = guard.history_lease_generation.saturating_add(1);
+        guard.history_lease_generation
+    };
     let _ = controller.select(ComposerDestination::run(scope));
-    refresh_controls_async(runtime, controller, Arc::clone(&ui), Arc::clone(&wake)).await;
+    if let Ok(lease) = runtime.acquire_history(&session_id).await {
+        let displaced = {
+            let mut guard = ui.lock().expect("run ui lock");
+            if guard.history_lease_generation == lease_gen {
+                guard.history_lease.replace(lease)
+            } else {
+                Some(lease)
+            }
+        };
+        drop(displaced);
+    }
+    refresh_controls_async(
+        runtime,
+        controller,
+        Arc::clone(&ui),
+        Arc::clone(&wake),
+        Some(session_id.clone()),
+    )
+    .await;
     Ok(session_id)
 }

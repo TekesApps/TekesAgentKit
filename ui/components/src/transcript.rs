@@ -349,6 +349,7 @@ pub struct TranscriptSurface {
     last_notice_sig: String,
     last_has_earlier: bool,
     last_following: bool,
+    session_error: Option<String>,
     choice_bindings: BTreeMap<ComponentId, ActionableChoiceBinding>,
     rendered_actionables_sig: String,
 }
@@ -383,9 +384,14 @@ impl TranscriptSurface {
             last_notice_sig: String::new(),
             last_has_earlier: false,
             last_following: true,
+            session_error: None,
             choice_bindings: BTreeMap::new(),
             rendered_actionables_sig: String::new(),
         }
+    }
+
+    pub fn set_session_error(&mut self, error: Option<String>) {
+        self.session_error = error;
     }
 
     pub fn build_content() -> Content {
@@ -653,7 +659,7 @@ impl TranscriptSurface {
             ConnectionPhase::Connecting | ConnectionPhase::Connected => None,
         };
         let has_earlier = snapshot.transcript.has_more_before;
-        let sig = format!("{notice_text:?}:{has_earlier}");
+        let sig = format!("{notice_text:?}:{:?}:{has_earlier}", self.session_error);
         if sig == self.last_notice_sig {
             return;
         }
@@ -679,6 +685,14 @@ impl TranscriptSurface {
             children.push(card_panel(
                 TRANSCRIPT_NOTICE_PANEL_ID,
                 row,
+                Insets::new(8.0, 12.0, 8.0, 12.0),
+            ));
+        }
+
+        if let Some(err) = &self.session_error {
+            children.push(card_panel(
+                TRANSCRIPT_ERROR_PANEL_ID,
+                Content::new(TRANSCRIPT_STATUS_ID, secondary_text(err.clone())),
                 Insets::new(8.0, 12.0, 8.0, 12.0),
             ));
         }
@@ -1034,7 +1048,19 @@ impl TranscriptSurface {
             self.sync_turns(host, snapshot, &dest_key);
         }
 
+        out
+    }
+
+    pub fn drain_link_actions(&self, host: &mut ContentHost) -> Vec<TranscriptIntent> {
+        let mut out = Vec::new();
         for &rich_id in &self.mounted_rich_ids {
+            let has_links = host
+                .get(rich_id)
+                .and_then(|c| c.component::<RichContent>())
+                .is_some_and(|rich| !rich.document().links().is_empty());
+            if !has_links {
+                continue;
+            }
             if let Some(rich) = host
                 .get_mut(rich_id)
                 .and_then(|c| c.component_mut::<RichContent>())

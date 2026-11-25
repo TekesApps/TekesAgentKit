@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.6.0 — 2026-11-25
+
+- Defer `TranscriptSurface` `RichContent::drain_link_actions` to pre-render (`AgentContainerAdapter::drain_deferred_intents`) so pointer actions on `AgentRunContainer` never invalidate `ContentHost` curve geometry before `PointerUp`, preserving native `Stop` and second `Send` clicks; add epoch-fenced `cancel_at_epoch` / `cancel_child_at_epoch` / `cancel_scope_at_epoch` and session-scoped `session_error` surfacing.
+- Add per-destination draft context mutations (`append_artifact`, `append_annotation`, `remove_artifact`, `remove_annotation`) so background attach/quote never overwrites draft text/settings, and isolate `RunWorkbenchBinding` model/effort/approval controls per session with `connection_epoch` and generation fencing.
+- Handle `Command::Close` for disconnected idle sessions, clean up failed `acquire_history` owners, capture runtime `Handle` in `SessionHistoryLease::drop`, and migrate `RunController::dispatch_with`, `RunWorkbenchBinding`, and `ChildRunBinding` from legacy `open_session` to scoped `SessionHistoryLease`.
+- Deliver unified public workspace + five-crate `ui/` workspace pinned to TekesUI `31114fea1074d16750c7437b140d2d147cbe8eda` without local `ui/.deps` overrides.
+
 ## 0.3.9 — 2026-10-29
 
 - Retain active Native journals when their last observer detaches, then retire them after terminal state; reopening keeps the original response.

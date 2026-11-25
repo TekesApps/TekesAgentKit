@@ -524,6 +524,7 @@ pub enum ComposerIntent {
     },
     Cancel {
         scope: RunScope,
+        connection_epoch: u64,
     },
     Reconnect,
     AttachDemoFile {
@@ -941,6 +942,11 @@ impl ComposerSurface {
         }
 
         let can_cancel = snapshot.run.as_ref().is_some_and(|r| r.can_cancel);
+        let cancel_epoch = snapshot
+            .run
+            .as_ref()
+            .map(|r| r.connection_epoch)
+            .unwrap_or(0);
 
         for record in records {
             if let Some(chip) = self.chip_targets.get(&record.action.target)
@@ -979,6 +985,7 @@ impl ComposerSurface {
                         {
                             out.push(ComposerIntent::Cancel {
                                 scope: scope.clone(),
+                                connection_epoch: cancel_epoch,
                             });
                         }
                     } else if !composing && let Some(dest) = &self.selected {
@@ -995,6 +1002,7 @@ impl ComposerSurface {
                     {
                         out.push(ComposerIntent::Cancel {
                             scope: scope.clone(),
+                            connection_epoch: cancel_epoch,
                         });
                     }
                 }

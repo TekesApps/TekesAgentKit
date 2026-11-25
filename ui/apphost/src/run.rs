@@ -87,12 +87,40 @@ impl AgentContainerAdapter for AgentRunAdapter {
         };
         let snapshot = run.run_snapshot();
         if !self.composer_only {
+            let session_error = run
+                .current_scope()
+                .and_then(|scope| run.session_error(&scope.session_id));
+            self.transcript.set_session_error(session_error);
             let actionables: Vec<ActionablePrompt> = run.actionables_for(&snapshot);
             self.transcript
                 .sync(host, &snapshot, &actionables, width_mode);
         }
         if !self.transcript_only {
             self.composer.sync(host, &snapshot, width_mode);
+        }
+    }
+
+    fn drain_deferred_intents(&mut self, host: &mut ContentHost, workbench: &SharedAgentWorkbench) {
+        if self.composer_only {
+            return;
+        }
+        let Some(run) = workbench.run_binding() else {
+            return;
+        };
+        for intent in self.transcript.drain_link_actions(host) {
+            if let TranscriptIntent::OpenLink(link) = intent
+                && let Some(path) = link.strip_prefix("doc:")
+            {
+                workbench.enqueue_command(WorkbenchCommand::OpenArtifact(ArtifactOpenRequest {
+                    workspace_id: workbench
+                        .active_workspace_id()
+                        .unwrap_or_else(|| "ws-main".to_owned()),
+                    path: path.to_owned(),
+                    revision: None,
+                    line_hint: None,
+                    source_scope: run.current_scope(),
+                }));
+            }
         }
     }
 
@@ -163,7 +191,10 @@ impl AgentContainerAdapter for AgentRunAdapter {
                     ComposerIntent::Send { destination } => {
                         run.submit_destination(&destination);
                     }
-                    ComposerIntent::Cancel { scope } => run.cancel_scope(&scope),
+                    ComposerIntent::Cancel {
+                        scope,
+                        connection_epoch,
+                    } => run.cancel_scope_at_epoch(connection_epoch, &scope),
                     ComposerIntent::Reconnect => run.reconnect(),
                     ComposerIntent::AttachDemoFile { destination } => {
                         run.attach_file_path(

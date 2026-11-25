@@ -199,6 +199,7 @@ struct ChildRunInternal {
     opened_once: bool,
     missing_reason: Option<String>,
     loading: bool,
+    history_lease: Option<tekes_agent_session::SessionHistoryLease>,
     revision: u64,
 }
 
@@ -218,6 +219,9 @@ pub struct ChildRunBinding {
 impl Drop for ChildRunBinding {
     fn drop(&mut self) {
         self._watcher.abort();
+        if let Ok(mut guard) = self.internal.lock() {
+            guard.history_lease.take();
+        }
     }
 }
 
@@ -254,6 +258,7 @@ impl ChildRunBinding {
             opened_once: false,
             missing_reason: None,
             loading: true,
+            history_lease: None,
             revision: 1,
         }));
 
@@ -330,16 +335,18 @@ impl ChildRunBinding {
         let wake = Arc::clone(&self.wake);
         self.handle.spawn(async move {
             let res = async {
-                runtime.open_session(&sid).await?;
+                let lease = runtime.acquire_history(&sid).await?;
                 let _ = ctrl.refresh_child_catalog(&scope).await;
-                Ok::<(), tekes_agent_contract::Error>(())
+                Ok::<tekes_agent_session::SessionHistoryLease, tekes_agent_contract::Error>(lease)
             }
             .await;
-            {
+            let old_lease = {
                 let mut guard = internal.lock().expect("child run lock");
                 guard.loading = false;
-                match &res {
-                    Ok(()) => {
+                let mut old = None;
+                match res {
+                    Ok(lease) => {
+                        old = guard.history_lease.replace(lease);
                         guard.opened_once = true;
                         guard.missing_reason = None;
                     }
@@ -348,7 +355,9 @@ impl ChildRunBinding {
                     }
                 }
                 guard.revision = guard.revision.saturating_add(1);
-            }
+                old
+            };
+            drop(old_lease);
             Self::check_store_presence(&runtime, &sid, &internal);
             wake.wake();
         });
@@ -362,7 +371,7 @@ impl ChildRunBinding {
         let before_rev = ctrl.snapshot().revision;
         let mut rx = ctrl.subscribe();
         let res = self.handle.block_on(async move {
-            runtime.open_session(&sid).await?;
+            let lease = runtime.acquire_history(&sid).await?;
             // Catalog enrichment is best-effort for harnesses implementing subagents.catalog.
             let _ = ctrl.refresh_child_catalog(&scope).await;
             if ctrl.snapshot().revision == before_rev || ctrl.snapshot().transcript.turns.is_empty()
@@ -370,25 +379,31 @@ impl ChildRunBinding {
                 let _ =
                     tokio::time::timeout(std::time::Duration::from_millis(250), rx.changed()).await;
             }
-            Ok::<(), tekes_agent_contract::Error>(())
+            Ok::<tekes_agent_session::SessionHistoryLease, tekes_agent_contract::Error>(lease)
         });
-        {
+        let (out_res, old_lease) = {
             let mut guard = self.internal.lock().expect("child run lock");
             guard.loading = false;
-            match &res {
-                Ok(()) => {
+            let mut old = None;
+            let out = match res {
+                Ok(lease) => {
+                    old = guard.history_lease.replace(lease);
                     guard.opened_once = true;
                     guard.missing_reason = None;
+                    Ok(())
                 }
                 Err(err) => {
                     guard.missing_reason = Some(format!("子代理轨迹不可用或已过期: {err}"));
+                    Err(err)
                 }
-            }
+            };
             guard.revision = guard.revision.saturating_add(1);
-        }
+            (out, old)
+        };
+        drop(old_lease);
         Self::check_store_presence(&self.runtime, &self.child_scope.session_id, &self.internal);
         self.wake.wake();
-        res
+        out_res
     }
 
     pub fn load_earlier_blocking(&self) -> Result<bool> {
