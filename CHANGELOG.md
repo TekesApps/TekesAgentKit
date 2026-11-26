@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.7 — 2026-11-26
+
+- Track per-session in-flight cancel operations (`SessionCancelTracking` / `CancelOpGuard`) in `RunUiState` so a newer confirmed same-turn Stop (`Ok(())`, `TurnTerminal::ConfirmedAborted`, or deferred `reconcile_uncertain_cancels`) supersedes any still-in-flight earlier failure for the same `(session, turn)`, even when the error slot was empty when the newer confirmation landed (#34).
+
 ## 0.6.6 — 2026-11-26
 
 - Attribute every `cancel_scope_at_epoch` attempt to the active open turn (`active_turn_target`) independent of whether `connection_epoch` matches `expected_epoch`, so retrying Stop at the current epoch on the same active turn clears a prior stale-epoch failure while preserving the failure if the turn ends without retry (#34).
