@@ -3,7 +3,10 @@ use futures_util::{StreamExt, stream};
 use serde_json::{Value, json};
 use std::{
     collections::BTreeMap,
-    sync::{Arc, Mutex},
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicBool, AtomicUsize, Ordering},
+    },
     time::Duration,
 };
 use tekes_agent_contract::*;
@@ -19,12 +22,18 @@ struct BlockerTestEndpoint {
     inner: Arc<Mutex<EndpointState>>,
     model_gate_a: Arc<Notify>,
     approval_gate_a: Arc<Notify>,
+    connect_count: Arc<AtomicUsize>,
+    block_reconnect: Arc<AtomicBool>,
+    reconnecting: Arc<Notify>,
+    reconnect_permit: Arc<Notify>,
 }
 
 struct EndpointState {
     rpcs: Vec<(String, Value)>,
     journal_txs: BTreeMap<String, mpsc::UnboundedSender<Result<Value>>>,
     journal_entries: BTreeMap<String, Vec<Value>>,
+    journal_opens: Vec<(usize, String)>,
+    journal_closes: Vec<(usize, String)>,
     inventory_tx: Option<mpsc::UnboundedSender<Result<Value>>>,
     running: BTreeMap<String, bool>,
     reject_cancel: bool,
@@ -38,6 +47,7 @@ impl BlockerTestEndpoint {
         let mut running = BTreeMap::new();
         running.insert("a".to_owned(), false);
         running.insert("b".to_owned(), false);
+        running.insert("c".to_owned(), false);
         let mut journal_entries = BTreeMap::new();
         journal_entries.insert(
             "a".to_owned(),
@@ -47,11 +57,17 @@ impl BlockerTestEndpoint {
             "b".to_owned(),
             vec![json!({"event": {"type": "user/message", "seq": 0, "time": 1, "data": {"text": "init-b"}}})],
         );
+        journal_entries.insert(
+            "c".to_owned(),
+            vec![json!({"event": {"type": "user/message", "seq": 0, "time": 1, "data": {"text": "init-c"}}})],
+        );
         Self {
             inner: Arc::new(Mutex::new(EndpointState {
                 rpcs: Vec::new(),
                 journal_txs: BTreeMap::new(),
                 journal_entries,
+                journal_opens: Vec::new(),
+                journal_closes: Vec::new(),
                 inventory_tx: None,
                 running,
                 reject_cancel: false,
@@ -61,15 +77,41 @@ impl BlockerTestEndpoint {
             })),
             model_gate_a: Arc::new(Notify::new()),
             approval_gate_a: Arc::new(Notify::new()),
+            connect_count: Arc::new(AtomicUsize::new(0)),
+            block_reconnect: Arc::new(AtomicBool::new(false)),
+            reconnecting: Arc::new(Notify::new()),
+            reconnect_permit: Arc::new(Notify::new()),
         }
     }
 
     fn rpcs(&self) -> Vec<(String, Value)> {
         self.inner.lock().unwrap().rpcs.clone()
     }
+
+    fn drop_connection(&self) {
+        self.block_reconnect.store(true, Ordering::Release);
+        let tx = self.inner.lock().unwrap().inventory_tx.take();
+        if let Some(tx) = tx {
+            let _ = tx.send(Err(Error::Disconnected));
+        }
+    }
+
+    fn unblock_reconnect(&self) {
+        self.block_reconnect.store(false, Ordering::Release);
+        self.reconnect_permit.notify_waiters();
+    }
+
+    fn journal_opens(&self) -> Vec<(usize, String)> {
+        self.inner.lock().unwrap().journal_opens.clone()
+    }
+
+    fn journal_closes(&self) -> Vec<(usize, String)> {
+        self.inner.lock().unwrap().journal_closes.clone()
+    }
 }
 
 struct TestSessionEndpoint {
+    conn: usize,
     host: HostDescription,
     source: BlockerTestEndpoint,
 }
@@ -77,7 +119,15 @@ struct TestSessionEndpoint {
 #[async_trait]
 impl EndpointConnector for BlockerTestEndpoint {
     async fn connect(&self) -> Result<Arc<dyn SessionEndpoint>> {
+        let conn = self.connect_count.fetch_add(1, Ordering::SeqCst) + 1;
+        if conn > 1 && self.block_reconnect.load(Ordering::Acquire) {
+            self.reconnecting.notify_waiters();
+            while self.block_reconnect.load(Ordering::Acquire) {
+                self.reconnect_permit.notified().await;
+            }
+        }
         Ok(Arc::new(TestSessionEndpoint {
+            conn,
             host: serde_json::from_value(json!({
                 "protocolVersion": 4,
                 "product": {"name": "Kernel", "version": "0.9.23"},
@@ -125,6 +175,7 @@ impl SessionEndpoint for TestSessionEndpoint {
                 let items = vec![
                     json!({"sessionId": "a", "running": guard.running["a"], "blank": false, "updatedAt": 10}),
                     json!({"sessionId": "b", "running": guard.running["b"], "blank": false, "updatedAt": 20}),
+                    json!({"sessionId": "c", "running": guard.running["c"], "blank": false, "updatedAt": 30}),
                 ];
                 guard.inventory_tx = Some(tx);
                 let baseline =
@@ -147,10 +198,25 @@ impl SessionEndpoint for TestSessionEndpoint {
                 ))
             }
             StreamTarget::SessionJournal { address, .. } => {
+                struct JournalDrop {
+                    conn: usize,
+                    sid: String,
+                    inner: Arc<Mutex<EndpointState>>,
+                }
+                impl Drop for JournalDrop {
+                    fn drop(&mut self) {
+                        self.inner
+                            .lock()
+                            .unwrap()
+                            .journal_closes
+                            .push((self.conn, self.sid.clone()));
+                    }
+                }
                 let sid = address.session_id.clone();
                 let (tx, rx) = mpsc::unbounded_channel();
                 let entries = {
                     let mut guard = self.source.inner.lock().unwrap();
+                    guard.journal_opens.push((self.conn, sid.clone()));
                     guard.journal_txs.insert(sid.clone(), tx);
                     guard.journal_entries.get(&sid).cloned().unwrap_or_default()
                 };
@@ -166,8 +232,13 @@ impl SessionEndpoint for TestSessionEndpoint {
                         "hasMoreBefore": false
                     }
                 });
-                let tail = stream::unfold(rx, |mut rx| async move {
-                    rx.recv().await.map(|item| (item, rx))
+                let guard = JournalDrop {
+                    conn: self.conn,
+                    sid: address.session_id.clone(),
+                    inner: Arc::clone(&self.source.inner),
+                };
+                let tail = stream::unfold((rx, guard), |(mut rx, guard)| async move {
+                    rx.recv().await.map(|item| (item, (rx, guard)))
                 });
                 Ok(Box::pin(stream::once(async { Ok(snap) }).chain(tail)))
             }
@@ -557,5 +628,222 @@ fn blocker3_dropping_binding_releases_visited_session_journals_on_shared_runtime
             && !s.sessions.get("a").is_some_and(|sess| sess.journal_ready)
     }));
 
+    rt.block_on(runtime.stop()).unwrap();
+}
+
+#[test]
+fn disconnected_switch_a_to_b_auto_loads_b_history_and_deltas_on_reconnect() {
+    let endpoint = BlockerTestEndpoint::new();
+    let (rt, runtime, binding) = setup_binding(&endpoint);
+    binding.open_initial_session("a").unwrap();
+    assert!(runtime.inspect(|s| s.sessions["a"].journal_ready));
+
+    // Drop connection and wait for reconnect barrier.
+    endpoint.drop_connection();
+    rt.block_on(wait_store(&runtime, |s| {
+        s.connection != tekes_agent_session::ConnectionState::Ready
+    }));
+    rt.block_on(endpoint.reconnecting.notified());
+
+    // Switch A -> B while disconnected; allow the spawned lease release to reach the disconnected
+    // runtime before unblocking reconnect, and never call select_session("b") again.
+    binding.select_session("b");
+    assert_eq!(
+        binding.current_scope().map(|s| s.session_id),
+        Some("b".to_owned())
+    );
+    assert!(!runtime.inspect(|s| s.sessions.get("b").is_some_and(|sess| sess.journal_ready)));
+    std::thread::sleep(Duration::from_millis(25));
+
+    let epoch_before = runtime.inspect(|s| s.connection_epoch);
+    let rpcs_before = endpoint.rpcs().len();
+    endpoint.unblock_reconnect();
+    rt.block_on(wait_store(&runtime, |s| {
+        s.connection == tekes_agent_session::ConnectionState::Ready
+            && s.connection_epoch > epoch_before
+            && s.sessions.get("b").is_some_and(|sess| sess.journal_ready)
+    }));
+
+    // Wait for B's snapshot to populate in binding WITHOUT another click/select_session.
+    for _ in 0..50 {
+        if binding
+            .run_snapshot()
+            .transcript
+            .items
+            .iter()
+            .any(|item| item.text.contains("init-b"))
+        {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    assert!(
+        binding
+            .run_snapshot()
+            .transcript
+            .items
+            .iter()
+            .any(|item| item.text.contains("init-b")),
+        "B real history must load automatically after reconnect"
+    );
+
+    // Stream live delta onto B and verify it arrives cleanly on conn 2.
+    let tx_b = endpoint.inner.lock().unwrap().journal_txs["b"].clone();
+    tx_b.send(Ok(json!({
+        "type": "event",
+        "generation": "g",
+        "sessionId": "b",
+        "entry": {
+            "event": {
+                "type": "assistant/message",
+                "seq": 1,
+                "time": 2,
+                "data": {
+                    "turn": 1,
+                    "step": 1,
+                    "sessionFinal": true,
+                    "message": {"id": "mb-1", "content": [{"type": "text", "text": "live-after-reconnect-b"}]}
+                }
+            }
+        }
+    })))
+    .unwrap();
+    for _ in 0..50 {
+        if binding
+            .run_snapshot()
+            .transcript
+            .items
+            .iter()
+            .any(|item| item.text.contains("live-after-reconnect-b"))
+        {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    assert!(
+        binding
+            .run_snapshot()
+            .transcript
+            .items
+            .iter()
+            .any(|item| item.text.contains("live-after-reconnect-b"))
+    );
+
+    // Idle A must NOT be reopened on conn 2; no prompt or cancel RPC re-sent.
+    let opens = endpoint.journal_opens();
+    assert!(opens.contains(&(2, "b".to_owned())));
+    assert!(!opens.contains(&(2, "a".to_owned())));
+    let closes = endpoint.journal_closes();
+    assert!(closes.contains(&(1, "a".to_owned())));
+    assert!(
+        !endpoint.rpcs()[rpcs_before..]
+            .iter()
+            .any(|(m, _)| m == "session.prompt" || m == "session.cancel")
+    );
+
+    rt.block_on(runtime.stop()).unwrap();
+}
+
+#[test]
+fn disconnected_switch_a_to_b_to_c_retains_only_c_subscription_on_reconnect() {
+    let endpoint = BlockerTestEndpoint::new();
+    let (rt, runtime, binding) = setup_binding(&endpoint);
+    binding.open_initial_session("a").unwrap();
+
+    endpoint.drop_connection();
+    rt.block_on(wait_store(&runtime, |s| {
+        s.connection != tekes_agent_session::ConnectionState::Ready
+    }));
+    rt.block_on(endpoint.reconnecting.notified());
+
+    binding.select_session("b");
+    binding.select_session("c");
+    std::thread::sleep(Duration::from_millis(25));
+
+    let epoch_before = runtime.inspect(|s| s.connection_epoch);
+    endpoint.unblock_reconnect();
+    rt.block_on(wait_store(&runtime, |s| {
+        s.connection == tekes_agent_session::ConnectionState::Ready
+            && s.connection_epoch > epoch_before
+            && s.sessions.get("c").is_some_and(|sess| sess.journal_ready)
+    }));
+
+    std::thread::sleep(Duration::from_millis(40));
+    let conn2_opens: Vec<String> = endpoint
+        .journal_opens()
+        .into_iter()
+        .filter(|(conn, _)| *conn == 2)
+        .map(|(_, sid)| sid)
+        .collect();
+    assert_eq!(conn2_opens, vec!["c".to_owned()]);
+    assert!(!runtime.inspect(|s| s.sessions["a"].journal_ready));
+    assert!(!runtime.inspect(|s| s.sessions["b"].journal_ready));
+    assert!(runtime.inspect(|s| s.sessions["c"].journal_ready));
+    for _ in 0..50 {
+        if binding
+            .run_snapshot()
+            .transcript
+            .items
+            .iter()
+            .any(|item| item.text.contains("init-c"))
+        {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    assert!(
+        binding
+            .run_snapshot()
+            .transcript
+            .items
+            .iter()
+            .any(|item| item.text.contains("init-c"))
+    );
+
+    rt.block_on(runtime.stop()).unwrap();
+}
+
+#[test]
+fn dropping_binding_while_disconnected_does_not_open_history_and_preserves_other_observer() {
+    let endpoint = BlockerTestEndpoint::new();
+    let (rt, runtime, binding) = setup_binding(&endpoint);
+    binding.open_initial_session("a").unwrap();
+    let other_lease_b = rt.block_on(runtime.acquire_history("b")).unwrap();
+    assert!(runtime.inspect(|s| s.sessions["b"].journal_ready));
+
+    endpoint.drop_connection();
+    rt.block_on(wait_store(&runtime, |s| {
+        s.connection != tekes_agent_session::ConnectionState::Ready
+    }));
+    rt.block_on(endpoint.reconnecting.notified());
+
+    binding.select_session("c");
+    drop(binding);
+    std::thread::sleep(Duration::from_millis(25));
+
+    let epoch_before = runtime.inspect(|s| s.connection_epoch);
+    endpoint.unblock_reconnect();
+    rt.block_on(wait_store(&runtime, |s| {
+        s.connection == tekes_agent_session::ConnectionState::Ready
+            && s.connection_epoch > epoch_before
+            && s.sessions.get("b").is_some_and(|sess| sess.journal_ready)
+    }));
+    std::thread::sleep(Duration::from_millis(40));
+
+    let conn2_opens: Vec<String> = endpoint
+        .journal_opens()
+        .into_iter()
+        .filter(|(conn, _)| *conn == 2)
+        .map(|(_, sid)| sid)
+        .collect();
+    assert_eq!(conn2_opens, vec!["b".to_owned()]);
+    assert!(!runtime.inspect(|s| s.sessions["c"].journal_ready));
+    assert!(!runtime.inspect(|s| s.sessions["a"].journal_ready));
+    assert!(runtime.inspect(|s| s.sessions["b"].journal_ready));
+
+    rt.block_on(other_lease_b.release()).unwrap();
+    rt.block_on(wait_store(&runtime, |s| {
+        !s.sessions.get("b").is_some_and(|sess| sess.journal_ready)
+    }));
     rt.block_on(runtime.stop()).unwrap();
 }

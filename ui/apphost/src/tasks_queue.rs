@@ -50,11 +50,13 @@ impl TasksQueueAdapter {
                 child_session_id: t.child_session_id,
             })
             .collect();
+        let active_session = run.current_scope().map(|scope| scope.session_id);
+        let error = run.error_for_session(active_session.as_deref());
         Some(TasksQueueViewModel {
             epoch: run.connection_epoch(),
             queued,
             tasks,
-            error: run.last_error(),
+            error,
         })
     }
 }

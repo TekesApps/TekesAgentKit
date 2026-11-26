@@ -34,9 +34,9 @@ dependencies = [
 
 [[package]]
 name = "anyhow"
-version = "1.0.104"
+version = "1.0.105"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "330a5ed07fa54e4702c9d6c4174f74427fc0ef6e214bbd677ae50a5099946470"
+checksum = "2cb931c189b85683d69a5cfad41d4d418671e1ac413dd209f3f2fc31e3cfd902"
 
 [[package]]
 name = "arrayref"
@@ -227,9 +227,9 @@ dependencies = [
 
 [[package]]
 name = "cc"
-version = "1.11.2"
+version = "1.11.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "33ef9e3e8154a45c7a95cff4c1299702106ad94062d7bb85fdc5d3a5afd91d45"
+checksum = "02f0e023adb368345ce0ca6cdfc0f24a06554468d0e8503e14a0841de79bfa69"
 dependencies = [
  "find-msvc-tools",
  "shlex",
@@ -326,9 +326,9 @@ dependencies = [
 
 [[package]]
 name = "crc32fast"
-version = "1.5.5"
+version = "1.5.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2b929dd2a135771f40afabd1073f85eed59c800b7c61901e5c254270497dad64"
+checksum = "fd9ae8fcb3ea71b0b26338b4ffb13006bb175de8fd07921089a906ce7e5e6945"
 dependencies = [
  "cfg-if",
 ]
@@ -503,9 +503,9 @@ checksum = "77ce24cb58228fbb8aa041425bb1050850ac19177686ea6e0f41a70416f56fdb"
 
 [[package]]
 name = "form_urlencoded"
-version = "1.2.2"
+version = "1.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cb4cb245038516f5f85277875cdaa4f7d2c9a0fa0468de06ed190163b1581fcf"
+checksum = "afa489199eaffb1211795df1c6236ce1ad0d41a6fa45250add73e3b02420f06e"
 dependencies = [
  "percent-encoding",
 ]
@@ -654,9 +654,9 @@ dependencies = [
 
 [[package]]
 name = "hashbrown"
-version = "0.17.1"
+version = "0.17.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ed5909b6e89a2db4456e54cd5f673791d7eca6732202bbf2a9cc504fe2f9b84a"
+checksum = "735eaa21a6a5ffb2e84362faaeb90c05ba8e19797ca30428478cb6ea3a4921bc"
 dependencies = [
  "foldhash",
 ]
@@ -711,9 +711,9 @@ dependencies = [
 
 [[package]]
 name = "hyper"
-version = "1.12.0"
+version = "1.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2c3e324da4c95177d6291d4c8730197c0d1822f8a9766814a4a44fa5ab797c9c"
+checksum = "229c6ff5584df4c6becbfe00567128bac768c8cd32ebc8a8366bd81ed072e8f3"
 dependencies = [
  "atomic-waker",
  "bytes",
@@ -1034,9 +1034,9 @@ checksum = "47d9d19d1d6efa0109d2f65ff4c85cddd50bd572e5a00127ab10987290bcefae"
 
 [[package]]
 name = "litrs"
-version = "1.0.1"
+version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4744e383959f0db86ede514b809b1c53251889093803c05267acc7d4e7030d70"
+checksum = "02b614978e47ce529faee66579f2b2fe19c94aa96d910a6a9a8043b2b02d8175"
 
 [[package]]
 name = "lock_api"
@@ -1970,9 +1970,9 @@ dependencies = [
 
 [[package]]
 name = "sha2"
-version = "0.11.1"
+version = "0.11.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "47d7069beb7d6ac7b9acd1039986e73443f24234f41074da099d6f994ac9ad19"
+checksum = "5b0e5c7d67bc53f435386b2130fdc900488c5703770f6d8a4633060e34288a27"
 dependencies = [
  "cfg-if",
  "cpufeatures 0.3.1",
@@ -2140,6 +2140,8 @@ name = "tekes-agent-apphost"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "async-trait",
+ "futures-util",
  "serde",
  "serde_json",
  "tekes-agent-components-ui",
@@ -2176,7 +2178,7 @@ dependencies = [
 
 [[package]]
 name = "tekes-agent-contract"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "async-trait",
  "base64",
@@ -2188,7 +2190,7 @@ dependencies = [
 
 [[package]]
 name = "tekes-agent-endpoint-dsh"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "async-trait",
  "base64",
@@ -2204,7 +2206,7 @@ dependencies = [
 
 [[package]]
 name = "tekes-agent-endpoint-kernel"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "async-trait",
  "futures-util",
@@ -2217,7 +2219,7 @@ dependencies = [
 
 [[package]]
 name = "tekes-agent-endpoint-pi"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "async-trait",
  "base64",
@@ -2236,7 +2238,7 @@ dependencies = [
 
 [[package]]
 name = "tekes-agent-presentation"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "async-trait",
  "iri-string",
@@ -2256,7 +2258,7 @@ dependencies = [
 
 [[package]]
 name = "tekes-agent-session"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "base64",
  "futures-util",
@@ -2341,7 +2343,7 @@ dependencies = [
 
 [[package]]
 name = "tekes-agent-web"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "async-trait",
  "base64",
@@ -2362,8 +2364,8 @@ dependencies = [
 
 [[package]]
 name = "tekes-ui-app-host"
-version = "0.4.11"
-source = "git+https://github.com/TekesApps/TekesUI.git?rev=31114fea1074d16750c7437b140d2d147cbe8eda#31114fea1074d16750c7437b140d2d147cbe8eda"
+version = "0.4.12"
+source = "git+https://github.com/TekesApps/TekesUI.git?rev=427c0e5d9e6fcdb0d71d203c402decdc05761df9#427c0e5d9e6fcdb0d71d203c402decdc05761df9"
 dependencies = [
  "anyhow",
  "resvg",
@@ -2386,8 +2388,8 @@ dependencies = [
 
 [[package]]
 name = "tekes-ui-app-protocol"
-version = "0.4.11"
-source = "git+https://github.com/TekesApps/TekesUI.git?rev=31114fea1074d16750c7437b140d2d147cbe8eda#31114fea1074d16750c7437b140d2d147cbe8eda"
+version = "0.4.12"
+source = "git+https://github.com/TekesApps/TekesUI.git?rev=427c0e5d9e6fcdb0d71d203c402decdc05761df9#427c0e5d9e6fcdb0d71d203c402decdc05761df9"
 dependencies = [
  "serde",
  "serde_json",
@@ -2395,8 +2397,8 @@ dependencies = [
 
 [[package]]
 name = "tekes-ui-controls"
-version = "0.4.11"
-source = "git+https://github.com/TekesApps/TekesUI.git?rev=31114fea1074d16750c7437b140d2d147cbe8eda#31114fea1074d16750c7437b140d2d147cbe8eda"
+version = "0.4.12"
+source = "git+https://github.com/TekesApps/TekesUI.git?rev=427c0e5d9e6fcdb0d71d203c402decdc05761df9#427c0e5d9e6fcdb0d71d203c402decdc05761df9"
 dependencies = [
  "resvg",
  "serde_json",
@@ -2413,22 +2415,22 @@ dependencies = [
 
 [[package]]
 name = "tekes-ui-design-export"
-version = "0.4.11"
-source = "git+https://github.com/TekesApps/TekesUI.git?rev=31114fea1074d16750c7437b140d2d147cbe8eda#31114fea1074d16750c7437b140d2d147cbe8eda"
+version = "0.4.12"
+source = "git+https://github.com/TekesApps/TekesUI.git?rev=427c0e5d9e6fcdb0d71d203c402decdc05761df9#427c0e5d9e6fcdb0d71d203c402decdc05761df9"
 dependencies = [
  "serde_json",
- "sha2 0.11.1",
+ "sha2 0.11.2",
 ]
 
 [[package]]
 name = "tekes-ui-icons"
-version = "0.4.11"
-source = "git+https://github.com/TekesApps/TekesUI.git?rev=31114fea1074d16750c7437b140d2d147cbe8eda#31114fea1074d16750c7437b140d2d147cbe8eda"
+version = "0.4.12"
+source = "git+https://github.com/TekesApps/TekesUI.git?rev=427c0e5d9e6fcdb0d71d203c402decdc05761df9#427c0e5d9e6fcdb0d71d203c402decdc05761df9"
 
 [[package]]
 name = "tekes-ui-macos-bridge"
-version = "0.4.11"
-source = "git+https://github.com/TekesApps/TekesUI.git?rev=31114fea1074d16750c7437b140d2d147cbe8eda#31114fea1074d16750c7437b140d2d147cbe8eda"
+version = "0.4.12"
+source = "git+https://github.com/TekesApps/TekesUI.git?rev=427c0e5d9e6fcdb0d71d203c402decdc05761df9#427c0e5d9e6fcdb0d71d203c402decdc05761df9"
 dependencies = [
  "tekes-ui-controls",
  "tekes-ui-platform-macos",
@@ -2439,8 +2441,8 @@ dependencies = [
 
 [[package]]
 name = "tekes-ui-module-runtime"
-version = "0.4.11"
-source = "git+https://github.com/TekesApps/TekesUI.git?rev=31114fea1074d16750c7437b140d2d147cbe8eda#31114fea1074d16750c7437b140d2d147cbe8eda"
+version = "0.4.12"
+source = "git+https://github.com/TekesApps/TekesUI.git?rev=427c0e5d9e6fcdb0d71d203c402decdc05761df9#427c0e5d9e6fcdb0d71d203c402decdc05761df9"
 dependencies = [
  "anyhow",
  "mach2",
@@ -2458,13 +2460,13 @@ dependencies = [
 
 [[package]]
 name = "tekes-ui-motion"
-version = "0.4.11"
-source = "git+https://github.com/TekesApps/TekesUI.git?rev=31114fea1074d16750c7437b140d2d147cbe8eda#31114fea1074d16750c7437b140d2d147cbe8eda"
+version = "0.4.12"
+source = "git+https://github.com/TekesApps/TekesUI.git?rev=427c0e5d9e6fcdb0d71d203c402decdc05761df9#427c0e5d9e6fcdb0d71d203c402decdc05761df9"
 
 [[package]]
 name = "tekes-ui-platform-macos"
-version = "0.4.11"
-source = "git+https://github.com/TekesApps/TekesUI.git?rev=31114fea1074d16750c7437b140d2d147cbe8eda#31114fea1074d16750c7437b140d2d147cbe8eda"
+version = "0.4.12"
+source = "git+https://github.com/TekesApps/TekesUI.git?rev=427c0e5d9e6fcdb0d71d203c402decdc05761df9#427c0e5d9e6fcdb0d71d203c402decdc05761df9"
 dependencies = [
  "block2",
  "objc2",
@@ -2478,8 +2480,8 @@ dependencies = [
 
 [[package]]
 name = "tekes-ui-render"
-version = "0.4.11"
-source = "git+https://github.com/TekesApps/TekesUI.git?rev=31114fea1074d16750c7437b140d2d147cbe8eda#31114fea1074d16750c7437b140d2d147cbe8eda"
+version = "0.4.12"
+source = "git+https://github.com/TekesApps/TekesUI.git?rev=427c0e5d9e6fcdb0d71d203c402decdc05761df9#427c0e5d9e6fcdb0d71d203c402decdc05761df9"
 dependencies = [
  "anyhow",
  "bytemuck",
@@ -2498,16 +2500,16 @@ dependencies = [
 
 [[package]]
 name = "tekes-ui-scene"
-version = "0.4.11"
-source = "git+https://github.com/TekesApps/TekesUI.git?rev=31114fea1074d16750c7437b140d2d147cbe8eda#31114fea1074d16750c7437b140d2d147cbe8eda"
+version = "0.4.12"
+source = "git+https://github.com/TekesApps/TekesUI.git?rev=427c0e5d9e6fcdb0d71d203c402decdc05761df9#427c0e5d9e6fcdb0d71d203c402decdc05761df9"
 dependencies = [
  "tekes-ui-tokens",
 ]
 
 [[package]]
 name = "tekes-ui-settings"
-version = "0.4.11"
-source = "git+https://github.com/TekesApps/TekesUI.git?rev=31114fea1074d16750c7437b140d2d147cbe8eda#31114fea1074d16750c7437b140d2d147cbe8eda"
+version = "0.4.12"
+source = "git+https://github.com/TekesApps/TekesUI.git?rev=427c0e5d9e6fcdb0d71d203c402decdc05761df9#427c0e5d9e6fcdb0d71d203c402decdc05761df9"
 dependencies = [
  "serde",
  "tekes-ui-controls",
@@ -2518,8 +2520,8 @@ dependencies = [
 
 [[package]]
 name = "tekes-ui-text"
-version = "0.4.11"
-source = "git+https://github.com/TekesApps/TekesUI.git?rev=31114fea1074d16750c7437b140d2d147cbe8eda#31114fea1074d16750c7437b140d2d147cbe8eda"
+version = "0.4.12"
+source = "git+https://github.com/TekesApps/TekesUI.git?rev=427c0e5d9e6fcdb0d71d203c402decdc05761df9#427c0e5d9e6fcdb0d71d203c402decdc05761df9"
 dependencies = [
  "objc2-core-foundation",
  "objc2-core-graphics",
@@ -2531,8 +2533,8 @@ dependencies = [
 
 [[package]]
 name = "tekes-ui-tokens"
-version = "0.4.11"
-source = "git+https://github.com/TekesApps/TekesUI.git?rev=31114fea1074d16750c7437b140d2d147cbe8eda#31114fea1074d16750c7437b140d2d147cbe8eda"
+version = "0.4.12"
+source = "git+https://github.com/TekesApps/TekesUI.git?rev=427c0e5d9e6fcdb0d71d203c402decdc05761df9#427c0e5d9e6fcdb0d71d203c402decdc05761df9"
 dependencies = [
  "serde_json",
  "tekes-ui-design-export",
@@ -2890,9 +2892,9 @@ checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 
 [[package]]
 name = "walkdir"
-version = "2.5.0"
+version = "2.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "29790946404f91d9c5d06f9874efddea1dc06c5efe94541a7d6863108e3a5e4b"
+checksum = "b42e295b7452c4604982280d8586001fcad9b8b201cac67bca9771e7a7475403"
 dependencies = [
  "same-file",
  "winapi-util",
@@ -3491,18 +3493,18 @@ dependencies = [
 
 [[package]]
 name = "zerocopy"
-version = "0.8.63"
+version = "0.8.66"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e5fe1f8f1b06191a00962174c61aa5005e0bb391a6d80d07e24d115c01a92ed8"
+checksum = "cba8a86aee14fc8cc6c208af60854b3d4ab7185a9a369a12c648faa2716ff42a"
 dependencies = [
  "zerocopy-derive",
 ]
 
 [[package]]
 name = "zerocopy-derive"
-version = "0.8.63"
+version = "0.8.66"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "863ad3ac83293fb4d740aedbfdc9240dd8d1a50c1099acd76ce80ce7c7230c7f"
+checksum = "f89bca3b96ceb3cfcb4572790402f977442270d252b9a8504ebc258760c55f94"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3571,9 +3573,9 @@ dependencies = [
 
 [[package]]
 name = "zlib-rs"
-version = "0.6.8"
+version = "0.6.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b268e58e7c693d7c271f93ffc4ba3b380412554231c85bf61ca7af91042a4112"
+checksum = "aa76918995d776d9dd34d371030be228d021137449771493d56e29f77e4148ac"
 
 [[package]]
 name = "zmij"

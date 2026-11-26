@@ -1,18 +1,29 @@
-use std::sync::Arc;
+use async_trait::async_trait;
+use futures_util::{StreamExt, stream};
+use serde_json::{Value, json};
+use std::collections::BTreeMap;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use tekes_agent_apphost::AppHostWakeHub;
+use tekes_agent_apphost::{
+    AgentRunContainer, AppHostWakeHub, SharedAgentWorkbench, TasksQueueContainer,
+};
 use tekes_agent_components_ui::{
     COMPOSER_SEND_BTN_ID, ComposerIntent, ComposerSurface, RUN_CONTAINER_STACK_ID,
-    ResponsiveWidthMode, TRANSCRIPT_ROOT_ID, TranscriptSurface,
+    ResponsiveWidthMode, TASKS_ERROR_ID, TRANSCRIPT_ERROR_PANEL_ID, TRANSCRIPT_ROOT_ID,
+    TRANSCRIPT_STATUS_ID, TasksQueueSurface, TasksQueueViewModel, TranscriptSurface,
+};
+use tekes_agent_contract::{
+    EndpointCapabilities, EndpointConnector, Error, FrameStream, HistoryPage, HistoryRequest,
+    HostDescription, SessionEndpoint, StreamTarget, unsupported,
 };
 use tekes_agent_presentation::{ComposerDestination, RunController, RunScope};
-use tekes_agent_session::SessionRuntime;
+use tekes_agent_session::{MemoryProjectionStore, SessionRuntime};
 use tekes_agent_ui_bindings::{
     DEFAULT_MAIN_SESSION_ID, FixtureSessionEndpoint, RunWorkbenchBinding, UiWakeNotifier,
 };
 use tekes_ui_controls::composition::{
     Content, ContentEvent, ContentHost, PointerButton, PointerEvent, PointerModifiers,
-    PointerPhase, StackContent,
+    PointerPhase, StackContent, TextContent,
 };
 use tekes_ui_scene::{Point, Rect, Scene};
 use tekes_ui_text::{
@@ -20,6 +31,7 @@ use tekes_ui_text::{
     traits::Shaper,
 };
 use tekes_ui_tokens::{Palette, Spacing, Theme, proposal};
+use tokio::sync::{Notify, mpsc};
 
 struct TestTextBackend(CoreTextShaper);
 
@@ -253,5 +265,463 @@ fn blocker1_pointer_stop_after_rendered_turn_never_clears_geometry_and_cancels_a
             .is_some_and(|r| r.can_cancel),
         "Cancel must end the running state cleanly"
     );
+    rt.block_on(runtime.stop()).unwrap();
+}
+
+#[derive(Clone)]
+struct ErrorScopeEndpoint {
+    inner: Arc<Mutex<ErrorScopeState>>,
+    cancel_gate_a: Arc<Notify>,
+}
+
+struct ErrorScopeState {
+    journal_txs: BTreeMap<String, mpsc::UnboundedSender<tekes_agent_contract::Result<Value>>>,
+    reject_cancel_a: bool,
+    reject_cancel_b: bool,
+    gate_cancel_a: bool,
+    fail_create: bool,
+}
+
+impl ErrorScopeEndpoint {
+    fn new() -> Self {
+        Self {
+            inner: Arc::new(Mutex::new(ErrorScopeState {
+                journal_txs: BTreeMap::new(),
+                reject_cancel_a: true,
+                reject_cancel_b: false,
+                gate_cancel_a: false,
+                fail_create: false,
+            })),
+            cancel_gate_a: Arc::new(Notify::new()),
+        }
+    }
+}
+
+struct ErrorScopeSessionEndpoint {
+    host: HostDescription,
+    source: ErrorScopeEndpoint,
+}
+
+#[async_trait]
+impl EndpointConnector for ErrorScopeEndpoint {
+    async fn connect(&self) -> tekes_agent_contract::Result<Arc<dyn SessionEndpoint>> {
+        Ok(Arc::new(ErrorScopeSessionEndpoint {
+            host: serde_json::from_value(json!({
+                "protocolVersion": 4,
+                "product": {"name": "Kernel", "version": "0.9.23"},
+                "capabilities": [
+                    "session-journal",
+                    "actionable-sync",
+                    "session-control-sync",
+                    "session-inventory-sync"
+                ],
+                "cwd": "/fixture",
+                "home": "/fixture",
+                "attachedSessions": 0,
+                "canOpenPath": false
+            }))
+            .unwrap(),
+            source: self.clone(),
+        }))
+    }
+}
+
+#[async_trait]
+impl SessionEndpoint for ErrorScopeSessionEndpoint {
+    fn identity(&self) -> &str {
+        "error-scope"
+    }
+    fn host(&self) -> &HostDescription {
+        &self.host
+    }
+    fn capabilities(&self) -> EndpointCapabilities {
+        EndpointCapabilities::methods(&["session.cancel", "session.create", "session.prompt"])
+    }
+    async fn follow(&self, target: StreamTarget) -> tekes_agent_contract::Result<FrameStream> {
+        match target {
+            StreamTarget::SessionInventory => {
+                let baseline = json!({
+                    "type": "baseline",
+                    "generation": "g",
+                    "snapshot": {
+                        "items": [
+                            {"sessionId": "a", "running": false, "blank": false, "updatedAt": 10},
+                            {"sessionId": "b", "running": false, "blank": false, "updatedAt": 20}
+                        ]
+                    }
+                });
+                Ok(Box::pin(
+                    stream::once(async { Ok(baseline) }).chain(stream::pending()),
+                ))
+            }
+            StreamTarget::SessionControl => {
+                let baseline = json!({
+                    "type": "baseline",
+                    "generation": "g",
+                    "snapshot": {"queues": [], "jobs": [], "projections": []}
+                });
+                Ok(Box::pin(
+                    stream::once(async { Ok(baseline) }).chain(stream::pending()),
+                ))
+            }
+            StreamTarget::Actionables => {
+                let reset = json!({"type": "reset", "generation": "g"});
+                Ok(Box::pin(
+                    stream::once(async { Ok(reset) }).chain(stream::pending()),
+                ))
+            }
+            StreamTarget::SessionJournal { address, .. } => {
+                let sid = address.session_id.clone();
+                let (tx, rx) = mpsc::unbounded_channel();
+                self.source
+                    .inner
+                    .lock()
+                    .unwrap()
+                    .journal_txs
+                    .insert(sid.clone(), tx);
+                let snap = json!({
+                    "type": "snapshot",
+                    "snapshot": {
+                        "sessionId": sid,
+                        "generation": "g",
+                        "throughSequence": 0,
+                        "windowLimit": 50,
+                        "entries": [{"event": {"type": "user/message", "seq": 0, "time": 1, "data": {"text": "init"}}}],
+                        "hasMoreBefore": false
+                    }
+                });
+                let tail = stream::unfold(rx, |mut rx| async move {
+                    rx.recv().await.map(|item| (item, rx))
+                });
+                Ok(Box::pin(stream::once(async { Ok(snap) }).chain(tail)))
+            }
+            _ => Err(unsupported("unsupported stream")),
+        }
+    }
+    async fn history_page(&self, _: HistoryRequest) -> tekes_agent_contract::Result<HistoryPage> {
+        Err(unsupported("unsupported history"))
+    }
+    async fn respond(&self, _: &str, _: i64, _: Value) -> tekes_agent_contract::Result<()> {
+        Ok(())
+    }
+    async fn call(
+        &self,
+        method: &str,
+        payload: Value,
+        _rpc_id: &str,
+    ) -> tekes_agent_contract::Result<Value> {
+        match method {
+            "session.cancel" => {
+                let sid = payload["sessionId"].as_str().unwrap_or("");
+                if sid == "a" && self.source.inner.lock().unwrap().gate_cancel_a {
+                    self.source.cancel_gate_a.notified().await;
+                }
+                let reject = {
+                    let guard = self.source.inner.lock().unwrap();
+                    (sid == "a" && guard.reject_cancel_a) || (sid == "b" && guard.reject_cancel_b)
+                };
+                if reject {
+                    return Err(Error::Remote(format!("cancel rejected ({sid})").into()));
+                }
+                Ok(json!({ "cancelled": true }))
+            }
+            "session.create" => {
+                if self.source.inner.lock().unwrap().fail_create {
+                    return Err(Error::Remote("endpoint create rejected".into()));
+                }
+                Ok(json!({ "sessionId": "c" }))
+            }
+            _ => Ok(json!({ "accepted": true })),
+        }
+    }
+    async fn close(&self) {}
+}
+
+async fn wait_store(runtime: &SessionRuntime, pred: impl Fn(&MemoryProjectionStore) -> bool) {
+    let mut sub = runtime.subscribe();
+    tokio::time::timeout(Duration::from_secs(2), async {
+        loop {
+            if runtime.inspect(&pred) {
+                return;
+            }
+            sub.changed().await.unwrap();
+        }
+    })
+    .await
+    .unwrap();
+}
+
+struct PersistentSurfaces {
+    transcript_host: ContentHost,
+    transcript: TranscriptSurface,
+    tasks_host: ContentHost,
+    tasks: TasksQueueSurface,
+}
+
+impl PersistentSurfaces {
+    fn new() -> Self {
+        Self {
+            transcript_host: ContentHost::new(TranscriptSurface::build_content()).unwrap(),
+            transcript: TranscriptSurface::new(),
+            tasks_host: ContentHost::new(TasksQueueSurface::build_content()).unwrap(),
+            tasks: TasksQueueSurface::new(),
+        }
+    }
+
+    fn sync_and_read(
+        &mut self,
+        workbench: &SharedAgentWorkbench,
+    ) -> ((bool, Option<String>), Option<String>) {
+        let run = workbench.run_binding().expect("run binding attached");
+        let snapshot = run.run_snapshot();
+        let active_session = run.current_scope().map(|scope| scope.session_id);
+        let session_error = run.error_for_session(active_session.as_deref());
+        self.transcript.set_session_error(session_error.clone());
+        let actionables = run.actionables_for(&snapshot);
+        self.transcript.sync(
+            &mut self.transcript_host,
+            &snapshot,
+            &actionables,
+            ResponsiveWidthMode::Expanded,
+        );
+        self.tasks.sync(
+            &mut self.tasks_host,
+            &TasksQueueViewModel {
+                epoch: run.connection_epoch(),
+                queued: Vec::new(),
+                tasks: Vec::new(),
+                error: session_error,
+            },
+            ResponsiveWidthMode::Expanded,
+        );
+        let has_panel = self
+            .transcript_host
+            .get(TRANSCRIPT_ERROR_PANEL_ID)
+            .is_some();
+        let tr_err = self
+            .transcript_host
+            .get(TRANSCRIPT_STATUS_ID)
+            .and_then(|node| node.component::<TextContent>())
+            .map(|txt| txt.text().to_owned());
+        let tq_err = self
+            .tasks_host
+            .get(TASKS_ERROR_ID)
+            .and_then(|node| node.component::<TextContent>())
+            .map(|txt| txt.text().to_owned());
+        ((has_panel, tr_err), tq_err)
+    }
+}
+
+fn inspect_rendered_errors(
+    workbench: &SharedAgentWorkbench,
+    persistent: &mut PersistentSurfaces,
+) -> ((bool, Option<String>), Option<String>) {
+    let mut run_container = AgentRunContainer::build("agent-run", workbench.clone()).unwrap();
+    let mut tasks_container =
+        TasksQueueContainer::build_tab("agent-tasks", workbench.clone()).unwrap();
+
+    let mut has_panel = false;
+    let mut tr_err = None;
+    run_container.with_host(&mut |host| {
+        has_panel = host.get(TRANSCRIPT_ERROR_PANEL_ID).is_some();
+        tr_err = host
+            .get(TRANSCRIPT_STATUS_ID)
+            .and_then(|node| node.component::<TextContent>())
+            .map(|txt| txt.text().to_owned());
+    });
+    let mut tq_err = None;
+    tasks_container.with_host(&mut |host| {
+        tq_err = host
+            .get(TASKS_ERROR_ID)
+            .and_then(|node| node.component::<TextContent>())
+            .map(|txt| txt.text().to_owned());
+    });
+
+    let persistent_res = persistent.sync_and_read(workbench);
+    assert_eq!(
+        ((has_panel, tr_err.clone()), tq_err.clone()),
+        persistent_res,
+        "AppHost containers and persistent incremental surfaces must agree"
+    );
+    ((has_panel, tr_err), tq_err)
+}
+
+#[test]
+fn session_cancel_error_isolated_in_transcript_and_tasks_queue_both_orders() {
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    let endpoint = ErrorScopeEndpoint::new();
+    let runtime = rt.block_on(async {
+        let runtime = Arc::new(SessionRuntime::spawn(
+            "error-scope",
+            Arc::new(endpoint.clone()),
+        ));
+        runtime.wait_ready(Duration::from_secs(2)).await.unwrap();
+        runtime
+    });
+    let controller =
+        rt.block_on(async { Arc::new(RunController::new(Arc::clone(&runtime)).unwrap()) });
+    let workbench = SharedAgentWorkbench::new();
+    let wake: Arc<dyn UiWakeNotifier> = workbench.wake_hub();
+    let binding = {
+        let _guard = rt.enter();
+        RunWorkbenchBinding::new(
+            "error-scope",
+            Arc::clone(&runtime),
+            controller,
+            rt.handle().clone(),
+            wake,
+        )
+    };
+    binding.open_initial_session("a").unwrap();
+    workbench.attach_run_binding(Arc::clone(&binding));
+
+    // Keep session A open/cancellable and prepare surface observer pair.
+    let tx_a = endpoint.inner.lock().unwrap().journal_txs["a"].clone();
+    tx_a.send(Ok(json!({
+        "type": "event",
+        "generation": "g",
+        "sessionId": "a",
+        "entry": {"event": {"type": "turn/start", "seq": 1, "time": 2, "data": {"turn": 1}}}
+    })))
+    .unwrap();
+    rt.block_on(wait_store(&runtime, |s| {
+        s.sessions.get("a").is_some_and(|sess| sess.run_open)
+    }));
+
+    let mut surfaces = PersistentSurfaces::new();
+
+    // Order 1: A cancel fails while A is active, then switch to B, then back to A.
+    let epoch = runtime.inspect(|s| s.connection_epoch);
+    let scope_a = RunScope::main("error-scope", "a");
+    binding.cancel_scope_at_epoch(epoch, &scope_a);
+    for _ in 0..50 {
+        if binding.session_error("a").is_some() {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    let ((has_panel, tr_err), tq_err) = inspect_rendered_errors(&workbench, &mut surfaces);
+    assert!(has_panel);
+    assert!(tr_err.is_some_and(|t| t.contains("Cancel failed")));
+    assert!(tq_err.is_some_and(|t| t.contains("Cancel failed")));
+
+    binding.select_session("b");
+    rt.block_on(wait_store(&runtime, |s| {
+        s.sessions.get("b").is_some_and(|sess| sess.journal_ready)
+    }));
+    let ((has_panel_b, tr_err_b), tq_err_b) = inspect_rendered_errors(&workbench, &mut surfaces);
+    assert!(!has_panel_b);
+    assert_eq!(tr_err_b, None);
+    assert_eq!(tq_err_b.as_deref(), Some(""));
+
+    binding.select_session("a");
+    let ((has_panel_a2, tr_err_a2), tq_err_a2) = inspect_rendered_errors(&workbench, &mut surfaces);
+    assert!(has_panel_a2);
+    assert!(tr_err_a2.is_some_and(|t| t.contains("Cancel failed")));
+    assert!(tq_err_a2.is_some_and(|t| t.contains("Cancel failed")));
+
+    // Order 2: Switch to B BEFORE A's gated cancel rejects (and while B has its own error).
+    binding.clear_session_error("a");
+    {
+        let mut guard = endpoint.inner.lock().unwrap();
+        guard.gate_cancel_a = true;
+        guard.reject_cancel_a = true;
+    }
+    binding.cancel_scope_at_epoch(epoch, &scope_a);
+    binding.select_session("b");
+    let scope_b = RunScope::main("error-scope", "b");
+    binding.cancel_scope_at_epoch(epoch + 99, &scope_b);
+    for _ in 0..50 {
+        if binding.session_error("b").is_some() {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    let ((_, _), b_err_opt) = inspect_rendered_errors(&workbench, &mut surfaces);
+    let b_err_before = b_err_opt.unwrap();
+    assert!(b_err_before.contains("Cancel failed"));
+    assert!(!b_err_before.contains("cancel rejected (a)"));
+
+    {
+        endpoint.inner.lock().unwrap().gate_cancel_a = false;
+    }
+    endpoint.cancel_gate_a.notify_waiters();
+    for _ in 0..50 {
+        if binding.session_error("a").is_some() {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    let ((_, tr_b_after_a_fail), tq_b_after_a_fail) =
+        inspect_rendered_errors(&workbench, &mut surfaces);
+    assert_eq!(tr_b_after_a_fail.as_deref(), Some(b_err_before.as_str()));
+    assert_eq!(tq_b_after_a_fail.as_deref(), Some(b_err_before.as_str()));
+
+    // Late A cancel success must NOT clear B's error, while clearing A's own error.
+    {
+        endpoint.inner.lock().unwrap().reject_cancel_a = false;
+    }
+    binding.cancel_scope_at_epoch(epoch, &scope_a);
+    for _ in 0..50 {
+        if binding.session_error("a").is_none() {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    let ((_, tr_b_after_a_ok), tq_b_after_a_ok) =
+        inspect_rendered_errors(&workbench, &mut surfaces);
+    assert_eq!(tr_b_after_a_ok.as_deref(), Some(b_err_before.as_str()));
+    assert_eq!(tq_b_after_a_ok.as_deref(), Some(b_err_before.as_str()));
+
+    // Also verify when B has no error, late A failure while B selected leaves B clean, and A visible.
+    binding.clear_session_error("b");
+    {
+        let mut guard = endpoint.inner.lock().unwrap();
+        guard.gate_cancel_a = true;
+        guard.reject_cancel_a = true;
+    }
+    binding.cancel_scope_at_epoch(epoch, &scope_a);
+    std::thread::sleep(Duration::from_millis(20));
+    endpoint.inner.lock().unwrap().gate_cancel_a = false;
+    endpoint.cancel_gate_a.notify_waiters();
+    for _ in 0..50 {
+        if binding.session_error("a").is_some() {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    let ((has_panel_b_clean, tr_b_clean), tq_b_clean) =
+        inspect_rendered_errors(&workbench, &mut surfaces);
+    assert!(!has_panel_b_clean);
+    assert_eq!(tr_b_clean, None);
+    assert_eq!(tq_b_clean.as_deref(), Some(""));
+
+    binding.select_session("a");
+    let ((has_panel_a3, tr_err_a3), tq_err_a3) = inspect_rendered_errors(&workbench, &mut surfaces);
+    assert!(has_panel_a3);
+    assert!(tr_err_a3.is_some_and(|t| t.contains("cancel rejected (a)")));
+    assert!(tq_err_a3.is_some_and(|t| t.contains("cancel rejected (a)")));
+
+    // True endpoint-level failure (`create_session`) surfaces in active session containers and clears.
+    binding.clear_session_error("a");
+    endpoint.inner.lock().unwrap().fail_create = true;
+    binding.create_session("/fixture");
+    for _ in 0..50 {
+        if binding.last_error().is_some() {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    let ((has_panel_ep, tr_err_ep), tq_err_ep) = inspect_rendered_errors(&workbench, &mut surfaces);
+    assert!(has_panel_ep);
+    assert!(tr_err_ep.is_some_and(|t| t.contains("endpoint create rejected")));
+    assert!(tq_err_ep.is_some_and(|t| t.contains("endpoint create rejected")));
+    binding.clear_error();
+    let ((has_panel_ep_cleared, tr_err_ep_cleared), tq_err_ep_cleared) =
+        inspect_rendered_errors(&workbench, &mut surfaces);
+    assert!(!has_panel_ep_cleared);
+    assert_eq!(tr_err_ep_cleared, None);
+    assert_eq!(tq_err_ep_cleared.as_deref(), Some(""));
+
     rt.block_on(runtime.stop()).unwrap();
 }
