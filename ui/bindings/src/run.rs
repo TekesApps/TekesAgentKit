@@ -115,6 +115,18 @@ struct UncertainCancel {
     target: CancelTurnTarget,
 }
 
+#[derive(Clone, Debug, PartialEq)]
+struct ConfirmedCancel {
+    op_id: u64,
+    target: CancelTurnTarget,
+}
+
+#[derive(Default)]
+struct SessionCancelTracking {
+    in_flight_ops: BTreeSet<u64>,
+    confirmed: Vec<ConfirmedCancel>,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum SessionErrorKind {
     Cancel,
@@ -160,10 +172,82 @@ struct RunUiState {
     session_errors: BTreeMap<String, SessionErrorEntry>,
     next_error_seq: u64,
     next_cancel_op_id: u64,
+    cancel_tracking: BTreeMap<String, SessionCancelTracking>,
     revision: u64,
 }
 
 impl RunUiState {
+    fn begin_cancel_op(&mut self, session_id: &str) -> (u64, u64) {
+        self.next_cancel_op_id = self.next_cancel_op_id.saturating_add(1);
+        let op_id = self.next_cancel_op_id;
+        let start_error_seq = self
+            .session_errors
+            .get(session_id)
+            .map_or(0, |entry| entry.seq);
+        self.cancel_tracking
+            .entry(session_id.to_owned())
+            .or_default()
+            .in_flight_ops
+            .insert(op_id);
+        (op_id, start_error_seq)
+    }
+
+    fn record_confirmed_cancel(
+        &mut self,
+        session_id: &str,
+        op_id: u64,
+        cancel_target: &Option<CancelTurnTarget>,
+    ) {
+        let Some(target) = cancel_target else {
+            return;
+        };
+        let Some(tracking) = self.cancel_tracking.get_mut(session_id) else {
+            return;
+        };
+        if !tracking.in_flight_ops.iter().any(|&id| id < op_id) {
+            return;
+        }
+        if let Some(existing) = tracking.confirmed.iter_mut().find(|c| &c.target == target) {
+            existing.op_id = existing.op_id.max(op_id);
+        } else {
+            tracking.confirmed.push(ConfirmedCancel {
+                op_id,
+                target: target.clone(),
+            });
+        }
+    }
+
+    fn is_superseded_by_confirmed_cancel(
+        &self,
+        session_id: &str,
+        op_id: u64,
+        cancel_target: &Option<CancelTurnTarget>,
+    ) -> bool {
+        let Some(target) = cancel_target else {
+            return false;
+        };
+        self.cancel_tracking
+            .get(session_id)
+            .is_some_and(|tracking| {
+                tracking
+                    .confirmed
+                    .iter()
+                    .any(|c| c.op_id > op_id && &c.target == target)
+            })
+    }
+
+    fn finish_cancel_op(&mut self, session_id: &str, op_id: u64) {
+        let Some(tracking) = self.cancel_tracking.get_mut(session_id) else {
+            return;
+        };
+        tracking.in_flight_ops.remove(&op_id);
+        if let Some(&min_in_flight) = tracking.in_flight_ops.first() {
+            tracking.confirmed.retain(|c| c.op_id > min_in_flight);
+        } else {
+            self.cancel_tracking.remove(session_id);
+        }
+    }
+
     fn controls_for_read(&self, session_id: Option<&str>) -> &SessionControlState {
         session_id
             .and_then(|sid| self.session_controls.get(sid))
@@ -488,6 +572,7 @@ impl RunWorkbenchBinding {
             session_errors: BTreeMap::new(),
             next_error_seq: 0,
             next_cancel_op_id: 0,
+            cancel_tracking: BTreeMap::new(),
             revision: 1,
         }));
         let selection_publish = Arc::new(Mutex::new(()));
@@ -1066,17 +1151,30 @@ impl RunWorkbenchBinding {
             let target = active_turn_target(state, &scope.session_id);
             (epoch_matched, target)
         });
-        let (op_id, start_error_seq) = {
-            let mut guard = self.ui.lock().expect("run ui lock");
-            guard.next_cancel_op_id = guard.next_cancel_op_id.saturating_add(1);
-            let op_id = guard.next_cancel_op_id;
-            let start_error_seq = guard
-                .session_errors
-                .get(&scope.session_id)
-                .map_or(0, |entry| entry.seq);
-            (op_id, start_error_seq)
-        };
+        let (op_id, start_error_seq) = self
+            .ui
+            .lock()
+            .expect("run ui lock")
+            .begin_cancel_op(&scope.session_id);
         self.handle.spawn(async move {
+            struct CancelOpGuard {
+                ui: Arc<Mutex<RunUiState>>,
+                session_id: String,
+                op_id: u64,
+            }
+            impl Drop for CancelOpGuard {
+                fn drop(&mut self) {
+                    self.ui
+                        .lock()
+                        .expect("run ui lock")
+                        .finish_cancel_op(&self.session_id, self.op_id);
+                }
+            }
+            let _op_guard = CancelOpGuard {
+                ui: Arc::clone(&ui),
+                session_id: scope.session_id.clone(),
+                op_id,
+            };
             match controller.cancel_at_epoch(expected_epoch, &scope).await {
                 Ok(()) => {
                     clear_superseded_cancel_error(
@@ -1115,6 +1213,7 @@ impl RunWorkbenchBinding {
                                 record_cancel_error_if_not_newer(
                                     &ui,
                                     &scope.session_id,
+                                    op_id,
                                     start_error_seq,
                                     Some(target),
                                     message,
@@ -1125,6 +1224,7 @@ impl RunWorkbenchBinding {
                                 let inserted_uncertain = record_cancel_error_if_not_newer(
                                     &ui,
                                     &scope.session_id,
+                                    op_id,
                                     start_error_seq,
                                     Some(target.clone()),
                                     message,
@@ -1139,6 +1239,7 @@ impl RunWorkbenchBinding {
                         record_cancel_error_if_not_newer(
                             &ui,
                             &scope.session_id,
+                            op_id,
                             start_error_seq,
                             cancel_target,
                             message,
@@ -1970,12 +2071,16 @@ fn clear_session_error_if_not_newer(
 fn record_cancel_error_if_not_newer(
     ui: &Mutex<RunUiState>,
     session_id: &str,
+    op_id: u64,
     start_error_seq: u64,
     cancel_target: Option<CancelTurnTarget>,
     message: String,
     uncertain_cancel: Option<UncertainCancel>,
 ) -> bool {
     let mut guard = ui.lock().expect("run ui lock");
+    if guard.is_superseded_by_confirmed_cancel(session_id, op_id, &cancel_target) {
+        return false;
+    }
     if guard
         .session_errors
         .get(session_id)
@@ -2050,6 +2155,7 @@ fn clear_superseded_cancel_error(
         guard.session_errors.remove(session_id);
         guard.revision = guard.revision.saturating_add(1);
     }
+    guard.record_confirmed_cancel(session_id, op_id, cancel_target);
     should_clear
 }
 
@@ -2133,6 +2239,7 @@ fn reconcile_uncertain_cancels(runtime: &SessionRuntime, ui: &Mutex<RunUiState>)
         match terminal {
             TurnTerminal::ConfirmedAborted => {
                 guard.session_errors.remove(&sid);
+                guard.record_confirmed_cancel(&sid, uc.op_id, &Some(uc.target));
                 changed = true;
             }
             TurnTerminal::ConfirmedOther => {

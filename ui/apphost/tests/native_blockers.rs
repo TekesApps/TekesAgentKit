@@ -445,17 +445,18 @@ impl SessionEndpoint for ErrorScopeSessionEndpoint {
         match method {
             "session.cancel" => {
                 let sid = payload["sessionId"].as_str().unwrap_or("");
-                if sid == "a" && self.source.inner.lock().unwrap().gate_cancel_a {
-                    self.source.cancel_gate_a.notified().await;
-                }
-                let (reject, transport_err) = {
+                let (gate, reject, transport_err) = {
                     let guard = self.source.inner.lock().unwrap();
                     (
+                        sid == "a" && guard.gate_cancel_a,
                         (sid == "a" && guard.reject_cancel_a)
                             || (sid == "b" && guard.reject_cancel_b),
                         sid == "a" && guard.transport_error_cancel_a,
                     )
                 };
+                if gate {
+                    self.source.cancel_gate_a.notified().await;
+                }
                 if transport_err {
                     return Err(Error::Transport("receipt dropped".into()));
                 }
@@ -985,6 +986,163 @@ fn same_turn_stop_retry_clears_previous_error_in_transcript_and_tasks_queue() {
     assert!(has_panel_ctrl);
     assert!(tr_ctrl.is_some_and(|t| t.contains("Cancel failed")));
     assert!(tq_ctrl.is_some_and(|t| t.contains("Cancel failed")));
+
+    rt.block_on(runtime.stop()).unwrap();
+}
+
+#[test]
+fn overlapping_same_turn_stop_late_rejection_does_not_resurrect_error_in_transcript_and_tasks_queue()
+ {
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    let endpoint = ErrorScopeEndpoint::new();
+    let runtime = rt.block_on(async {
+        let runtime = Arc::new(SessionRuntime::spawn(
+            "error-scope",
+            Arc::new(endpoint.clone()),
+        ));
+        runtime.wait_ready(Duration::from_secs(2)).await.unwrap();
+        runtime
+    });
+    let controller =
+        rt.block_on(async { Arc::new(RunController::new(Arc::clone(&runtime)).unwrap()) });
+    let workbench = SharedAgentWorkbench::new();
+    let wake: Arc<dyn UiWakeNotifier> = workbench.wake_hub();
+    let binding = {
+        let _guard = rt.enter();
+        RunWorkbenchBinding::new(
+            "error-scope",
+            Arc::clone(&runtime),
+            controller,
+            rt.handle().clone(),
+            wake,
+        )
+    };
+    binding.open_initial_session("b").unwrap();
+    {
+        endpoint.inner.lock().unwrap().reject_cancel_b = true;
+    }
+    binding.cancel_scope_at_epoch(999, &RunScope::main("error-scope", "b"));
+    for _ in 0..50 {
+        if binding.error_for_session(Some("b")).is_some() {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+
+    binding.select_session("a");
+    rt.block_on(wait_store(&runtime, |s| {
+        s.sessions.get("a").is_some_and(|sess| sess.journal_ready)
+    }));
+    workbench.attach_run_binding(Arc::clone(&binding));
+
+    let tx_a = endpoint.inner.lock().unwrap().journal_txs["a"].clone();
+    endpoint.inner.lock().unwrap().running_a = true;
+    tx_a.send(Ok(json!({
+        "type": "event",
+        "generation": "g",
+        "sessionId": "a",
+        "entry": {"event": {"type": "turn/start", "seq": 1, "time": 2, "data": {"turn": 1}}}
+    })))
+    .unwrap();
+    rt.block_on(wait_store(&runtime, |s| s.sessions["a"].run_open));
+
+    let mut surfaces = PersistentSurfaces::new();
+    let scope_a = RunScope::main("error-scope", "a");
+    let epoch = runtime.inspect(|s| s.connection_epoch);
+
+    // 1. Overlap order: Stop #1 parked (will reject), Stop #2 succeeds + turn aborts -> release Stop #1 -> both panels remain clean.
+    {
+        let mut guard = endpoint.inner.lock().unwrap();
+        guard.gate_cancel_a = true;
+        guard.reject_cancel_a = true;
+    }
+    binding.cancel_scope_at_epoch(epoch, &scope_a);
+    std::thread::sleep(Duration::from_millis(20));
+
+    {
+        let mut guard = endpoint.inner.lock().unwrap();
+        guard.gate_cancel_a = false;
+        guard.reject_cancel_a = false;
+        guard.running_a = false;
+        guard.journal_entries_a = vec![
+            json!({"event": {"type": "user/message", "seq": 0, "time": 1, "data": {"text": "init"}}}),
+            json!({"event": {"type": "turn/start", "seq": 1, "time": 2, "data": {"turn": 1}}}),
+            json!({"event": {"type": "turn/end", "seq": 2, "time": 3, "data": {"turn": 1, "reason": "aborted"}}}),
+        ];
+    }
+    binding.cancel_scope_at_epoch(epoch, &scope_a);
+    tx_a.send(Ok(json!({
+        "type": "event",
+        "generation": "g",
+        "sessionId": "a",
+        "entry": {"event": {"type": "turn/end", "seq": 2, "time": 3, "data": {"turn": 1, "reason": "aborted"}}}
+    })))
+    .unwrap();
+    rt.block_on(wait_store(&runtime, |s| !s.sessions["a"].run_open));
+    std::thread::sleep(Duration::from_millis(20));
+    let before_release = inspect_rendered_errors(&workbench, &mut surfaces);
+    assert_eq!(before_release, ((false, None), Some(String::new())));
+
+    endpoint.cancel_gate_a.notify_waiters();
+    std::thread::sleep(Duration::from_millis(40));
+    let after_late_release = inspect_rendered_errors(&workbench, &mut surfaces);
+    assert_eq!(after_late_release, ((false, None), Some(String::new())));
+
+    // Switch B -> A: B retains its own error, A stays clean.
+    binding.select_session("b");
+    rt.block_on(wait_store(&runtime, |s| s.sessions["b"].journal_ready));
+    let ((has_panel_b, tr_b), tq_b) = inspect_rendered_errors(&workbench, &mut surfaces);
+    assert!(has_panel_b);
+    assert!(tr_b.is_some_and(|t| t.contains("Cancel failed")));
+    assert!(tq_b.is_some_and(|t| t.contains("Cancel failed")));
+
+    binding.select_session("a");
+    rt.block_on(wait_store(&runtime, |s| s.sessions["a"].journal_ready));
+    let after_switch_back = inspect_rendered_errors(&workbench, &mut surfaces);
+    assert_eq!(after_switch_back, ((false, None), Some(String::new())));
+
+    // 2. Ordered control: Turn 2 Stop #1 rejects first -> both panels show failure -> Stop #2 succeeds -> both panels clear.
+    {
+        let mut guard = endpoint.inner.lock().unwrap();
+        guard.running_a = true;
+        guard.reject_cancel_a = true;
+        guard.journal_entries_a.push(
+            json!({"event": {"type": "turn/start", "seq": 3, "time": 4, "data": {"turn": 2}}}),
+        );
+    }
+    let tx_a2 = endpoint.inner.lock().unwrap().journal_txs["a"].clone();
+    tx_a2
+        .send(Ok(json!({
+            "type": "event",
+            "generation": "g",
+            "sessionId": "a",
+            "entry": {"event": {"type": "turn/start", "seq": 3, "time": 4, "data": {"turn": 2}}}
+        })))
+        .unwrap();
+    rt.block_on(wait_store(&runtime, |s| s.sessions["a"].run_open));
+
+    binding.cancel_scope_at_epoch(epoch, &scope_a);
+    for _ in 0..50 {
+        if binding.error_for_session(Some("a")).is_some() {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    let ((has_panel_ord, tr_ord), tq_ord) = inspect_rendered_errors(&workbench, &mut surfaces);
+    assert!(has_panel_ord);
+    assert!(tr_ord.is_some_and(|t| t.contains("cancel rejected (a)")));
+    assert!(tq_ord.is_some_and(|t| t.contains("cancel rejected (a)")));
+
+    endpoint.inner.lock().unwrap().reject_cancel_a = false;
+    binding.cancel_scope_at_epoch(epoch, &scope_a);
+    for _ in 0..50 {
+        if binding.error_for_session(Some("a")).is_none() {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    let after_ordered = inspect_rendered_errors(&workbench, &mut surfaces);
+    assert_eq!(after_ordered, ((false, None), Some(String::new())));
 
     rt.block_on(runtime.stop()).unwrap();
 }

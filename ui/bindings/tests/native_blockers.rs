@@ -37,6 +37,9 @@ struct BlockerTestEndpoint {
     hold_cancel: Arc<AtomicBool>,
     cancel_gate_entered: Arc<Notify>,
     cancel_release: Arc<Notify>,
+    park_reject_cancel: Arc<AtomicBool>,
+    park_reject_entered: Arc<Notify>,
+    park_reject_release: Arc<Notify>,
 }
 
 struct EndpointState {
@@ -109,6 +112,9 @@ impl BlockerTestEndpoint {
             hold_cancel: Arc::new(AtomicBool::new(false)),
             cancel_gate_entered: Arc::new(Notify::new()),
             cancel_release: Arc::new(Notify::new()),
+            park_reject_cancel: Arc::new(AtomicBool::new(false)),
+            park_reject_entered: Arc::new(Notify::new()),
+            park_reject_release: Arc::new(Notify::new()),
         }
     }
 
@@ -340,6 +346,11 @@ impl SessionEndpoint for TestSessionEndpoint {
                 Ok(json!({ "mode": mode }))
             }
             "session.cancel" => {
+                if self.source.park_reject_cancel.swap(false, Ordering::AcqRel) {
+                    self.source.park_reject_entered.notify_waiters();
+                    self.source.park_reject_release.notified().await;
+                    return Err(Error::Remote("cancel rejected".into()));
+                }
                 if self.source.hold_cancel.swap(false, Ordering::AcqRel) {
                     self.source.cancel_gate_entered.notify_waiters();
                     self.source.cancel_release.notified().await;
@@ -2180,6 +2191,222 @@ fn same_turn_second_stop_http_loss_after_aborted_clears_previous_rejection_while
         "newer queue-edit failure must remain after HTTP-only Stop loss on ConfirmedAborted"
     );
     assert!(binding.error_for_session(Some("b")).is_some());
+
+    rt.block_on(runtime.stop()).unwrap();
+}
+
+#[test]
+fn overlapping_same_turn_stop_late_rejection_is_superseded_while_later_turns_and_single_rejections_preserve_errors()
+ {
+    let endpoint = BlockerTestEndpoint::new();
+    {
+        let mut guard = endpoint.inner.lock().unwrap();
+        guard.running.insert("a".to_owned(), true);
+        guard.journal_entries.insert(
+            "a".to_owned(),
+            vec![
+                json!({"event": {"type": "user/message", "seq": 0, "time": 1, "data": {"text": "t1"}}}),
+                json!({"event": {"type": "turn/start", "seq": 1, "time": 2, "data": {"turn": 1}}}),
+            ],
+        );
+        guard.running.insert("b".to_owned(), true);
+        guard.journal_entries.insert(
+            "b".to_owned(),
+            vec![
+                json!({"event": {"type": "user/message", "seq": 0, "time": 1, "data": {"text": "tb"}}}),
+                json!({"event": {"type": "turn/start", "seq": 1, "time": 2, "data": {"turn": 1}}}),
+            ],
+        );
+    }
+    let (rt, runtime, binding) = setup_binding(&endpoint);
+    binding.open_initial_session("b").unwrap();
+    endpoint.inner.lock().unwrap().reject_cancel = true;
+    binding.cancel_scope(&RunScope::main("blocker-test", "b"));
+    for _ in 0..50 {
+        if binding.error_for_session(Some("b")).is_some() {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    let b_err = binding.error_for_session(Some("b"));
+    assert!(b_err.is_some());
+    endpoint.inner.lock().unwrap().reject_cancel = false;
+
+    binding.select_session("a");
+    rt.block_on(wait_store(&runtime, |s| {
+        s.sessions["a"].journal_ready && s.sessions["a"].run_open
+    }));
+    let scope_a = RunScope::main("blocker-test", "a");
+    let epoch = runtime.inspect(|s| s.connection_epoch);
+
+    // 1. Overlapping same-turn Stop #1 parked rejection + Stop #2 Ok(()) -> late Stop #1 rejection suppressed.
+    endpoint.park_reject_cancel.store(true, Ordering::Release);
+    binding.cancel_scope_at_epoch(epoch, &scope_a);
+    rt.block_on(endpoint.park_reject_entered.notified());
+    assert_eq!(binding.error_for_session(Some("a")), None);
+
+    binding.cancel_scope_at_epoch(epoch, &scope_a);
+    let tx_a = endpoint.inner.lock().unwrap().journal_txs["a"].clone();
+    tx_a.send(Ok(json!({
+        "type": "event",
+        "generation": "g",
+        "sessionId": "a",
+        "entry": {"event": {"type": "turn/end", "seq": 2, "time": 3, "data": {"turn": 1, "reason": "aborted"}}}
+    })))
+    .unwrap();
+    endpoint
+        .inner
+        .lock()
+        .unwrap()
+        .running
+        .insert("a".to_owned(), false);
+    rt.block_on(wait_store(&runtime, |s| !s.sessions["a"].run_open));
+    endpoint.park_reject_release.notify_one();
+    std::thread::sleep(Duration::from_millis(40));
+    let rev = binding.ui_revision();
+    assert_eq!(binding.session_error("a"), None);
+    assert_eq!(binding.error_for_session(Some("a")), None);
+    assert_eq!(binding.ui_revision(), rev);
+    assert_eq!(binding.error_for_session(Some("b")), b_err);
+
+    // 2. Overlapping Stop #1 parked rejection + Stop #2 HTTP loss with immediate ConfirmedAborted.
+    endpoint
+        .inner
+        .lock()
+        .unwrap()
+        .running
+        .insert("a".to_owned(), true);
+    tx_a.send(Ok(json!({
+        "type": "event",
+        "generation": "g",
+        "sessionId": "a",
+        "entry": {"event": {"type": "turn/start", "seq": 3, "time": 4, "data": {"turn": 2}}}
+    })))
+    .unwrap();
+    rt.block_on(wait_store(&runtime, |s| s.sessions["a"].run_open));
+    endpoint.park_reject_cancel.store(true, Ordering::Release);
+    binding.cancel_scope_at_epoch(epoch, &scope_a);
+    rt.block_on(endpoint.park_reject_entered.notified());
+
+    endpoint.inner.lock().unwrap().transport_error_cancel = true;
+    endpoint.hold_cancel.store(true, Ordering::Release);
+    binding.cancel_scope_at_epoch(epoch, &scope_a);
+    rt.block_on(endpoint.cancel_gate_entered.notified());
+    tx_a.send(Ok(json!({
+        "type": "event",
+        "generation": "g",
+        "sessionId": "a",
+        "entry": {"event": {"type": "turn/end", "seq": 4, "time": 5, "data": {"turn": 2, "reason": "aborted"}}}
+    })))
+    .unwrap();
+    endpoint
+        .inner
+        .lock()
+        .unwrap()
+        .running
+        .insert("a".to_owned(), false);
+    rt.block_on(wait_store(&runtime, |s| !s.sessions["a"].run_open));
+    endpoint.cancel_release.notify_one();
+    std::thread::sleep(Duration::from_millis(30));
+    endpoint.park_reject_release.notify_one();
+    std::thread::sleep(Duration::from_millis(40));
+    assert_eq!(binding.error_for_session(Some("a")), None);
+
+    // 3. Overlapping Stop #1 parked rejection + Stop #2 HTTP loss Pending -> deferred reconcile_uncertain_cancels.
+    endpoint
+        .inner
+        .lock()
+        .unwrap()
+        .running
+        .insert("a".to_owned(), true);
+    tx_a.send(Ok(json!({
+        "type": "event",
+        "generation": "g",
+        "sessionId": "a",
+        "entry": {"event": {"type": "turn/start", "seq": 5, "time": 6, "data": {"turn": 3}}}
+    })))
+    .unwrap();
+    rt.block_on(wait_store(&runtime, |s| s.sessions["a"].run_open));
+    endpoint.park_reject_cancel.store(true, Ordering::Release);
+    binding.cancel_scope_at_epoch(epoch, &scope_a);
+    rt.block_on(endpoint.park_reject_entered.notified());
+
+    binding.cancel_scope_at_epoch(epoch, &scope_a);
+    for _ in 0..50 {
+        if binding
+            .error_for_session(Some("a"))
+            .as_deref()
+            .is_some_and(|e| e.contains("receipt socket closed"))
+        {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    tx_a.send(Ok(json!({
+        "type": "event",
+        "generation": "g",
+        "sessionId": "a",
+        "entry": {"event": {"type": "turn/end", "seq": 6, "time": 7, "data": {"turn": 3, "reason": "aborted"}}}
+    })))
+    .unwrap();
+    rt.block_on(wait_store(&runtime, |s| !s.sessions["a"].run_open));
+    for _ in 0..50 {
+        if binding.error_for_session(Some("a")).is_none() {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    endpoint.park_reject_release.notify_one();
+    std::thread::sleep(Duration::from_millis(40));
+    assert_eq!(binding.error_for_session(Some("a")), None);
+
+    // 4. Turn 4 succeeds via overlapping Stops -> Turn 5 Stop #3 rejects -> Turn 5 rejection preserved even after Turn 4 Stop #1 releases.
+    tx_a.send(Ok(json!({
+        "type": "event",
+        "generation": "g",
+        "sessionId": "a",
+        "entry": {"event": {"type": "turn/start", "seq": 7, "time": 8, "data": {"turn": 4}}}
+    })))
+    .unwrap();
+    rt.block_on(wait_store(&runtime, |s| s.sessions["a"].run_open));
+    endpoint.inner.lock().unwrap().transport_error_cancel = false;
+    endpoint.park_reject_cancel.store(true, Ordering::Release);
+    binding.cancel_scope_at_epoch(epoch, &scope_a);
+    rt.block_on(endpoint.park_reject_entered.notified());
+    binding.cancel_scope_at_epoch(epoch, &scope_a);
+    tx_a.send(Ok(json!({
+        "type": "event",
+        "generation": "g",
+        "sessionId": "a",
+        "entry": {"event": {"type": "turn/end", "seq": 8, "time": 9, "data": {"turn": 4, "reason": "aborted"}}}
+    })))
+    .unwrap();
+    rt.block_on(wait_store(&runtime, |s| !s.sessions["a"].run_open));
+    tx_a.send(Ok(json!({
+        "type": "event",
+        "generation": "g",
+        "sessionId": "a",
+        "entry": {"event": {"type": "turn/start", "seq": 9, "time": 10, "data": {"turn": 5}}}
+    })))
+    .unwrap();
+    rt.block_on(wait_store(&runtime, |s| s.sessions["a"].run_open));
+    endpoint.inner.lock().unwrap().reject_cancel = true;
+    binding.cancel_scope_at_epoch(epoch, &scope_a);
+    for _ in 0..50 {
+        if binding.error_for_session(Some("a")).is_some() {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    endpoint.park_reject_release.notify_one();
+    std::thread::sleep(Duration::from_millis(40));
+    assert!(
+        binding
+            .error_for_session(Some("a"))
+            .as_deref()
+            .is_some_and(|e| e.contains("cancel rejected"))
+    );
+    assert_eq!(binding.error_for_session(Some("b")), b_err);
 
     rt.block_on(runtime.stop()).unwrap();
 }
