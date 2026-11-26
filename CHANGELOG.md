@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.5 — 2026-11-26
+
+- Gate background `try_spawn_history_acquire` on `published_lease_generation == history_lease_generation` and synchronously await `lease.release()` on stale/rolled-back `open_initial_session` cancellation so overlapping `select_session(C)` never acquires `C` before `RunController` publishes `C`, and stale `B` journals close on the wire before `open_initial_session(B)` returns `Err(Error::Disconnected)` (#40).
+
 ## 0.6.4 — 2026-11-26
 
 - Decouple `RunWorkbenchBinding` selection publication (`select_session`, `open_initial_session`, `create_session_async`) from `RunUiState` mutex locking via a dedicated `selection_publish` mutex so `RunController::subscribe().borrow()` read guards never stall UI-only getters (`session_error`, `error_for_session`, `last_error`, `sidebar_rows`), while keeping final selection, transcript history, and `SessionHistoryLease` consistent (#40).

@@ -686,7 +686,7 @@ impl RunWorkbenchBinding {
             if guard.dropped || guard.history_lease_generation != start_lease_gen {
                 drop(guard);
                 drop(pub_guard);
-                drop(lease);
+                let _ = self.handle.block_on(lease.release());
                 return Err(tekes_agent_contract::Error::Disconnected);
             }
             let prev_desired = guard.desired_history_session.clone();
@@ -705,6 +705,8 @@ impl RunWorkbenchBinding {
                 if guard.history_lease_generation == lease_gen {
                     guard.desired_history_session = prev_desired;
                     guard.history_acquire_attempted = prev_attempted;
+                    guard.published_lease_generation =
+                        guard.published_lease_generation.max(lease_gen);
                     let current = guard.history_lease.take();
                     guard.history_lease = prev_lease;
                     current
@@ -713,7 +715,9 @@ impl RunWorkbenchBinding {
                 }
             };
             drop(pub_guard);
-            drop(rolled_back_lease);
+            if let Some(rolled_back) = rolled_back_lease {
+                let _ = self.handle.block_on(rolled_back.release());
+            }
             return Err(err);
         }
         drop(pub_guard);
@@ -2145,7 +2149,10 @@ fn try_spawn_history_acquire(
             .is_some_and(|lease| lease.session_id() == sid);
         let lease_gen = guard.history_lease_generation;
         let key = (lease_gen, epoch, sid.clone());
-        if has_lease || guard.history_acquire_attempted.as_ref() == Some(&key) {
+        if has_lease
+            || guard.published_lease_generation != lease_gen
+            || guard.history_acquire_attempted.as_ref() == Some(&key)
+        {
             return;
         }
         guard.history_acquire_attempted = Some(key);
