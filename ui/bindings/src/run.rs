@@ -112,8 +112,11 @@ struct RunUiState {
     selected_harness: String,
     default_controls: SessionControlState,
     session_controls: BTreeMap<String, SessionControlState>,
+    desired_history_session: Option<String>,
     history_lease: Option<SessionHistoryLease>,
     history_lease_generation: u64,
+    history_acquire_attempted: Option<(u64, u64, String)>,
+    dropped: bool,
     local_pins: BTreeSet<String>,
     local_titles: BTreeMap<String, String>,
     local_archived: BTreeSet<String>,
@@ -388,9 +391,14 @@ pub struct RunWorkbenchBinding {
 impl Drop for RunWorkbenchBinding {
     fn drop(&mut self) {
         self._watcher.abort();
-        if let Ok(mut guard) = self.ui.lock() {
-            guard.history_lease.take();
-        }
+        let old_lease = self.ui.lock().ok().and_then(|mut guard| {
+            guard.dropped = true;
+            guard.desired_history_session = None;
+            guard.history_acquire_attempted = None;
+            guard.history_lease_generation = guard.history_lease_generation.saturating_add(1);
+            guard.history_lease.take()
+        });
+        drop(old_lease);
     }
 }
 
@@ -411,9 +419,43 @@ impl RunWorkbenchBinding {
         wake: Arc<dyn UiWakeNotifier>,
     ) -> Arc<Self> {
         let endpoint_id = endpoint_id.into();
+        let lower_endpoint = endpoint_id.to_ascii_lowercase();
+        let selected_harness = if lower_endpoint.contains("pi") {
+            AVAILABLE_HARNESSES[1].to_owned()
+        } else if lower_endpoint.contains("dsh") {
+            AVAILABLE_HARNESSES[2].to_owned()
+        } else {
+            AVAILABLE_HARNESSES[0].to_owned()
+        };
+        let ui = Arc::new(Mutex::new(RunUiState {
+            endpoint_id,
+            default_cwd: "/fixture/tekes-agentkit".to_owned(),
+            live_kernel_tools: false,
+            filter_mode: SidebarFilterMode::All,
+            search_query: String::new(),
+            selected_harness,
+            default_controls: SessionControlState::default(),
+            session_controls: BTreeMap::new(),
+            desired_history_session: None,
+            history_lease: None,
+            history_lease_generation: 0,
+            history_acquire_attempted: None,
+            dropped: false,
+            local_pins: BTreeSet::new(),
+            local_titles: BTreeMap::new(),
+            local_archived: BTreeSet::new(),
+            host_summary_sections: Vec::new(),
+            last_error: None,
+            session_errors: BTreeMap::new(),
+            revision: 1,
+        }));
         let mut run_rx = controller.subscribe();
         let mut store_rx = runtime.subscribe();
         let wake_clone = Arc::clone(&wake);
+        let runtime_w = Arc::clone(&runtime);
+        let controller_w = Arc::clone(&controller);
+        let ui_weak = Arc::downgrade(&ui);
+        let handle_w = handle.clone();
         let watcher = handle.spawn(async move {
             loop {
                 tokio::select! {
@@ -427,43 +469,28 @@ impl RunWorkbenchBinding {
                         if changed.is_err() {
                             break;
                         }
+                        if let Some(ui_strong) = ui_weak.upgrade() {
+                            try_spawn_history_acquire(
+                                &runtime_w,
+                                &controller_w,
+                                &ui_strong,
+                                &wake_clone,
+                                &handle_w,
+                            );
+                        } else {
+                            break;
+                        }
                         wake_clone.wake();
                     }
                 }
             }
         });
-        let lower_endpoint = endpoint_id.to_ascii_lowercase();
-        let selected_harness = if lower_endpoint.contains("pi") {
-            AVAILABLE_HARNESSES[1].to_owned()
-        } else if lower_endpoint.contains("dsh") {
-            AVAILABLE_HARNESSES[2].to_owned()
-        } else {
-            AVAILABLE_HARNESSES[0].to_owned()
-        };
         Arc::new(Self {
             runtime,
             controller,
             handle,
             wake,
-            ui: Arc::new(Mutex::new(RunUiState {
-                endpoint_id,
-                default_cwd: "/fixture/tekes-agentkit".to_owned(),
-                live_kernel_tools: false,
-                filter_mode: SidebarFilterMode::All,
-                search_query: String::new(),
-                selected_harness,
-                default_controls: SessionControlState::default(),
-                session_controls: BTreeMap::new(),
-                history_lease: None,
-                history_lease_generation: 0,
-                local_pins: BTreeSet::new(),
-                local_titles: BTreeMap::new(),
-                local_archived: BTreeSet::new(),
-                host_summary_sections: Vec::new(),
-                last_error: None,
-                session_errors: BTreeMap::new(),
-                revision: 1,
-            })),
+            ui,
             _watcher: watcher,
         })
     }
@@ -514,6 +541,15 @@ impl RunWorkbenchBinding {
             .session_errors
             .get(session_id)
             .cloned()
+    }
+
+    /// Returns the active error to display for `session_id`: session-scoped failures
+    /// first, falling back to endpoint-level failures (`last_error`).
+    pub fn error_for_session(&self, session_id: Option<&str>) -> Option<String> {
+        let guard = self.ui.lock().expect("run ui lock");
+        session_id
+            .and_then(|sid| guard.session_errors.get(sid).cloned())
+            .or_else(|| guard.last_error.clone())
     }
 
     pub fn clear_session_error(&self, session_id: &str) {
@@ -575,23 +611,40 @@ impl RunWorkbenchBinding {
         let runtime = Arc::clone(&self.runtime);
         let ui = Arc::clone(&self.ui);
         let sid = session_id.to_owned();
-        let lease_gen = {
+        let epoch = runtime.inspect(|s| s.connection_epoch);
+        let (lease_gen, old_lease) = {
             let mut guard = self.ui.lock().expect("run ui lock");
             guard.history_lease_generation = guard.history_lease_generation.saturating_add(1);
-            guard.history_lease_generation
+            let lease_gen = guard.history_lease_generation;
+            guard.desired_history_session = Some(sid.clone());
+            guard.history_acquire_attempted = Some((lease_gen, epoch, sid.clone()));
+            let old = if guard
+                .history_lease
+                .as_ref()
+                .is_some_and(|l| l.session_id() == sid)
+            {
+                None
+            } else {
+                guard.history_lease.take()
+            };
+            (lease_gen, old)
         };
+        drop(old_lease);
         self.handle.block_on(async move {
-            controller.select(ComposerDestination::run(scope))?;
             let lease = runtime.acquire_history(&sid).await?;
-            let old_lease = {
+            let displaced = {
                 let mut guard = ui.lock().expect("run ui lock");
-                if guard.history_lease_generation == lease_gen {
+                if !guard.dropped
+                    && guard.history_lease_generation == lease_gen
+                    && guard.desired_history_session.as_deref() == Some(sid.as_str())
+                {
                     guard.history_lease.replace(lease)
                 } else {
                     Some(lease)
                 }
             };
-            drop(old_lease);
+            drop(displaced);
+            controller.select(ComposerDestination::run(scope))?;
             Ok(())
         })
     }
@@ -698,10 +751,11 @@ impl RunWorkbenchBinding {
         let scope = RunScope::main(endpoint_id, session_id);
         let dest = ComposerDestination::run(scope);
         let _ = self.controller.select(dest);
-        let (lease_gen, need_acquire, old_lease) = {
+        let (need_acquire, old_lease) = {
             let mut guard = self.ui.lock().expect("run ui lock");
             guard.history_lease_generation = guard.history_lease_generation.saturating_add(1);
-            let lease_gen = guard.history_lease_generation;
+            guard.desired_history_session = Some(session_id.to_owned());
+            guard.history_acquire_attempted = None;
             let same_lease = guard
                 .history_lease
                 .as_ref()
@@ -711,29 +765,28 @@ impl RunWorkbenchBinding {
             } else {
                 guard.history_lease.take()
             };
-            (lease_gen, !same_lease, old_lease)
+            (!same_lease, old_lease)
         };
         drop(old_lease);
-        let runtime = Arc::clone(&self.runtime);
-        let controller = Arc::clone(&self.controller);
-        let ui = Arc::clone(&self.ui);
-        let sid = session_id.to_owned();
-        let wake = Arc::clone(&self.wake);
-        self.handle.spawn(async move {
-            if need_acquire && let Ok(lease) = runtime.acquire_history(&sid).await {
-                let displaced = {
-                    let mut guard = ui.lock().expect("run ui lock");
-                    if guard.history_lease_generation == lease_gen {
-                        guard.history_lease.replace(lease)
-                    } else {
-                        Some(lease)
-                    }
-                };
-                drop(displaced);
-            }
-            refresh_controls_async(runtime, controller, ui, Arc::clone(&wake), Some(sid)).await;
-            wake.wake();
-        });
+        if need_acquire {
+            try_spawn_history_acquire(
+                &self.runtime,
+                &self.controller,
+                &self.ui,
+                &self.wake,
+                &self.handle,
+            );
+        } else {
+            let runtime = Arc::clone(&self.runtime);
+            let controller = Arc::clone(&self.controller);
+            let ui = Arc::clone(&self.ui);
+            let sid = session_id.to_owned();
+            let wake = Arc::clone(&self.wake);
+            self.handle.spawn(async move {
+                refresh_controls_async(runtime, controller, ui, Arc::clone(&wake), Some(sid)).await;
+                wake.wake();
+            });
+        }
         self.bump_ui();
     }
 
@@ -744,13 +797,24 @@ impl RunWorkbenchBinding {
         let wake = Arc::clone(&self.wake);
         let cwd = cwd.to_owned();
         self.handle.spawn(async move {
-            if let Err(err) =
-                create_session_async(runtime, controller, Arc::clone(&ui), Arc::clone(&wake), cwd)
-                    .await
+            match create_session_async(runtime, controller, Arc::clone(&ui), Arc::clone(&wake), cwd)
+                .await
             {
-                eprintln!("AgentKit create session failed: {err:#}");
-                ui.lock().expect("run ui lock").last_error = Some(err.to_string());
-                wake.wake();
+                Ok(_) => {
+                    let mut guard = ui.lock().expect("run ui lock");
+                    guard.last_error = None;
+                    guard.revision = guard.revision.saturating_add(1);
+                    drop(guard);
+                    wake.wake();
+                }
+                Err(err) => {
+                    eprintln!("AgentKit create session failed: {err:#}");
+                    let mut guard = ui.lock().expect("run ui lock");
+                    guard.last_error = Some(err.to_string());
+                    guard.revision = guard.revision.saturating_add(1);
+                    drop(guard);
+                    wake.wake();
+                }
             }
         });
     }
@@ -848,22 +912,24 @@ impl RunWorkbenchBinding {
         self.handle.spawn(async move {
             match controller.dispatch_with(ticket, None, &prep).await {
                 Ok(_) => {
-                    let mut guard = ui.lock().expect("run ui lock");
                     if let Some(sid) = &target_session {
-                        guard.session_errors.remove(sid);
+                        record_session_error(&ui, sid, None);
+                    } else {
+                        let mut guard = ui.lock().expect("run ui lock");
+                        guard.last_error = None;
+                        guard.revision = guard.revision.saturating_add(1);
                     }
-                    guard.last_error = None;
-                    guard.revision = guard.revision.saturating_add(1);
                 }
                 Err(err) => {
                     eprintln!("AgentKit submit failed: {err:#}");
-                    let mut guard = ui.lock().expect("run ui lock");
                     let msg = err.to_string();
                     if let Some(sid) = &target_session {
-                        guard.session_errors.insert(sid.clone(), msg.clone());
+                        record_session_error(&ui, sid, Some(msg));
+                    } else {
+                        let mut guard = ui.lock().expect("run ui lock");
+                        guard.last_error = Some(msg);
+                        guard.revision = guard.revision.saturating_add(1);
                     }
-                    guard.last_error = Some(msg);
-                    guard.revision = guard.revision.saturating_add(1);
                 }
             }
             wake.wake();
@@ -882,22 +948,12 @@ impl RunWorkbenchBinding {
         let ui = Arc::clone(&self.ui);
         let wake = Arc::clone(&self.wake);
         self.handle.spawn(async move {
-            match controller.cancel_at_epoch(expected_epoch, &scope).await {
-                Ok(()) => {
-                    let mut guard = ui.lock().expect("run ui lock");
-                    guard.session_errors.remove(&scope.session_id);
-                    guard.revision = guard.revision.saturating_add(1);
-                }
-                Err(err) => {
-                    let msg = format!("Cancel failed: {err}");
-                    let mut guard = ui.lock().expect("run ui lock");
-                    guard
-                        .session_errors
-                        .insert(scope.session_id.clone(), msg.clone());
-                    guard.last_error = Some(msg);
-                    guard.revision = guard.revision.saturating_add(1);
-                }
-            }
+            let outcome = controller
+                .cancel_at_epoch(expected_epoch, &scope)
+                .await
+                .err()
+                .map(|err| format!("Cancel failed: {err}"));
+            record_session_error(&ui, &scope.session_id, outcome);
             wake.wake();
         });
     }
@@ -1433,20 +1489,19 @@ impl RunWorkbenchBinding {
         item_id: &str,
     ) -> Result<()> {
         if let Err(err) = self.verify_queue_epoch(expected_epoch) {
-            self.ui.lock().expect("run ui lock").last_error = Some(err.to_string());
-            self.bump_ui();
+            record_session_error(&self.ui, session_id, Some(err.to_string()));
+            self.wake.wake();
             return Err(err);
         }
         let runtime = Arc::clone(&self.runtime);
         let runtime_check = Arc::clone(&self.runtime);
+        let ui = Arc::clone(&self.ui);
         let wake = Arc::clone(&self.wake);
         let sid = session_id.to_owned();
         let iid = item_id.to_owned();
         let rpc_id = format!("queue-rm-{}", uuid::Uuid::new_v4());
-        let ui_ref = self.runtime.clone();
-        let _ = ui_ref;
         self.handle.spawn(async move {
-            let _ = runtime
+            let outcome = runtime
                 .call_optional_at_epoch_with_validation(
                     expected_epoch,
                     "session.updateQueue",
@@ -1466,7 +1521,10 @@ impl RunWorkbenchBinding {
                         })
                     },
                 )
-                .await;
+                .await
+                .err()
+                .map(|err| err.to_string());
+            record_session_error(&ui, &sid, outcome);
             wake.wake();
         });
         self.bump_ui();
@@ -1481,8 +1539,8 @@ impl RunWorkbenchBinding {
         item_id: &str,
     ) -> Result<()> {
         if let Err(err) = self.verify_queue_epoch(expected_epoch) {
-            self.ui.lock().expect("run ui lock").last_error = Some(err.to_string());
-            self.bump_ui();
+            record_session_error(&self.ui, session_id, Some(err.to_string()));
+            self.wake.wake();
             return Err(err);
         }
         let runtime = Arc::clone(&self.runtime);
@@ -1513,12 +1571,12 @@ impl RunWorkbenchBinding {
                 )
                 .await
         });
-        if let Err(err) = &res {
-            self.ui.lock().expect("run ui lock").last_error = Some(err.to_string());
-        } else {
-            self.ui.lock().expect("run ui lock").last_error = None;
-        }
-        self.bump_ui();
+        record_session_error(
+            &self.ui,
+            session_id,
+            res.as_ref().err().map(ToString::to_string),
+        );
+        self.wake.wake();
         res.map(|_| ())
     }
 
@@ -1531,12 +1589,13 @@ impl RunWorkbenchBinding {
         new_text: String,
     ) -> Result<()> {
         if let Err(err) = self.verify_queue_epoch(expected_epoch) {
-            self.ui.lock().expect("run ui lock").last_error = Some(err.to_string());
-            self.bump_ui();
+            record_session_error(&self.ui, session_id, Some(err.to_string()));
+            self.wake.wake();
             return Err(err);
         }
         let runtime = Arc::clone(&self.runtime);
         let runtime_check = Arc::clone(&self.runtime);
+        let ui = Arc::clone(&self.ui);
         let wake = Arc::clone(&self.wake);
         let sid = session_id.to_owned();
         let iid = item_id.to_owned();
@@ -1545,7 +1604,7 @@ impl RunWorkbenchBinding {
             content: vec![json!({ "type": "text", "text": new_text })],
         };
         self.handle.spawn(async move {
-            let _ = runtime
+            let outcome = runtime
                 .call_optional_at_epoch_with_validation(
                     expected_epoch,
                     "session.updateQueue",
@@ -1565,7 +1624,10 @@ impl RunWorkbenchBinding {
                         })
                     },
                 )
-                .await;
+                .await
+                .err()
+                .map(|err| err.to_string());
+            record_session_error(&ui, &sid, outcome);
             wake.wake();
         });
         self.bump_ui();
@@ -1581,8 +1643,8 @@ impl RunWorkbenchBinding {
         new_text: String,
     ) -> Result<()> {
         if let Err(err) = self.verify_queue_epoch(expected_epoch) {
-            self.ui.lock().expect("run ui lock").last_error = Some(err.to_string());
-            self.bump_ui();
+            record_session_error(&self.ui, session_id, Some(err.to_string()));
+            self.wake.wake();
             return Err(err);
         }
         let runtime = Arc::clone(&self.runtime);
@@ -1616,14 +1678,87 @@ impl RunWorkbenchBinding {
                 )
                 .await
         });
-        if let Err(err) = &res {
-            self.ui.lock().expect("run ui lock").last_error = Some(err.to_string());
-        } else {
-            self.ui.lock().expect("run ui lock").last_error = None;
-        }
-        self.bump_ui();
+        record_session_error(
+            &self.ui,
+            session_id,
+            res.as_ref().err().map(ToString::to_string),
+        );
+        self.wake.wake();
         res.map(|_| ())
     }
+}
+
+fn record_session_error(ui: &Mutex<RunUiState>, session_id: &str, error: Option<String>) {
+    let mut guard = ui.lock().expect("run ui lock");
+    match error {
+        Some(msg) => {
+            guard.session_errors.insert(session_id.to_owned(), msg);
+        }
+        None => {
+            guard.session_errors.remove(session_id);
+        }
+    }
+    guard.revision = guard.revision.saturating_add(1);
+}
+
+fn try_spawn_history_acquire(
+    runtime: &Arc<SessionRuntime>,
+    controller: &Arc<RunController>,
+    ui: &Arc<Mutex<RunUiState>>,
+    wake: &Arc<dyn UiWakeNotifier>,
+    handle: &Handle,
+) {
+    let (is_ready, epoch) =
+        runtime.inspect(|s| (s.connection == ConnectionState::Ready, s.connection_epoch));
+    if !is_ready {
+        return;
+    }
+    let (sid, lease_gen) = {
+        let mut guard = ui.lock().expect("run ui lock");
+        if guard.dropped {
+            return;
+        }
+        let Some(sid) = guard.desired_history_session.clone() else {
+            return;
+        };
+        let has_lease = guard
+            .history_lease
+            .as_ref()
+            .is_some_and(|lease| lease.session_id() == sid);
+        let lease_gen = guard.history_lease_generation;
+        let key = (lease_gen, epoch, sid.clone());
+        if has_lease || guard.history_acquire_attempted.as_ref() == Some(&key) {
+            return;
+        }
+        guard.history_acquire_attempted = Some(key);
+        (sid, lease_gen)
+    };
+    let runtime = Arc::clone(runtime);
+    let controller = Arc::clone(controller);
+    let ui = Arc::clone(ui);
+    let wake = Arc::clone(wake);
+    handle.spawn(async move {
+        if let Ok(lease) = runtime.acquire_history(&sid).await {
+            let (installed, displaced) = {
+                let mut guard = ui.lock().expect("run ui lock");
+                if !guard.dropped
+                    && guard.history_lease_generation == lease_gen
+                    && guard.desired_history_session.as_deref() == Some(sid.as_str())
+                {
+                    let old = guard.history_lease.replace(lease);
+                    guard.revision = guard.revision.saturating_add(1);
+                    (true, old)
+                } else {
+                    (false, Some(lease))
+                }
+            };
+            drop(displaced);
+            if installed {
+                refresh_controls_async(runtime, controller, ui, Arc::clone(&wake), Some(sid)).await;
+            }
+        }
+        wake.wake();
+    });
 }
 
 fn current_selected_session_id(controller: &RunController) -> Option<String> {
@@ -1869,16 +2004,33 @@ async fn create_session_async(
             .await;
     }
     let scope = RunScope::main(endpoint_id, session_id.clone());
-    let lease_gen = {
+    let epoch = runtime.inspect(|s| s.connection_epoch);
+    let (lease_gen, old_lease) = {
         let mut guard = ui.lock().expect("run ui lock");
         guard.history_lease_generation = guard.history_lease_generation.saturating_add(1);
-        guard.history_lease_generation
+        let lease_gen = guard.history_lease_generation;
+        guard.desired_history_session = Some(session_id.clone());
+        guard.history_acquire_attempted = Some((lease_gen, epoch, session_id.clone()));
+        let old = if guard
+            .history_lease
+            .as_ref()
+            .is_some_and(|l| l.session_id() == session_id)
+        {
+            None
+        } else {
+            guard.history_lease.take()
+        };
+        (lease_gen, old)
     };
+    drop(old_lease);
     let _ = controller.select(ComposerDestination::run(scope));
     if let Ok(lease) = runtime.acquire_history(&session_id).await {
         let displaced = {
             let mut guard = ui.lock().expect("run ui lock");
-            if guard.history_lease_generation == lease_gen {
+            if !guard.dropped
+                && guard.history_lease_generation == lease_gen
+                && guard.desired_history_session.as_deref() == Some(session_id.as_str())
+            {
                 guard.history_lease.replace(lease)
             } else {
                 Some(lease)

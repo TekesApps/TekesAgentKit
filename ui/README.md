@@ -1,6 +1,6 @@
-# TekesAgentKit Rust UI (`ui/`) · `TekesUI v0.4.11` `AppHost` 组件库
+# TekesAgentKit Rust UI (`ui/`) · `TekesUI v0.4.12` `AppHost` 组件库
 
-复用 `TekesAgentKit v0.5.0` 的 headless 协议与表示层（`tekes-agent-contract`、`tekes-agent-session`、`tekes-agent-presentation`、`tekes-agent-endpoint-kernel`、`tekes-agent-web`），通过不可变公开 git revision（[tekesui-source.json](tekesui-source.json)，`TekesUI v0.4.11` / `31114fea1074d16750c7437b140d2d147cbe8eda`）原生消费 `tekes-ui-app-host`、`tekes-ui-controls`、`tekes-ui-settings` 与 `tekes-ui-render`。
+复用 `TekesAgentKit v0.6.1` 的 headless 协议与表示层（`tekes-agent-contract`、`tekes-agent-session`、`tekes-agent-presentation`、`tekes-agent-endpoint-kernel`、`tekes-agent-web`），通过不可变公开 git revision（[tekesui-source.json](tekesui-source.json)，`TekesUI v0.4.12` / `427c0e5d9e6fcdb0d71d203c402decdc05761df9`）原生消费 `tekes-ui-app-host`、`tekes-ui-controls`、`tekes-ui-settings` 与 `tekes-ui-render`。
 
 - **五层 / 五 Crate 独立工作区**：`components`、`bindings`、`apphost`、`demo`（形态 A）、`consumer`（形态 B，仅消费公开 API），统一 `unsafe_code = "forbid"`，不包含 Swift 源码或 `--frame-pump` 轮询，所有异步增量由 `WindowWake` / `AppHostWakeHub` 按需驱动。
 - **架构与契约文档**：[AppHost 架构规范](../docs/tekesui-apphost-architecture.md)、[集成契约](../docs/tekesui-integration-contract.md)、[TekesUI 缺口追踪](../docs/tekesui-gaps.md)。
@@ -21,7 +21,7 @@
 从仓库根目录运行（串行共享 Cargo target）：
 
 ```sh
-# 静态所有权、unsafe=forbid 与 TekesUI v0.4.11 Pin 校验
+# 静态所有权、unsafe=forbid 与 TekesUI v0.4.12 Pin 校验
 python3 scripts/check-ui-boundaries.py
 
 # 全量 lint 与测试（Phase 0-3 + 形态 A/B + Metal 离屏 PNG）
@@ -57,7 +57,7 @@ tekes-agent-ui-demo --endpoint-config /absolute/native.json --offscreen /tmp/app
 
 | 验证层 | 已验证范围与实测证据 | 明确不越界宣称（Not Proven Here） |
 |---|---|---|
-| **Static 边界** | `scripts/check-headless-boundaries.py`、`scripts/check-ui-boundaries.py`、`cargo clippy --workspace --all-targets --locked -- -D warnings`（root & `ui/`）、`unsafe_code = "forbid"`、TekesUI `31114fea1074d16750c7437b140d2d147cbe8eda` pin 校验 | 仅静态依赖与边界约束，不代表运行时覆盖 |
+| **Static 边界** | `scripts/check-headless-boundaries.py`、`scripts/check-ui-boundaries.py`、`cargo clippy --workspace --all-targets --locked -- -D warnings`（root & `ui/`）、`unsafe_code = "forbid"`、TekesUI `427c0e5d9e6fcdb0d71d203c402decdc05761df9` pin 校验 | 仅静态依赖与边界约束，不代表运行时覆盖 |
 | **Replay（确定性回放）** | `phase0_lifecycle`、`phase1_core_trio`、`phase2_workspace_inspectors`、`phase3_multiagent_settings`、`reading`、`run_flow`：覆盖 `WindowWake` 延期同步、`ReadingController` 前插锚点、`FixtureSessionEndpoint` 流式/取消/分页/Actionable、epoch 队列屏障、`ChildRun` `Missing`、`SideChat` 草稿隔离、CAS 与秘密字段 `••••••••` 掩码、`cap-std` 逃逸拦截 | Fixture 协议确定性回放，不替代真实 LLM 与线上网路延迟 |
 | **Integration（真实协议 / 双形态）** | 隔离临时 `HOME` + 临时端口真实 `TekesKernel v0.9.23` (`tekes-supervisor` / `tekes-worker`) 启动与 `tekes-agent-headless` 建会/对话，经 `--endpoint-config` 连通 `SessionRuntime` + `RunController` 渲染出真实会谈截屏；独立公开消费者 `ui/consumer` 通过 `apphost_topology_b`（`CadSpecViewerProvider` + 零重建 `promote` 槽位互换） | Kernel 冒烟使用本地合成 SSE responses provider（零付费模型调用）；Pi/DSH UI 原生宿主演示待独立接装 |
 | **Native UI（原生窗口 & GPU 渲染）** | macOS `AppWindow` 真机窗口运行 `--native-selftest`（`Resize`、`WindowDark`/`WindowLight`、`ClickPublished` 命中焦点）并返回 `SELFTEST_OK`；Metal `Renderer::new_headless()` 生成并目视检查形态 A Light/Dark 与形态 B Domain Focus / Agent Promoted 四张 `(1440x900)` PNG 及 Real Kernel Smoke PNG | `--offscreen` 为固定分辨率离线 Metal 渲染，不能等同多显示器缩放/全屏幕窗口管理压力测试 |

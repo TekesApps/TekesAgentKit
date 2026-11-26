@@ -1,6 +1,6 @@
 # AgentKit × TekesUI `AppHost` 容器架构规范
 
-状态：正式设计基线（消费不可变公开版本 `TekesUI v0.4.11` / `31114fea1074d16750c7437b140d2d147cbe8eda`）。
+状态：正式设计基线（消费不可变公开版本 `TekesUI v0.4.12` / `427c0e5d9e6fcdb0d71d203c402decdc05761df9`）。
 
 ## 1. 四层所有权与边界
 

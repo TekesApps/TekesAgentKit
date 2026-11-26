@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.1 — 2026-11-26
+
+- Keep session operation errors (`cancel_scope_at_epoch`, `submit_destination` with run scope, and queue mutations) scoped per session in `RunUiState::session_errors`, add `RunWorkbenchBinding::error_for_session`, and route `TasksQueueAdapter`, `AgentRunAdapter`, and showcase `build_tasks_queue_model` through session-scoped lookup before falling back to endpoint-level `last_error`.
+- Track `desired_history_session`, `history_acquire_attempted`, and `dropped` on `RunWorkbenchBinding` so switching sessions while disconnected automatically acquires the final selected session's `SessionHistoryLease` once `SessionRuntime` transitions back to `ConnectionState::Ready`, without polling or dropping views holding detached observers.
+- Upgrade pinned `TekesUI` dependencies across `ui/Cargo.toml`, `ui/tekesui-source.json`, and delivery docs from `v0.4.11` (`31114fea1074d16750c7437b140d2d147cbe8eda`) to `v0.4.12` (`427c0e5d9e6fcdb0d71d203c402decdc05761df9`) for native primary/auxiliary window teardown.
+
 ## 0.6.0 — 2026-11-25
 
 - Defer `TranscriptSurface` `RichContent::drain_link_actions` to pre-render (`AgentContainerAdapter::drain_deferred_intents`) so pointer actions on `AgentRunContainer` never invalidate `ContentHost` curve geometry before `PointerUp`, preserving native `Stop` and second `Send` clicks; add epoch-fenced `cancel_at_epoch` / `cancel_child_at_epoch` / `cancel_scope_at_epoch` and session-scoped `session_error` surfacing.

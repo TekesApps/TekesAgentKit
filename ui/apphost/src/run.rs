@@ -87,9 +87,8 @@ impl AgentContainerAdapter for AgentRunAdapter {
         };
         let snapshot = run.run_snapshot();
         if !self.composer_only {
-            let session_error = run
-                .current_scope()
-                .and_then(|scope| run.session_error(&scope.session_id));
+            let active_session = run.current_scope().map(|scope| scope.session_id);
+            let session_error = run.error_for_session(active_session.as_deref());
             self.transcript.set_session_error(session_error);
             let actionables: Vec<ActionablePrompt> = run.actionables_for(&snapshot);
             self.transcript
