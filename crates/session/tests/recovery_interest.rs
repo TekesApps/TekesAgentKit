@@ -362,6 +362,13 @@ async fn failed_epoch_preflight_does_not_suppress_the_first_real_recovery_dispat
 type JournalTxMap =
     std::collections::BTreeMap<(usize, String), tokio::sync::mpsc::UnboundedSender<Result<Value>>>;
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Conn2JournalFailure {
+    None,
+    TransientDisconnected,
+    PermanentRemote,
+}
+
 #[derive(Clone)]
 struct ControlledReconnectConnector {
     connects: Arc<AtomicUsize>,
@@ -369,6 +376,7 @@ struct ControlledReconnectConnector {
     hold_inventory_conn2: Arc<std::sync::atomic::AtomicBool>,
     inventory_follow_entered: Arc<tokio::sync::Notify>,
     inventory_follow_release: Arc<tokio::sync::Notify>,
+    conn2_a_failure: Arc<Mutex<Conn2JournalFailure>>,
     followed_journals: Arc<Mutex<Vec<(usize, String)>>>,
     closed_journals: Arc<Mutex<Vec<(usize, String)>>>,
     recovery_calls: Arc<Mutex<Vec<Value>>>,
@@ -386,6 +394,7 @@ impl ControlledReconnectConnector {
             hold_inventory_conn2: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             inventory_follow_entered: Arc::new(tokio::sync::Notify::new()),
             inventory_follow_release: Arc::new(tokio::sync::Notify::new()),
+            conn2_a_failure: Arc::new(Mutex::new(Conn2JournalFailure::None)),
             followed_journals: Arc::new(Mutex::new(Vec::new())),
             closed_journals: Arc::new(Mutex::new(Vec::new())),
             recovery_calls: Arc::new(Mutex::new(Vec::new())),
@@ -490,6 +499,18 @@ impl SessionEndpoint for ControlledReconnectEndpoint {
                 ))
             }
             StreamTarget::SessionJournal { address, .. } => {
+                if self.connection == 2 && address.session_id == "a" {
+                    let failure = *self.source.conn2_a_failure.lock().unwrap();
+                    match failure {
+                        Conn2JournalFailure::TransientDisconnected => {
+                            return Err(Error::Disconnected);
+                        }
+                        Conn2JournalFailure::PermanentRemote => {
+                            return Err(Error::Remote(json!({"code": "session-quarantined"})));
+                        }
+                        Conn2JournalFailure::None => {}
+                    }
+                }
                 struct JournalDrop {
                     conn: usize,
                     sid: String,
@@ -914,5 +935,151 @@ async fn releasing_idle_session_during_reconnect_handshake_closes_immediately_an
 
     lease_a2.release().await.unwrap();
     wait_store(&r, |s| !s.sessions["a"].journal_ready).await;
+    r.stop().await.unwrap();
+}
+
+#[tokio::test]
+async fn double_reconnect_transient_journal_error_keeps_active_a_until_conn3_turn_end_while_b_is_ready()
+ {
+    let source = ControlledReconnectConnector::new();
+    source.active_run.store(true, Ordering::SeqCst);
+    *source.conn2_a_failure.lock().unwrap() = Conn2JournalFailure::TransientDisconnected;
+    let r = Arc::new(SessionRuntime::spawn(
+        "controlled-reconnect",
+        Arc::new(source.clone()),
+    ));
+    r.wait_ready(Duration::from_secs(2)).await.unwrap();
+
+    let lease_a = r.acquire_history("a").await.unwrap();
+    assert!(r.inspect(|s| s.sessions["a"].journal_ready && s.sessions["a"].run_open));
+
+    source.drop_inventory.notify_one();
+    wait_store(&r, |s| s.connection != ConnectionState::Ready).await;
+    lease_a.release().await.unwrap();
+
+    // Unblock conn 2; conn 2's add_journal("a") fails transiently with Error::Disconnected,
+    // causing runtime to reconnect automatically on conn 3 while retaining active A in wanted.
+    source.connect2_gate.notify_one();
+    wait_store(&r, |s| {
+        s.connection == ConnectionState::Ready && source.connects.load(Ordering::SeqCst) >= 3
+    })
+    .await;
+
+    let lease_b = r.acquire_history("b").await.unwrap();
+    assert!(r.inspect(|s| {
+        s.sessions["b"].journal_ready
+            && s.sessions["b"]
+                .entries
+                .values()
+                .all(|e| e.event.data["text"] == "hist-b")
+    }));
+    assert!(
+        source
+            .followed_journals
+            .lock()
+            .unwrap()
+            .contains(&(3, "a".to_owned())),
+        "conn 3 must reopen active A after conn 2 transient drop"
+    );
+    tokio::time::sleep(Duration::from_millis(50)).await;
+    assert!(
+        !source
+            .closed_journals
+            .lock()
+            .unwrap()
+            .contains(&(3, "a".to_owned())),
+        "active A must stay open on conn 3 until real turn/end arrives"
+    );
+    assert!(r.inspect(|s| s.sessions["a"].journal_ready && s.sessions["a"].run_open));
+
+    let tx_a = source.journal_txs.lock().unwrap()[&(3, "a".to_owned())].clone();
+    tx_a.send(Ok(json!({
+        "type": "event",
+        "generation": "g",
+        "sessionId": "a",
+        "entry": {
+            "event": {
+                "type": "turn/end",
+                "seq": 2,
+                "time": 4,
+                "data": {"turn": 1, "reason": "completed"}
+            }
+        }
+    })))
+    .unwrap();
+    wait_store(&r, |s| {
+        s.sessions
+            .get("a")
+            .is_some_and(|sess| !sess.journal_ready && !sess.run_open)
+    })
+    .await;
+    assert!(r.inspect(|s| {
+        s.sessions["a"]
+            .entries
+            .values()
+            .any(|e| e.event.kind == "turn/end")
+    }));
+    tokio::time::timeout(Duration::from_secs(2), async {
+        while !source
+            .closed_journals
+            .lock()
+            .unwrap()
+            .contains(&(3, "a".to_owned()))
+        {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .unwrap();
+    assert!(r.inspect(|s| s.sessions["b"].journal_ready));
+    lease_b.release().await.unwrap();
+    r.stop().await.unwrap();
+}
+
+#[tokio::test]
+async fn permanent_remote_journal_error_retires_deferred_active_a_without_blocking_b() {
+    let source = ControlledReconnectConnector::new();
+    source.active_run.store(true, Ordering::SeqCst);
+    *source.conn2_a_failure.lock().unwrap() = Conn2JournalFailure::PermanentRemote;
+    let r = Arc::new(SessionRuntime::spawn(
+        "controlled-reconnect",
+        Arc::new(source.clone()),
+    ));
+    r.wait_ready(Duration::from_secs(2)).await.unwrap();
+
+    let lease_a = r.acquire_history("a").await.unwrap();
+    source.drop_inventory.notify_one();
+    wait_store(&r, |s| s.connection != ConnectionState::Ready).await;
+    lease_a.release().await.unwrap();
+
+    source.connect2_gate.notify_one();
+    wait_store(&r, |s| {
+        s.connection == ConnectionState::Ready && source.connects.load(Ordering::SeqCst) == 2
+    })
+    .await;
+    assert!(r.inspect(|s| {
+        !s.sessions["a"].journal_ready
+            && s.sessions["a"]
+                .journal_error
+                .as_deref()
+                .is_some_and(|e| e.contains("session-quarantined"))
+    }));
+
+    let lease_b = r.acquire_history("b").await.unwrap();
+    assert!(r.inspect(|s| s.sessions["b"].journal_ready));
+
+    // Reconnecting again must NOT retry permanently rejected deferred A, while B recovers.
+    r.reconnect().await.unwrap();
+    let conn3_follows: Vec<_> = source
+        .followed_journals
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|(c, _)| *c == 3)
+        .cloned()
+        .collect();
+    assert_eq!(conn3_follows, vec![(3, "b".to_owned())]);
+    assert!(r.inspect(|s| s.sessions["b"].journal_ready && !s.sessions["a"].journal_ready));
+    lease_b.release().await.unwrap();
     r.stop().await.unwrap();
 }

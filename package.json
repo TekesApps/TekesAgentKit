@@ -1,6 +1,6 @@
 {
   "name": "@tekesagentkit/client-contract",
-  "version": "0.6.2",
+  "version": "0.6.3",
   "type": "module",
   "license": "MIT",
   "types": "./web-contract/index.d.ts",

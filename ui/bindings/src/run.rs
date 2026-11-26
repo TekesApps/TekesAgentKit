@@ -103,6 +103,25 @@ impl SessionControlState {
     }
 }
 
+#[derive(Clone, Debug, PartialEq)]
+struct UncertainCancel {
+    turn_start_seq: i64,
+    turn_id: Option<Value>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+struct SessionErrorEntry {
+    message: String,
+    uncertain_cancel: Option<UncertainCancel>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum TurnTerminal {
+    Pending,
+    ConfirmedAborted,
+    ConfirmedOther,
+}
+
 struct RunUiState {
     endpoint_id: String,
     default_cwd: String,
@@ -122,7 +141,7 @@ struct RunUiState {
     local_archived: BTreeSet<String>,
     host_summary_sections: Vec<(String, Vec<(String, String)>)>,
     last_error: Option<String>,
-    session_errors: BTreeMap<String, String>,
+    session_errors: BTreeMap<String, SessionErrorEntry>,
     revision: u64,
 }
 
@@ -477,6 +496,7 @@ impl RunWorkbenchBinding {
                                 &wake_clone,
                                 &handle_w,
                             );
+                            reconcile_uncertain_cancels(&runtime_w, &ui_strong);
                         } else {
                             break;
                         }
@@ -535,20 +555,31 @@ impl RunWorkbenchBinding {
     }
 
     pub fn session_error(&self, session_id: &str) -> Option<String> {
+        if reconcile_uncertain_cancels(&self.runtime, &self.ui) {
+            self.wake.wake();
+        }
         self.ui
             .lock()
             .expect("run ui lock")
             .session_errors
             .get(session_id)
-            .cloned()
+            .map(|entry| entry.message.clone())
     }
 
     /// Returns the active error to display for `session_id`: session-scoped failures
     /// first, falling back to endpoint-level failures (`last_error`).
     pub fn error_for_session(&self, session_id: Option<&str>) -> Option<String> {
+        if reconcile_uncertain_cancels(&self.runtime, &self.ui) {
+            self.wake.wake();
+        }
         let guard = self.ui.lock().expect("run ui lock");
         session_id
-            .and_then(|sid| guard.session_errors.get(sid).cloned())
+            .and_then(|sid| {
+                guard
+                    .session_errors
+                    .get(sid)
+                    .map(|entry| entry.message.clone())
+            })
             .or_else(|| guard.last_error.clone())
     }
 
@@ -756,15 +787,20 @@ impl RunWorkbenchBinding {
     /// is preserved and acquires the selected session's history lease as soon as
     /// `SessionRuntime` becomes `Ready`.
     pub fn select_session(&self, session_id: &str) {
-        let endpoint_id = self.endpoint_id();
-        let scope = RunScope::main(endpoint_id, session_id);
-        let dest = ComposerDestination::run(scope);
-        let _ = self.controller.select(dest);
         let (need_acquire, old_lease) = {
             let mut guard = self.ui.lock().expect("run ui lock");
+            if guard.dropped {
+                return;
+            }
+            let scope = RunScope::main(guard.endpoint_id.clone(), session_id);
+            let dest = ComposerDestination::run(scope);
+            if self.controller.select(dest).is_err() {
+                return;
+            }
             guard.history_lease_generation = guard.history_lease_generation.saturating_add(1);
             guard.desired_history_session = Some(session_id.to_owned());
             guard.history_acquire_attempted = None;
+            guard.revision = guard.revision.saturating_add(1);
             let same_lease = guard
                 .history_lease
                 .as_ref()
@@ -796,7 +832,7 @@ impl RunWorkbenchBinding {
                 wake.wake();
             });
         }
-        self.bump_ui();
+        self.wake.wake();
     }
 
     pub fn create_session(&self, cwd: &str) {
@@ -953,16 +989,82 @@ impl RunWorkbenchBinding {
 
     pub fn cancel_scope_at_epoch(&self, expected_epoch: u64, scope: &RunScope) {
         let controller = Arc::clone(&self.controller);
+        let runtime = Arc::clone(&self.runtime);
         let scope = scope.clone();
         let ui = Arc::clone(&self.ui);
         let wake = Arc::clone(&self.wake);
+        let cancel_target = self.runtime.inspect(|state| {
+            if state.connection != ConnectionState::Ready
+                || state.connection_epoch != expected_epoch
+            {
+                return None;
+            }
+            let session = state.sessions.get(&scope.session_id)?;
+            if !session.run_open {
+                return None;
+            }
+            session
+                .entries
+                .values()
+                .rev()
+                .find_map(|entry| match entry.event.kind.as_str() {
+                    "turn/start" => Some(Some(UncertainCancel {
+                        turn_start_seq: entry.event.seq,
+                        turn_id: entry
+                            .event
+                            .data
+                            .get("turn")
+                            .filter(|v| !v.is_null())
+                            .cloned(),
+                    })),
+                    "turn/end" => Some(None),
+                    _ => None,
+                })
+                .flatten()
+        });
         self.handle.spawn(async move {
-            let outcome = controller
-                .cancel_at_epoch(expected_epoch, &scope)
-                .await
-                .err()
-                .map(|err| format!("Cancel failed: {err}"));
-            record_session_error(&ui, &scope.session_id, outcome);
+            match controller.cancel_at_epoch(expected_epoch, &scope).await {
+                Ok(()) => record_session_error(&ui, &scope.session_id, None),
+                Err(err) => {
+                    let message = format!("Cancel failed: {err}");
+                    let is_unconfirmed = matches!(
+                        &err,
+                        tekes_agent_contract::Error::Disconnected
+                            | tekes_agent_contract::Error::Transport(_)
+                            | tekes_agent_contract::Error::Timeout
+                    );
+                    if is_unconfirmed && let Some(uc) = cancel_target {
+                        match runtime.inspect(|s| inspect_turn_terminal(s, &scope.session_id, &uc))
+                        {
+                            TurnTerminal::ConfirmedAborted => {
+                                record_session_error(&ui, &scope.session_id, None);
+                            }
+                            TurnTerminal::ConfirmedOther => {
+                                record_session_error_entry(
+                                    &ui,
+                                    &scope.session_id,
+                                    Some(SessionErrorEntry {
+                                        message,
+                                        uncertain_cancel: None,
+                                    }),
+                                );
+                            }
+                            TurnTerminal::Pending => {
+                                record_session_error_entry(
+                                    &ui,
+                                    &scope.session_id,
+                                    Some(SessionErrorEntry {
+                                        message,
+                                        uncertain_cancel: Some(uc),
+                                    }),
+                                );
+                            }
+                        }
+                    } else {
+                        record_session_error(&ui, &scope.session_id, Some(message));
+                    }
+                }
+            }
             wake.wake();
         });
     }
@@ -1698,16 +1800,127 @@ impl RunWorkbenchBinding {
 }
 
 fn record_session_error(ui: &Mutex<RunUiState>, session_id: &str, error: Option<String>) {
+    record_session_error_entry(
+        ui,
+        session_id,
+        error.map(|message| SessionErrorEntry {
+            message,
+            uncertain_cancel: None,
+        }),
+    );
+}
+
+fn record_session_error_entry(
+    ui: &Mutex<RunUiState>,
+    session_id: &str,
+    entry: Option<SessionErrorEntry>,
+) {
     let mut guard = ui.lock().expect("run ui lock");
-    match error {
-        Some(msg) => {
-            guard.session_errors.insert(session_id.to_owned(), msg);
+    match entry {
+        Some(entry) => {
+            guard.session_errors.insert(session_id.to_owned(), entry);
         }
         None => {
             guard.session_errors.remove(session_id);
         }
     }
     guard.revision = guard.revision.saturating_add(1);
+}
+
+fn inspect_turn_terminal(
+    store: &tekes_agent_session::MemoryProjectionStore,
+    session_id: &str,
+    uc: &UncertainCancel,
+) -> TurnTerminal {
+    if store.connection != ConnectionState::Ready {
+        return TurnTerminal::Pending;
+    }
+    let Some(session) = store.sessions.get(session_id) else {
+        return TurnTerminal::Pending;
+    };
+    if !session.journal_ready || session.journal_error.is_some() {
+        return TurnTerminal::Pending;
+    }
+    for (_, entry) in session.entries.range((uc.turn_start_seq + 1)..) {
+        match entry.event.kind.as_str() {
+            "turn/end" => {
+                if let Some(expected_turn) = &uc.turn_id
+                    && entry.event.data.get("turn") != Some(expected_turn)
+                {
+                    return TurnTerminal::ConfirmedOther;
+                }
+                let reason = entry.event.data["reason"]
+                    .as_str()
+                    .or_else(|| entry.event.data["reason"]["kind"].as_str());
+                return if reason == Some("aborted") {
+                    TurnTerminal::ConfirmedAborted
+                } else {
+                    TurnTerminal::ConfirmedOther
+                };
+            }
+            "turn/start" => return TurnTerminal::ConfirmedOther,
+            _ => {}
+        }
+    }
+    TurnTerminal::Pending
+}
+
+fn reconcile_uncertain_cancels(runtime: &SessionRuntime, ui: &Mutex<RunUiState>) -> bool {
+    let pending: Vec<(String, UncertainCancel)> = {
+        let guard = ui.lock().expect("run ui lock");
+        guard
+            .session_errors
+            .iter()
+            .filter_map(|(sid, entry)| {
+                entry
+                    .uncertain_cancel
+                    .as_ref()
+                    .map(|uc| (sid.clone(), uc.clone()))
+            })
+            .collect()
+    };
+    if pending.is_empty() {
+        return false;
+    }
+    let evaluated: Vec<(String, UncertainCancel, TurnTerminal)> = runtime.inspect(|store| {
+        pending
+            .into_iter()
+            .map(|(sid, uc)| {
+                let terminal = inspect_turn_terminal(store, &sid, &uc);
+                (sid, uc, terminal)
+            })
+            .collect()
+    });
+    let mut guard = ui.lock().expect("run ui lock");
+    let mut changed = false;
+    for (sid, uc, terminal) in evaluated {
+        if terminal == TurnTerminal::Pending {
+            continue;
+        }
+        let matches = guard
+            .session_errors
+            .get(&sid)
+            .is_some_and(|entry| entry.uncertain_cancel.as_ref() == Some(&uc));
+        if !matches {
+            continue;
+        }
+        match terminal {
+            TurnTerminal::ConfirmedAborted => {
+                guard.session_errors.remove(&sid);
+                changed = true;
+            }
+            TurnTerminal::ConfirmedOther => {
+                if let Some(entry) = guard.session_errors.get_mut(&sid) {
+                    entry.uncertain_cancel = None;
+                }
+            }
+            TurnTerminal::Pending => {}
+        }
+    }
+    if changed {
+        guard.revision = guard.revision.saturating_add(1);
+    }
+    changed
 }
 
 fn try_spawn_history_acquire(
@@ -2016,10 +2229,15 @@ async fn create_session_async(
     let epoch = runtime.inspect(|s| s.connection_epoch);
     let (lease_gen, old_lease) = {
         let mut guard = ui.lock().expect("run ui lock");
+        if guard.dropped {
+            return Err(tekes_agent_contract::Error::Disconnected);
+        }
+        let _ = controller.select(ComposerDestination::run(scope));
         guard.history_lease_generation = guard.history_lease_generation.saturating_add(1);
         let lease_gen = guard.history_lease_generation;
         guard.desired_history_session = Some(session_id.clone());
         guard.history_acquire_attempted = Some((lease_gen, epoch, session_id.clone()));
+        guard.revision = guard.revision.saturating_add(1);
         let old = if guard
             .history_lease
             .as_ref()
@@ -2032,7 +2250,6 @@ async fn create_session_async(
         (lease_gen, old)
     };
     drop(old_lease);
-    let _ = controller.select(ComposerDestination::run(scope));
     if let Ok(lease) = runtime.acquire_history(&session_id).await {
         let displaced = {
             let mut guard = ui.lock().expect("run ui lock");
