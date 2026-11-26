@@ -1172,6 +1172,10 @@ fn overlapping_open_initial_session_b_and_select_session_c_keeps_selection_histo
         endpoint.journal_b_release.notify_one();
         std::thread::sleep(Duration::from_millis(30));
         assert!(!opener.is_finished() && !selector.is_finished());
+        assert!(
+            !runtime.inspect(|s| s.sessions.get("c").is_some_and(|sess| sess.journal_ready)),
+            "C must not acquire history before selection publication completes"
+        );
         let (done_tx, done_rx) = std::sync::mpsc::channel();
         let binding_getter = &binding;
         scope.spawn(move || {
@@ -1190,6 +1194,10 @@ fn overlapping_open_initial_session_b_and_select_session_c_keeps_selection_histo
         let b_res = opener.join().unwrap();
         selector.join().unwrap();
         assert!(matches!(b_res, Err(Error::Disconnected)));
+        assert!(
+            endpoint.journal_closes().contains(&(1, "b".to_owned())),
+            "stale B journal must already be closed once opener returns Err(Disconnected)"
+        );
     });
 
     rt.block_on(wait_store(&runtime, |s| {
