@@ -26,11 +26,15 @@ struct BlockerTestEndpoint {
     block_reconnect: Arc<AtomicBool>,
     reconnecting: Arc<Notify>,
     reconnect_permit: Arc<Notify>,
+    hold_inventory_conn2: Arc<AtomicBool>,
+    inventory_follow_entered: Arc<Notify>,
+    inventory_follow_release: Arc<Notify>,
 }
 
 struct EndpointState {
     rpcs: Vec<(String, Value)>,
     journal_txs: BTreeMap<String, mpsc::UnboundedSender<Result<Value>>>,
+    journal_txs_by_conn: BTreeMap<(usize, String), mpsc::UnboundedSender<Result<Value>>>,
     journal_entries: BTreeMap<String, Vec<Value>>,
     journal_opens: Vec<(usize, String)>,
     journal_closes: Vec<(usize, String)>,
@@ -65,6 +69,7 @@ impl BlockerTestEndpoint {
             inner: Arc::new(Mutex::new(EndpointState {
                 rpcs: Vec::new(),
                 journal_txs: BTreeMap::new(),
+                journal_txs_by_conn: BTreeMap::new(),
                 journal_entries,
                 journal_opens: Vec::new(),
                 journal_closes: Vec::new(),
@@ -81,6 +86,9 @@ impl BlockerTestEndpoint {
             block_reconnect: Arc::new(AtomicBool::new(false)),
             reconnecting: Arc::new(Notify::new()),
             reconnect_permit: Arc::new(Notify::new()),
+            hold_inventory_conn2: Arc::new(AtomicBool::new(false)),
+            inventory_follow_entered: Arc::new(Notify::new()),
+            inventory_follow_release: Arc::new(Notify::new()),
         }
     }
 
@@ -170,6 +178,10 @@ impl SessionEndpoint for TestSessionEndpoint {
     async fn follow(&self, target: StreamTarget) -> Result<FrameStream> {
         match target {
             StreamTarget::SessionInventory => {
+                if self.conn == 2 && self.source.hold_inventory_conn2.load(Ordering::Acquire) {
+                    self.source.inventory_follow_entered.notify_waiters();
+                    self.source.inventory_follow_release.notified().await;
+                }
                 let (tx, rx) = mpsc::unbounded_channel();
                 let mut guard = self.source.inner.lock().unwrap();
                 let items = vec![
@@ -217,7 +229,10 @@ impl SessionEndpoint for TestSessionEndpoint {
                 let entries = {
                     let mut guard = self.source.inner.lock().unwrap();
                     guard.journal_opens.push((self.conn, sid.clone()));
-                    guard.journal_txs.insert(sid.clone(), tx);
+                    guard.journal_txs.insert(sid.clone(), tx.clone());
+                    guard
+                        .journal_txs_by_conn
+                        .insert((self.conn, sid.clone()), tx);
                     guard.journal_entries.get(&sid).cloned().unwrap_or_default()
                 };
                 let through = entries.len().saturating_sub(1);
@@ -845,5 +860,241 @@ fn dropping_binding_while_disconnected_does_not_open_history_and_preserves_other
     rt.block_on(wait_store(&runtime, |s| {
         !s.sessions.get("b").is_some_and(|sess| sess.journal_ready)
     }));
+    rt.block_on(runtime.stop()).unwrap();
+}
+
+#[test]
+fn open_initial_session_disconnected_fresh_binding_preserves_empty_selection_and_opens_nothing() {
+    let endpoint = BlockerTestEndpoint::new();
+    let (rt, runtime, binding) = setup_binding(&endpoint);
+
+    endpoint.drop_connection();
+    rt.block_on(wait_store(&runtime, |s| {
+        s.connection != tekes_agent_session::ConnectionState::Ready
+    }));
+    rt.block_on(endpoint.reconnecting.notified());
+
+    let err = binding
+        .open_initial_session("b")
+        .expect_err("initial open during disconnect must fail");
+    assert!(matches!(err, Error::Disconnected));
+    assert!(binding.current_scope().is_none());
+
+    let epoch_before = runtime.inspect(|s| s.connection_epoch);
+    endpoint.unblock_reconnect();
+    rt.block_on(wait_store(&runtime, |s| {
+        s.connection == tekes_agent_session::ConnectionState::Ready
+            && s.connection_epoch > epoch_before
+    }));
+    std::thread::sleep(Duration::from_millis(50));
+
+    let conn2_opens: Vec<_> = endpoint
+        .journal_opens()
+        .into_iter()
+        .filter(|(conn, _)| *conn == 2)
+        .collect();
+    assert!(
+        conn2_opens.is_empty(),
+        "unexpected conn2 opens: {conn2_opens:?}"
+    );
+    assert!(!runtime.inspect(|s| s.sessions["b"].journal_ready));
+    assert!(binding.current_scope().is_none());
+    assert!(
+        !binding
+            .run_snapshot()
+            .transcript
+            .items
+            .iter()
+            .any(|item| item.text.contains("init-b"))
+    );
+
+    // Once reconnected, opening B succeeds with selection and lease consistent.
+    binding.open_initial_session("b").unwrap();
+    assert_eq!(
+        binding.current_scope().map(|s| s.session_id),
+        Some("b".to_owned())
+    );
+    assert!(runtime.inspect(|s| s.sessions["b"].journal_ready));
+    assert!(
+        binding
+            .run_snapshot()
+            .transcript
+            .items
+            .iter()
+            .any(|item| item.text.contains("init-b"))
+    );
+    rt.block_on(runtime.stop()).unwrap();
+}
+
+#[test]
+fn open_initial_session_disconnected_with_previous_selection_preserves_a_and_never_opens_b() {
+    let endpoint = BlockerTestEndpoint::new();
+    let (rt, runtime, binding) = setup_binding(&endpoint);
+    binding.open_initial_session("a").unwrap();
+    assert!(runtime.inspect(|s| s.sessions["a"].journal_ready));
+
+    endpoint.drop_connection();
+    rt.block_on(wait_store(&runtime, |s| {
+        s.connection != tekes_agent_session::ConnectionState::Ready
+    }));
+    rt.block_on(endpoint.reconnecting.notified());
+
+    let err = binding
+        .open_initial_session("b")
+        .expect_err("initial open during disconnect must fail");
+    assert!(matches!(err, Error::Disconnected));
+    assert_eq!(
+        binding.current_scope().map(|s| s.session_id),
+        Some("a".to_owned())
+    );
+
+    let epoch_before = runtime.inspect(|s| s.connection_epoch);
+    endpoint.unblock_reconnect();
+    rt.block_on(wait_store(&runtime, |s| {
+        s.connection == tekes_agent_session::ConnectionState::Ready
+            && s.connection_epoch > epoch_before
+            && s.sessions.get("a").is_some_and(|sess| sess.journal_ready)
+    }));
+    std::thread::sleep(Duration::from_millis(50));
+
+    let conn2_opens: Vec<String> = endpoint
+        .journal_opens()
+        .into_iter()
+        .filter(|(conn, _)| *conn == 2)
+        .map(|(_, sid)| sid)
+        .collect();
+    assert_eq!(conn2_opens, vec!["a".to_owned()]);
+    assert!(runtime.inspect(|s| s.sessions["a"].journal_ready));
+    assert!(!runtime.inspect(|s| s.sessions["b"].journal_ready));
+    assert_eq!(
+        binding.current_scope().map(|s| s.session_id),
+        Some("a".to_owned())
+    );
+    assert!(
+        binding
+            .run_snapshot()
+            .transcript
+            .items
+            .iter()
+            .any(|item| item.text.contains("init-a"))
+    );
+    assert!(
+        !binding
+            .run_snapshot()
+            .transcript
+            .items
+            .iter()
+            .any(|item| item.text.contains("init-b"))
+    );
+    rt.block_on(runtime.stop()).unwrap();
+}
+
+#[test]
+fn switching_from_running_a_to_b_during_reconnect_handshake_keeps_a_until_turn_end_and_shows_only_b()
+ {
+    let endpoint = BlockerTestEndpoint::new();
+    {
+        let mut guard = endpoint.inner.lock().unwrap();
+        guard.running.insert("a".to_owned(), true);
+        guard.journal_entries.insert(
+            "a".to_owned(),
+            vec![
+                json!({"event": {"type": "user/message", "seq": 0, "time": 1, "data": {"text": "init-a"}}}),
+                json!({"event": {"type": "turn/start", "seq": 1, "time": 2, "data": {"turn": 1}}}),
+            ],
+        );
+    }
+    let (rt, runtime, binding) = setup_binding(&endpoint);
+    binding.open_initial_session("a").unwrap();
+    assert!(runtime.inspect(|s| s.sessions["a"].journal_ready && s.sessions["a"].run_open));
+
+    endpoint.hold_inventory_conn2.store(true, Ordering::Release);
+    endpoint.drop_connection();
+    rt.block_on(wait_store(&runtime, |s| {
+        s.connection != tekes_agent_session::ConnectionState::Ready
+    }));
+    rt.block_on(endpoint.reconnecting.notified());
+    endpoint.unblock_reconnect();
+    rt.block_on(endpoint.inventory_follow_entered.notified());
+
+    binding.select_session("b");
+    assert_eq!(
+        binding.current_scope().map(|s| s.session_id),
+        Some("b".to_owned())
+    );
+    std::thread::sleep(Duration::from_millis(25));
+
+    endpoint.inventory_follow_release.notify_one();
+    rt.block_on(wait_store(&runtime, |s| {
+        s.connection == tekes_agent_session::ConnectionState::Ready
+            && s.sessions.get("b").is_some_and(|sess| sess.journal_ready)
+    }));
+
+    for _ in 0..50 {
+        if binding
+            .run_snapshot()
+            .transcript
+            .items
+            .iter()
+            .any(|item| item.text.contains("init-b"))
+        {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    let snap = binding.run_snapshot();
+    assert!(
+        snap.transcript
+            .items
+            .iter()
+            .any(|item| item.text.contains("init-b"))
+    );
+    assert!(
+        !snap
+            .transcript
+            .items
+            .iter()
+            .any(|item| item.text.contains("init-a"))
+    );
+
+    assert!(endpoint.journal_opens().contains(&(2, "a".to_owned())));
+    std::thread::sleep(Duration::from_millis(50));
+    assert!(
+        !endpoint.journal_closes().contains(&(2, "a".to_owned())),
+        "A journal closed prematurely on conn 2: {:?}",
+        endpoint.journal_closes()
+    );
+    assert!(runtime.inspect(|s| s.sessions["a"].journal_ready && s.sessions["a"].run_open));
+
+    let tx_a = endpoint.inner.lock().unwrap().journal_txs_by_conn[&(2, "a".to_owned())].clone();
+    tx_a.send(Ok(json!({
+        "type": "event",
+        "generation": "g",
+        "sessionId": "a",
+        "entry": {
+            "event": {
+                "type": "turn/end",
+                "seq": 2,
+                "time": 4,
+                "data": {"turn": 1, "reason": "completed"}
+            }
+        }
+    })))
+    .unwrap();
+    rt.block_on(wait_store(&runtime, |s| {
+        !s.sessions["a"].journal_ready && !s.sessions["a"].run_open
+    }));
+    for _ in 0..50 {
+        if endpoint.journal_closes().contains(&(2, "a".to_owned())) {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    assert!(endpoint.journal_closes().contains(&(2, "a".to_owned())));
+    assert_eq!(
+        binding.current_scope().map(|s| s.session_id),
+        Some("b".to_owned())
+    );
+    assert!(runtime.inspect(|s| s.sessions["b"].journal_ready));
     rt.block_on(runtime.stop()).unwrap();
 }
