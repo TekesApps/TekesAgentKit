@@ -1060,34 +1060,11 @@ impl RunWorkbenchBinding {
         let scope = scope.clone();
         let ui = Arc::clone(&self.ui);
         let wake = Arc::clone(&self.wake);
-        let cancel_target = self.runtime.inspect(|state| {
-            if state.connection != ConnectionState::Ready
-                || state.connection_epoch != expected_epoch
-            {
-                return None;
-            }
-            let session = state.sessions.get(&scope.session_id)?;
-            if !session.run_open {
-                return None;
-            }
-            session
-                .entries
-                .values()
-                .rev()
-                .find_map(|entry| match entry.event.kind.as_str() {
-                    "turn/start" => Some(Some(CancelTurnTarget {
-                        turn_start_seq: entry.event.seq,
-                        turn_id: entry
-                            .event
-                            .data
-                            .get("turn")
-                            .filter(|v| !v.is_null())
-                            .cloned(),
-                    })),
-                    "turn/end" => Some(None),
-                    _ => None,
-                })
-                .flatten()
+        let (epoch_matched, cancel_target) = self.runtime.inspect(|state| {
+            let epoch_matched = state.connection == ConnectionState::Ready
+                && state.connection_epoch == expected_epoch;
+            let target = active_turn_target(state, &scope.session_id);
+            (epoch_matched, target)
         });
         let (op_id, start_error_seq) = {
             let mut guard = self.ui.lock().expect("run ui lock");
@@ -1102,25 +1079,13 @@ impl RunWorkbenchBinding {
         self.handle.spawn(async move {
             match controller.cancel_at_epoch(expected_epoch, &scope).await {
                 Ok(()) => {
-                    let mut guard = ui.lock().expect("run ui lock");
-                    let should_clear =
-                        guard
-                            .session_errors
-                            .get(&scope.session_id)
-                            .is_some_and(|entry| {
-                                entry
-                                    .uncertain_cancel
-                                    .as_ref()
-                                    .is_some_and(|uc| uc.op_id == op_id)
-                                    || (entry.seq <= start_error_seq
-                                        && entry.kind == SessionErrorKind::Cancel
-                                        && cancel_target.is_some()
-                                        && entry.cancel_target == cancel_target)
-                            });
-                    if should_clear {
-                        guard.session_errors.remove(&scope.session_id);
-                        guard.revision = guard.revision.saturating_add(1);
-                    }
+                    clear_superseded_cancel_error(
+                        &ui,
+                        &scope.session_id,
+                        op_id,
+                        start_error_seq,
+                        &cancel_target,
+                    );
                 }
                 Err(err) => {
                     let message = format!("Cancel failed: {err}");
@@ -1130,13 +1095,21 @@ impl RunWorkbenchBinding {
                             | tekes_agent_contract::Error::Transport(_)
                             | tekes_agent_contract::Error::Timeout
                     );
-                    if is_unconfirmed && let Some(target) = cancel_target.clone() {
+                    if is_unconfirmed
+                        && epoch_matched
+                        && let Some(target) = cancel_target.clone()
+                    {
                         match runtime
                             .inspect(|s| inspect_turn_terminal(s, &scope.session_id, &target))
                         {
                             TurnTerminal::ConfirmedAborted => {
-                                // Only resolve this operation if it had somehow inserted an uncertain entry;
-                                // never clear another operation's error.
+                                clear_superseded_cancel_error(
+                                    &ui,
+                                    &scope.session_id,
+                                    op_id,
+                                    start_error_seq,
+                                    &cancel_target,
+                                );
                             }
                             TurnTerminal::ConfirmedOther => {
                                 record_cancel_error_if_not_newer(
@@ -2025,6 +1998,59 @@ fn record_cancel_error_if_not_newer(
     );
     guard.revision = guard.revision.saturating_add(1);
     has_uncertain
+}
+
+fn active_turn_target(
+    store: &tekes_agent_session::MemoryProjectionStore,
+    session_id: &str,
+) -> Option<CancelTurnTarget> {
+    let session = store.sessions.get(session_id)?;
+    if !session.run_open {
+        return None;
+    }
+    session
+        .entries
+        .values()
+        .rev()
+        .find_map(|entry| match entry.event.kind.as_str() {
+            "turn/start" => Some(Some(CancelTurnTarget {
+                turn_start_seq: entry.event.seq,
+                turn_id: entry
+                    .event
+                    .data
+                    .get("turn")
+                    .filter(|v| !v.is_null())
+                    .cloned(),
+            })),
+            "turn/end" => Some(None),
+            _ => None,
+        })
+        .flatten()
+}
+
+fn clear_superseded_cancel_error(
+    ui: &Mutex<RunUiState>,
+    session_id: &str,
+    op_id: u64,
+    start_error_seq: u64,
+    cancel_target: &Option<CancelTurnTarget>,
+) -> bool {
+    let mut guard = ui.lock().expect("run ui lock");
+    let should_clear = guard.session_errors.get(session_id).is_some_and(|entry| {
+        entry
+            .uncertain_cancel
+            .as_ref()
+            .is_some_and(|uc| uc.op_id == op_id)
+            || (entry.seq <= start_error_seq
+                && entry.kind == SessionErrorKind::Cancel
+                && cancel_target.is_some()
+                && entry.cancel_target == *cancel_target)
+    });
+    if should_clear {
+        guard.session_errors.remove(session_id);
+        guard.revision = guard.revision.saturating_add(1);
+    }
+    should_clear
 }
 
 fn inspect_turn_terminal(

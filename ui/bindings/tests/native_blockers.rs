@@ -49,6 +49,7 @@ struct EndpointState {
     inventory_tx: Option<mpsc::UnboundedSender<Result<Value>>>,
     running: BTreeMap<String, bool>,
     reject_cancel: bool,
+    transport_error_cancel: bool,
     reject_queue_update: bool,
     model_delay_a: bool,
     approval_delay_a: bool,
@@ -85,6 +86,7 @@ impl BlockerTestEndpoint {
                 inventory_tx: None,
                 running,
                 reject_cancel: false,
+                transport_error_cancel: false,
                 reject_queue_update: false,
                 model_delay_a: false,
                 approval_delay_a: false,
@@ -350,6 +352,9 @@ impl SessionEndpoint for TestSessionEndpoint {
                     self.source.cancel_entered.notify_waiters();
                     self.source.drop_connection();
                     return Err(Error::Disconnected);
+                }
+                if self.source.inner.lock().unwrap().transport_error_cancel {
+                    return Err(Error::Transport("receipt socket closed".into()));
                 }
                 if self.source.inner.lock().unwrap().reject_cancel {
                     return Err(Error::Remote("cancel rejected".into()));
@@ -1801,6 +1806,378 @@ fn stale_stop_reply_and_disconnect_reconcile_preserve_next_turn_cancel_rejection
         binding.ui_revision(),
         rev_before,
         "read-only error getters must not bump ui_revision"
+    );
+    assert!(binding.error_for_session(Some("b")).is_some());
+
+    rt.block_on(runtime.stop()).unwrap();
+}
+
+#[test]
+fn stale_epoch_stop_clears_on_same_turn_retry_and_persists_without_retry() {
+    let endpoint = BlockerTestEndpoint::new();
+    {
+        let mut guard = endpoint.inner.lock().unwrap();
+        guard.running.insert("a".to_owned(), true);
+        guard.journal_entries.insert(
+            "a".to_owned(),
+            vec![
+                json!({"event": {"type": "user/message", "seq": 0, "time": 1, "data": {"text": "t1"}}}),
+                json!({"event": {"type": "turn/start", "seq": 1, "time": 2, "data": {"turn": 1}}}),
+            ],
+        );
+    }
+    let (rt, runtime, binding) = setup_binding(&endpoint);
+    binding.open_initial_session("a").unwrap();
+    rt.block_on(wait_store(&runtime, |s| {
+        s.sessions["a"].journal_ready && s.sessions["a"].run_open
+    }));
+
+    // Reconnect on the same running turn and click Stop with the stale pre-reconnect epoch.
+    let old_epoch = runtime.inspect(|s| s.connection_epoch);
+    endpoint.drop_connection();
+    rt.block_on(wait_store(&runtime, |s| {
+        s.connection != tekes_agent_session::ConnectionState::Ready
+    }));
+    endpoint.unblock_reconnect();
+    rt.block_on(wait_store(&runtime, |s| {
+        s.connection == tekes_agent_session::ConnectionState::Ready
+            && s.connection_epoch > old_epoch
+            && s.sessions["a"].journal_ready
+    }));
+    let new_epoch = runtime.inspect(|s| s.connection_epoch);
+    let scope_a = RunScope::main("blocker-test", "a");
+
+    binding.cancel_scope_at_epoch(old_epoch, &scope_a);
+    for _ in 0..50 {
+        if binding.error_for_session(Some("a")).is_some() {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    let stale_err = binding
+        .error_for_session(Some("a"))
+        .expect("stale-epoch click must record local disconnect error");
+    assert!(stale_err.contains("disconnected"));
+    assert_eq!(
+        endpoint
+            .rpcs()
+            .iter()
+            .filter(|(m, _)| m == "session.cancel")
+            .count(),
+        0
+    );
+
+    // Retry on the same active turn with new_epoch -> clears the stale-epoch error on A.
+    binding.cancel_scope_at_epoch(new_epoch, &scope_a);
+    for _ in 0..50 {
+        if binding.error_for_session(Some("a")).is_none() {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    let rev = binding.ui_revision();
+    assert_eq!(binding.error_for_session(Some("a")), None);
+    assert_eq!(binding.error_for_session(Some("b")), None);
+    assert_eq!(
+        binding.ui_revision(),
+        rev,
+        "read-only getter must not bump revision"
+    );
+    assert_eq!(
+        endpoint
+            .rpcs()
+            .iter()
+            .filter(|(m, _)| m == "session.cancel")
+            .count(),
+        1
+    );
+
+    // Control: stale-epoch click on Turn 2 with NO retry, turn completes naturally -> error stays.
+    {
+        let mut guard = endpoint.inner.lock().unwrap();
+        guard.running.insert("a".to_owned(), true);
+        guard.journal_entries.insert(
+            "a".to_owned(),
+            vec![
+                json!({"event": {"type": "user/message", "seq": 0, "time": 1, "data": {"text": "t1"}}}),
+                json!({"event": {"type": "turn/start", "seq": 1, "time": 2, "data": {"turn": 1}}}),
+                json!({"event": {"type": "turn/end", "seq": 2, "time": 3, "data": {"turn": 1, "reason": "aborted"}}}),
+                json!({"event": {"type": "turn/start", "seq": 3, "time": 4, "data": {"turn": 2}}}),
+            ],
+        );
+    }
+    endpoint.drop_connection();
+    rt.block_on(wait_store(&runtime, |s| {
+        s.connection != tekes_agent_session::ConnectionState::Ready
+    }));
+    endpoint.unblock_reconnect();
+    rt.block_on(wait_store(&runtime, |s| {
+        s.connection == tekes_agent_session::ConnectionState::Ready
+            && s.connection_epoch > new_epoch
+            && s.sessions["a"].journal_ready
+            && s.sessions["a"].run_open
+    }));
+    binding.cancel_scope_at_epoch(new_epoch, &scope_a);
+    for _ in 0..50 {
+        if binding.error_for_session(Some("a")).is_some() {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    let stale_err2 = binding.error_for_session(Some("a")).unwrap();
+    let tx_a = endpoint.inner.lock().unwrap().journal_txs["a"].clone();
+    tx_a.send(Ok(json!({
+        "type": "event",
+        "generation": "g",
+        "sessionId": "a",
+        "entry": {"event": {"type": "turn/end", "seq": 4, "time": 5, "data": {"turn": 2, "reason": "completed"}}}
+    })))
+    .unwrap();
+    rt.block_on(wait_store(&runtime, |s| !s.sessions["a"].run_open));
+    std::thread::sleep(Duration::from_millis(40));
+    assert_eq!(binding.error_for_session(Some("a")), Some(stale_err2));
+    assert_eq!(
+        endpoint
+            .rpcs()
+            .iter()
+            .filter(|(m, _)| m == "session.cancel")
+            .count(),
+        1
+    );
+
+    rt.block_on(runtime.stop()).unwrap();
+}
+
+#[test]
+fn same_turn_second_stop_http_loss_after_aborted_clears_previous_rejection_while_isolating_newer_and_no_retry_controls()
+ {
+    let endpoint = BlockerTestEndpoint::new();
+    {
+        let mut guard = endpoint.inner.lock().unwrap();
+        guard.running.insert("a".to_owned(), true);
+        guard.journal_entries.insert(
+            "a".to_owned(),
+            vec![
+                json!({"event": {"type": "user/message", "seq": 0, "time": 1, "data": {"text": "t1"}}}),
+                json!({"event": {"type": "turn/start", "seq": 1, "time": 2, "data": {"turn": 1}}}),
+            ],
+        );
+        guard.running.insert("b".to_owned(), true);
+        guard.journal_entries.insert(
+            "b".to_owned(),
+            vec![
+                json!({"event": {"type": "user/message", "seq": 0, "time": 1, "data": {"text": "tb"}}}),
+                json!({"event": {"type": "turn/start", "seq": 1, "time": 2, "data": {"turn": 1}}}),
+            ],
+        );
+    }
+    let (rt, runtime, binding) = setup_binding(&endpoint);
+    binding.open_initial_session("b").unwrap();
+    endpoint.inner.lock().unwrap().reject_cancel = true;
+    binding.cancel_scope(&RunScope::main("blocker-test", "b"));
+    for _ in 0..50 {
+        if binding.error_for_session(Some("b")).is_some() {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    assert!(binding.error_for_session(Some("b")).is_some());
+
+    // 1. Immediate ConfirmedAborted path: 1st Stop rejected -> turn/end aborted -> 2nd Stop HTTP-only transport loss -> A clears.
+    binding.select_session("a");
+    rt.block_on(wait_store(&runtime, |s| {
+        s.sessions["a"].journal_ready && s.sessions["a"].run_open
+    }));
+    let scope_a = RunScope::main("blocker-test", "a");
+    let epoch = runtime.inspect(|s| s.connection_epoch);
+    binding.cancel_scope_at_epoch(epoch, &scope_a);
+    for _ in 0..50 {
+        if binding.error_for_session(Some("a")).is_some() {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    assert!(
+        binding
+            .error_for_session(Some("a"))
+            .as_deref()
+            .is_some_and(|e| e.contains("cancel rejected"))
+    );
+
+    {
+        let mut guard = endpoint.inner.lock().unwrap();
+        guard.reject_cancel = false;
+        guard.transport_error_cancel = true;
+    }
+    endpoint.hold_cancel.store(true, Ordering::Release);
+    binding.cancel_scope_at_epoch(epoch, &scope_a);
+    rt.block_on(endpoint.cancel_gate_entered.notified());
+
+    let tx_a = endpoint.inner.lock().unwrap().journal_txs["a"].clone();
+    tx_a.send(Ok(json!({
+        "type": "event",
+        "generation": "g",
+        "sessionId": "a",
+        "entry": {"event": {"type": "turn/end", "seq": 2, "time": 3, "data": {"turn": 1, "reason": "aborted"}}}
+    })))
+    .unwrap();
+    endpoint
+        .inner
+        .lock()
+        .unwrap()
+        .running
+        .insert("a".to_owned(), false);
+    rt.block_on(wait_store(&runtime, |s| !s.sessions["a"].run_open));
+    endpoint.cancel_release.notify_one();
+    for _ in 0..50 {
+        if binding.error_for_session(Some("a")).is_none() {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    assert_eq!(binding.error_for_session(Some("a")), None);
+    assert!(binding.error_for_session(Some("b")).is_some());
+
+    // 2. Deferred Pending -> ConfirmedAborted path: 2nd Stop drops HTTP receipt BEFORE turn/end(aborted) arrives.
+    endpoint
+        .inner
+        .lock()
+        .unwrap()
+        .running
+        .insert("a".to_owned(), true);
+    let tx_a2 = endpoint.inner.lock().unwrap().journal_txs["a"].clone();
+    tx_a2
+        .send(Ok(json!({
+            "type": "event",
+            "generation": "g",
+            "sessionId": "a",
+            "entry": {"event": {"type": "turn/start", "seq": 3, "time": 4, "data": {"turn": 2}}}
+        })))
+        .unwrap();
+    rt.block_on(wait_store(&runtime, |s| s.sessions["a"].run_open));
+    {
+        let mut guard = endpoint.inner.lock().unwrap();
+        guard.reject_cancel = true;
+        guard.transport_error_cancel = false;
+    }
+    binding.cancel_scope_at_epoch(epoch, &scope_a);
+    for _ in 0..50 {
+        if binding.error_for_session(Some("a")).is_some() {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    {
+        let mut guard = endpoint.inner.lock().unwrap();
+        guard.reject_cancel = false;
+        guard.transport_error_cancel = true;
+    }
+    binding.cancel_scope_at_epoch(epoch, &scope_a);
+    for _ in 0..50 {
+        if binding
+            .error_for_session(Some("a"))
+            .as_deref()
+            .is_some_and(|e| e.contains("receipt socket closed"))
+        {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    tx_a2
+        .send(Ok(json!({
+            "type": "event",
+            "generation": "g",
+            "sessionId": "a",
+            "entry": {"event": {"type": "turn/end", "seq": 4, "time": 5, "data": {"turn": 2, "reason": "aborted"}}}
+        })))
+        .unwrap();
+    rt.block_on(wait_store(&runtime, |s| !s.sessions["a"].run_open));
+    for _ in 0..50 {
+        if binding.error_for_session(Some("a")).is_none() {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    assert_eq!(binding.error_for_session(Some("a")), None);
+
+    // 3. Control: Single explicit rejection without retry stays visible even when turn later aborts.
+    tx_a2
+        .send(Ok(json!({
+            "type": "event",
+            "generation": "g",
+            "sessionId": "a",
+            "entry": {"event": {"type": "turn/start", "seq": 5, "time": 6, "data": {"turn": 3}}}
+        })))
+        .unwrap();
+    rt.block_on(wait_store(&runtime, |s| s.sessions["a"].run_open));
+    {
+        let mut guard = endpoint.inner.lock().unwrap();
+        guard.reject_cancel = true;
+        guard.transport_error_cancel = false;
+    }
+    binding.cancel_scope_at_epoch(epoch, &scope_a);
+    for _ in 0..50 {
+        if binding.error_for_session(Some("a")).is_some() {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    tx_a2
+        .send(Ok(json!({
+            "type": "event",
+            "generation": "g",
+            "sessionId": "a",
+            "entry": {"event": {"type": "turn/end", "seq": 6, "time": 7, "data": {"turn": 3, "reason": "aborted"}}}
+        })))
+        .unwrap();
+    rt.block_on(wait_store(&runtime, |s| !s.sessions["a"].run_open));
+    std::thread::sleep(Duration::from_millis(40));
+    assert!(
+        binding
+            .error_for_session(Some("a"))
+            .as_deref()
+            .is_some_and(|e| e.contains("cancel rejected"))
+    );
+
+    // 4. Newer queue-edit error stays preserved when 2nd Stop hits HTTP-only transport loss + ConfirmedAborted.
+    binding.clear_session_error("a");
+    tx_a2
+        .send(Ok(json!({
+            "type": "event",
+            "generation": "g",
+            "sessionId": "a",
+            "entry": {"event": {"type": "turn/start", "seq": 7, "time": 8, "data": {"turn": 4}}}
+        })))
+        .unwrap();
+    rt.block_on(wait_store(&runtime, |s| s.sessions["a"].run_open));
+    {
+        let mut guard = endpoint.inner.lock().unwrap();
+        guard.reject_cancel = false;
+        guard.transport_error_cancel = true;
+        guard.reject_queue_update = true;
+    }
+    endpoint.hold_cancel.store(true, Ordering::Release);
+    binding.cancel_scope_at_epoch(epoch, &scope_a);
+    rt.block_on(endpoint.cancel_gate_entered.notified());
+    let q_res = binding.edit_queued_prompt_at_epoch_blocking(epoch, "a", "input:0", "new".into());
+    assert!(q_res.is_err());
+    tx_a2
+        .send(Ok(json!({
+            "type": "event",
+            "generation": "g",
+            "sessionId": "a",
+            "entry": {"event": {"type": "turn/end", "seq": 8, "time": 9, "data": {"turn": 4, "reason": "aborted"}}}
+        })))
+        .unwrap();
+    rt.block_on(wait_store(&runtime, |s| !s.sessions["a"].run_open));
+    endpoint.cancel_release.notify_one();
+    std::thread::sleep(Duration::from_millis(40));
+    assert!(
+        binding
+            .error_for_session(Some("a"))
+            .as_deref()
+            .is_some_and(|e| e.contains("queue-item-not-found")),
+        "newer queue-edit failure must remain after HTTP-only Stop loss on ConfirmedAborted"
     );
     assert!(binding.error_for_session(Some("b")).is_some());
 
