@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.3 — 2026-11-26
+
+- Preserve deferred active session subscriptions across transient handshake reconnect failures (`Error::Disconnected` / `Error::Transport(_)`) so the next healthy connection continues receiving durable `turn/end` before closing, while still retiring explicit permanent `Error::Remote(_)` server rejections (#56).
+- Serialize `RunWorkbenchBinding::select_session` and `create_session_async` with `open_initial_session` under `RunUiState` so overlapping `open_initial_session(B)` and `select_session(C)` always agree on final selection, transcript, and lease ownership across reconnect (#40).
+- Reconcile unconfirmed interrupted `cancel_scope_at_epoch` errors against authoritative same-session, same-turn `turn/end (reason: "aborted")` replay on reconnect without resending `session.cancel` or clearing explicit rejections, other turns, or other sessions (#34).
+
 ## 0.6.2 — 2026-11-26
 
 - Defer closing a running session's journal when its last observer detaches across a disconnect or during the reconnect `inventory`/`follow` handshake (`has_unsettled_run`), so `SessionRuntime` keeps the stream open until durable `turn/end` arrives on the reconnected journal while releasing idle sessions promptly.

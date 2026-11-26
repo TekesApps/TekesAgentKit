@@ -29,6 +29,11 @@ struct BlockerTestEndpoint {
     hold_inventory_conn2: Arc<AtomicBool>,
     inventory_follow_entered: Arc<Notify>,
     inventory_follow_release: Arc<Notify>,
+    hold_journal_b: Arc<AtomicBool>,
+    journal_b_entered: Arc<Notify>,
+    journal_b_release: Arc<Notify>,
+    cancel_disconnect_before_reply: Arc<AtomicBool>,
+    cancel_entered: Arc<Notify>,
 }
 
 struct EndpointState {
@@ -89,6 +94,11 @@ impl BlockerTestEndpoint {
             hold_inventory_conn2: Arc::new(AtomicBool::new(false)),
             inventory_follow_entered: Arc::new(Notify::new()),
             inventory_follow_release: Arc::new(Notify::new()),
+            hold_journal_b: Arc::new(AtomicBool::new(false)),
+            journal_b_entered: Arc::new(Notify::new()),
+            journal_b_release: Arc::new(Notify::new()),
+            cancel_disconnect_before_reply: Arc::new(AtomicBool::new(false)),
+            cancel_entered: Arc::new(Notify::new()),
         }
     }
 
@@ -210,6 +220,10 @@ impl SessionEndpoint for TestSessionEndpoint {
                 ))
             }
             StreamTarget::SessionJournal { address, .. } => {
+                if address.session_id == "b" && self.source.hold_journal_b.load(Ordering::Acquire) {
+                    self.source.journal_b_entered.notify_waiters();
+                    self.source.journal_b_release.notified().await;
+                }
                 struct JournalDrop {
                     conn: usize,
                     sid: String,
@@ -235,7 +249,10 @@ impl SessionEndpoint for TestSessionEndpoint {
                         .insert((self.conn, sid.clone()), tx);
                     guard.journal_entries.get(&sid).cloned().unwrap_or_default()
                 };
-                let through = entries.len().saturating_sub(1);
+                let through = entries
+                    .last()
+                    .and_then(|e| e["event"]["seq"].as_i64())
+                    .unwrap_or(0);
                 let snap = json!({
                     "type": "snapshot",
                     "snapshot": {
@@ -312,6 +329,15 @@ impl SessionEndpoint for TestSessionEndpoint {
                 Ok(json!({ "mode": mode }))
             }
             "session.cancel" => {
+                if self
+                    .source
+                    .cancel_disconnect_before_reply
+                    .swap(false, Ordering::AcqRel)
+                {
+                    self.source.cancel_entered.notify_waiters();
+                    self.source.drop_connection();
+                    return Err(Error::Disconnected);
+                }
                 if self.source.inner.lock().unwrap().reject_cancel {
                     return Err(Error::Remote("cancel rejected".into()));
                 }
@@ -1096,5 +1122,340 @@ fn switching_from_running_a_to_b_during_reconnect_handshake_keeps_a_until_turn_e
         Some("b".to_owned())
     );
     assert!(runtime.inspect(|s| s.sessions["b"].journal_ready));
+    rt.block_on(runtime.stop()).unwrap();
+}
+
+#[test]
+fn overlapping_open_initial_session_b_and_select_session_c_keeps_selection_history_and_lease_on_c_across_reconnect()
+ {
+    let endpoint = BlockerTestEndpoint::new();
+    let (rt, runtime, binding) = setup_binding(&endpoint);
+    binding.open_initial_session("a").unwrap();
+    assert!(runtime.inspect(|s| s.sessions["a"].journal_ready));
+
+    endpoint.hold_journal_b.store(true, Ordering::Release);
+    std::thread::scope(|scope| {
+        let binding_b = &binding;
+        let opener = scope.spawn(move || binding_b.open_initial_session("b"));
+        rt.block_on(endpoint.journal_b_entered.notified());
+
+        let rx = binding.controller().subscribe();
+        let watch_guard = rx.borrow();
+        let (started_tx, started_rx) = std::sync::mpsc::channel();
+        let binding_c = &binding;
+        let selector = scope.spawn(move || {
+            started_tx.send(()).unwrap();
+            binding_c.select_session("c");
+        });
+        started_rx.recv().unwrap();
+        std::thread::sleep(Duration::from_millis(30));
+
+        endpoint.journal_b_release.notify_one();
+        std::thread::sleep(Duration::from_millis(30));
+        drop(watch_guard);
+
+        let b_res = opener.join().unwrap();
+        selector.join().unwrap();
+        let _ = b_res;
+    });
+
+    rt.block_on(wait_store(&runtime, |s| {
+        s.sessions.get("c").is_some_and(|sess| sess.journal_ready)
+            && !s.sessions.get("b").is_some_and(|sess| sess.journal_ready)
+            && !s.sessions.get("a").is_some_and(|sess| sess.journal_ready)
+    }));
+    for _ in 0..50 {
+        if binding
+            .run_snapshot()
+            .transcript
+            .items
+            .iter()
+            .any(|item| item.text.contains("init-c"))
+        {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    assert_eq!(
+        binding.current_scope().map(|s| s.session_id),
+        Some("c".to_owned())
+    );
+    let snap = binding.run_snapshot();
+    assert!(
+        snap.transcript
+            .items
+            .iter()
+            .any(|item| item.text.contains("init-c"))
+    );
+    assert!(
+        !snap
+            .transcript
+            .items
+            .iter()
+            .any(|item| item.text.contains("init-b"))
+    );
+
+    // Reconnect and confirm C remains selected, open, and visible.
+    let epoch_before = runtime.inspect(|s| s.connection_epoch);
+    endpoint.drop_connection();
+    rt.block_on(wait_store(&runtime, |s| {
+        s.connection != tekes_agent_session::ConnectionState::Ready
+    }));
+    rt.block_on(endpoint.reconnecting.notified());
+    endpoint.unblock_reconnect();
+    rt.block_on(wait_store(&runtime, |s| {
+        s.connection == tekes_agent_session::ConnectionState::Ready
+            && s.connection_epoch > epoch_before
+            && s.sessions.get("c").is_some_and(|sess| sess.journal_ready)
+    }));
+    std::thread::sleep(Duration::from_millis(40));
+    let conn2_opens: Vec<String> = endpoint
+        .journal_opens()
+        .into_iter()
+        .filter(|(conn, _)| *conn == 2)
+        .map(|(_, sid)| sid)
+        .collect();
+    assert_eq!(conn2_opens, vec!["c".to_owned()]);
+    assert_eq!(
+        binding.current_scope().map(|s| s.session_id),
+        Some("c".to_owned())
+    );
+    assert!(
+        binding
+            .run_snapshot()
+            .transcript
+            .items
+            .iter()
+            .any(|item| item.text.contains("init-c"))
+    );
+    rt.block_on(runtime.stop()).unwrap();
+}
+
+#[test]
+fn interrupted_stop_receipt_reconciles_on_same_turn_aborted_and_preserves_rejections_other_turns_and_other_sessions()
+ {
+    // 1. Interrupted cancel receipt on Turn 1 clears when reconnect replays Turn 1 aborted,
+    // without resending cancel or clearing B's error.
+    let endpoint = BlockerTestEndpoint::new();
+    {
+        let mut guard = endpoint.inner.lock().unwrap();
+        guard.running.insert("a".to_owned(), true);
+        guard.journal_entries.insert(
+            "a".to_owned(),
+            vec![
+                json!({"event": {"type": "user/message", "seq": 0, "time": 1, "data": {"text": "init-a"}}}),
+                json!({"event": {"type": "turn/start", "seq": 1, "time": 2, "data": {"turn": 1}}}),
+            ],
+        );
+    }
+    let (rt, runtime, binding) = setup_binding(&endpoint);
+    binding.open_initial_session("a").unwrap();
+
+    // Seed an independent error on session B via real rejection.
+    {
+        let mut guard = endpoint.inner.lock().unwrap();
+        guard.running.insert("b".to_owned(), true);
+        guard.journal_entries.insert(
+            "b".to_owned(),
+            vec![
+                json!({"event": {"type": "user/message", "seq": 0, "time": 1, "data": {"text": "init-b"}}}),
+                json!({"event": {"type": "turn/start", "seq": 1, "time": 2, "data": {"turn": 1}}}),
+            ],
+        );
+        guard.reject_cancel = true;
+    }
+    binding.select_session("b");
+    rt.block_on(wait_store(&runtime, |s| s.sessions["b"].journal_ready));
+    binding.cancel_scope(&RunScope::main("blocker-test", "b"));
+    for _ in 0..50 {
+        if binding.error_for_session(Some("b")).is_some() {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    assert!(binding.error_for_session(Some("b")).is_some());
+
+    // Switch back to A and trigger Stop whose receipt is cut by disconnect.
+    binding.select_session("a");
+    rt.block_on(wait_store(&runtime, |s| s.sessions["a"].journal_ready));
+    endpoint.inner.lock().unwrap().reject_cancel = false;
+    endpoint
+        .cancel_disconnect_before_reply
+        .store(true, Ordering::Release);
+    // Prepare authoritative Turn 1 aborted snapshot for conn 2 reconnect.
+    {
+        let mut guard = endpoint.inner.lock().unwrap();
+        guard.running.insert("a".to_owned(), false);
+        guard.journal_entries.insert(
+            "a".to_owned(),
+            vec![
+                json!({"event": {"type": "user/message", "seq": 0, "time": 1, "data": {"text": "init-a"}}}),
+                json!({"event": {"type": "turn/start", "seq": 1, "time": 2, "data": {"turn": 1}}}),
+                json!({"event": {"type": "turn/end", "seq": 2, "time": 3, "data": {"turn": 1, "reason": "aborted"}}}),
+            ],
+        );
+    }
+
+    let epoch1 = runtime.inspect(|s| s.connection_epoch);
+    binding.cancel_scope_at_epoch(epoch1, &RunScope::main("blocker-test", "a"));
+    for _ in 0..100 {
+        if binding.error_for_session(Some("a")).is_some()
+            && runtime.inspect(|s| s.connection != tekes_agent_session::ConnectionState::Ready)
+        {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    assert!(
+        binding
+            .error_for_session(Some("a"))
+            .as_deref()
+            .is_some_and(|e| e.contains("Cancel failed"))
+    );
+
+    endpoint.unblock_reconnect();
+    rt.block_on(wait_store(&runtime, |s| {
+        s.connection == tekes_agent_session::ConnectionState::Ready
+            && s.connection_epoch > epoch1
+            && s.sessions["a"].journal_ready
+    }));
+    for _ in 0..50 {
+        if binding.error_for_session(Some("a")).is_none() {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    assert_eq!(binding.error_for_session(Some("a")), None);
+    assert!(
+        binding.error_for_session(Some("b")).is_some(),
+        "reconciling A must not clear B's independent error"
+    );
+    let a_cancel_rpcs = endpoint
+        .rpcs()
+        .into_iter()
+        .filter(|(m, p)| m == "session.cancel" && p["sessionId"] == "a")
+        .count();
+    assert_eq!(
+        a_cancel_rpcs, 1,
+        "must not resend session.cancel on reconnect"
+    );
+
+    // 2. If Turn 1 completes normally (not aborted), error stays visible even if Turn 2 later aborts.
+    {
+        let mut guard = endpoint.inner.lock().unwrap();
+        guard.running.insert("a".to_owned(), true);
+        guard.journal_entries.insert(
+            "a".to_owned(),
+            vec![
+                json!({"event": {"type": "user/message", "seq": 10, "time": 10, "data": {"text": "t1"}}}),
+                json!({"event": {"type": "turn/start", "seq": 11, "time": 11, "data": {"turn": 1}}}),
+            ],
+        );
+    }
+    let epoch2 = runtime.inspect(|s| s.connection_epoch);
+    endpoint.drop_connection();
+    rt.block_on(wait_store(&runtime, |s| {
+        s.connection != tekes_agent_session::ConnectionState::Ready
+    }));
+    endpoint.unblock_reconnect();
+    rt.block_on(wait_store(&runtime, |s| {
+        s.connection == tekes_agent_session::ConnectionState::Ready
+            && s.connection_epoch > epoch2
+            && s.sessions["a"].journal_ready
+    }));
+    endpoint
+        .cancel_disconnect_before_reply
+        .store(true, Ordering::Release);
+    {
+        let mut guard = endpoint.inner.lock().unwrap();
+        guard.running.insert("a".to_owned(), false);
+        guard.journal_entries.insert(
+            "a".to_owned(),
+            vec![
+                json!({"event": {"type": "user/message", "seq": 10, "time": 10, "data": {"text": "t1"}}}),
+                json!({"event": {"type": "turn/start", "seq": 11, "time": 11, "data": {"turn": 1}}}),
+                json!({"event": {"type": "turn/end", "seq": 12, "time": 12, "data": {"turn": 1, "reason": "completed"}}}),
+                json!({"event": {"type": "turn/start", "seq": 13, "time": 13, "data": {"turn": 2}}}),
+                json!({"event": {"type": "turn/end", "seq": 14, "time": 14, "data": {"turn": 2, "reason": "aborted"}}}),
+            ],
+        );
+    }
+    let epoch3 = runtime.inspect(|s| s.connection_epoch);
+    binding.cancel_scope_at_epoch(epoch3, &RunScope::main("blocker-test", "a"));
+    for _ in 0..100 {
+        if binding.error_for_session(Some("a")).is_some()
+            && runtime.inspect(|s| s.connection != tekes_agent_session::ConnectionState::Ready)
+        {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    endpoint.unblock_reconnect();
+    rt.block_on(wait_store(&runtime, |s| {
+        s.connection == tekes_agent_session::ConnectionState::Ready
+            && s.connection_epoch > epoch3
+            && s.sessions["a"].journal_ready
+    }));
+    std::thread::sleep(Duration::from_millis(40));
+    assert!(
+        binding
+            .error_for_session(Some("a"))
+            .as_deref()
+            .is_some_and(|e| e.contains("Cancel failed")),
+        "completed Turn 1 error must remain visible even when Turn 2 aborted"
+    );
+
+    // 3. Explicit Remote rejection must NOT be cleared by an aborted turn/end on the same turn.
+    {
+        let mut guard = endpoint.inner.lock().unwrap();
+        guard.reject_cancel = true;
+        guard.running.insert("a".to_owned(), true);
+        guard.journal_entries.insert(
+            "a".to_owned(),
+            vec![
+                json!({"event": {"type": "user/message", "seq": 20, "time": 20, "data": {"text": "t3"}}}),
+                json!({"event": {"type": "turn/start", "seq": 21, "time": 21, "data": {"turn": 3}}}),
+            ],
+        );
+    }
+    binding.clear_session_error("a");
+    let epoch4 = runtime.inspect(|s| s.connection_epoch);
+    endpoint.drop_connection();
+    rt.block_on(wait_store(&runtime, |s| {
+        s.connection != tekes_agent_session::ConnectionState::Ready
+    }));
+    endpoint.unblock_reconnect();
+    rt.block_on(wait_store(&runtime, |s| {
+        s.connection == tekes_agent_session::ConnectionState::Ready
+            && s.connection_epoch > epoch4
+            && s.sessions["a"].journal_ready
+    }));
+    let epoch5 = runtime.inspect(|s| s.connection_epoch);
+    binding.cancel_scope_at_epoch(epoch5, &RunScope::main("blocker-test", "a"));
+    for _ in 0..50 {
+        if binding.error_for_session(Some("a")).is_some() {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    let tx_a = endpoint.inner.lock().unwrap().journal_txs["a"].clone();
+    tx_a.send(Ok(json!({
+        "type": "event",
+        "generation": "g",
+        "sessionId": "a",
+        "entry": {
+            "event": {"type": "turn/end", "seq": 22, "time": 22, "data": {"turn": 3, "reason": "aborted"}}
+        }
+    })))
+    .unwrap();
+    rt.block_on(wait_store(&runtime, |s| !s.sessions["a"].run_open));
+    std::thread::sleep(Duration::from_millis(40));
+    assert!(
+        binding
+            .error_for_session(Some("a"))
+            .as_deref()
+            .is_some_and(|e| e.contains("cancel rejected")),
+        "explicit remote rejection must stay visible"
+    );
     rt.block_on(runtime.stop()).unwrap();
 }

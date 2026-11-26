@@ -926,6 +926,7 @@ async fn connected(
     }
     let mut journal_epochs = std::collections::BTreeMap::new();
     let mut journal_cancellations = std::collections::BTreeMap::new();
+    let mut permanent_journal_errors = BTreeSet::<String>::new();
     let mut next_journal_epoch = epoch * 1_000_000;
     let mut failed_deferred_closes = Vec::new();
     for id in wanted.iter() {
@@ -944,9 +945,17 @@ async fn connected(
                 journal_epochs.insert(id.clone(), next_journal_epoch);
             }
             Err(error) => {
-                record_session_error(store, id, &error);
-                if deferred_closes.contains(id) {
-                    failed_deferred_closes.push(id.clone());
+                if matches!(&error, Error::Remote(_)) {
+                    record_session_read_error(store, id, &error);
+                    permanent_journal_errors.insert(id.clone());
+                    if deferred_closes.contains(id) {
+                        failed_deferred_closes.push(id.clone());
+                    }
+                } else {
+                    record_session_error(store, id, &error);
+                    if matches!(&error, Error::Disconnected | Error::Transport(_)) {
+                        return Err(error);
+                    }
                 }
             }
         }
@@ -1106,14 +1115,31 @@ async fn connected(
                                     journal_epochs.insert(id.to_owned(), next_journal_epoch);
                                     continue;
                                 }
-                                Err(error) => record_session_error(store, id, &error),
+                                Err(error) => {
+                                    if matches!(&error, Error::Remote(_)) {
+                                        record_session_read_error(store, id, &error);
+                                        permanent_journal_errors.insert(id.to_owned());
+                                        if deferred_closes.remove(id) { wanted.remove(id); }
+                                    } else {
+                                        record_session_error(store, id, &error);
+                                        if matches!(&error, Error::Disconnected | Error::Transport(_)) {
+                                            return Err(error);
+                                        }
+                                    }
+                                }
                             }
                         } else if matches!(&error, Error::Remote(_)) {
                             record_session_read_error(store, id, &error);
-                        } else { record_session_error(store, id, &error); }
+                            permanent_journal_errors.insert(id.to_owned());
+                            if deferred_closes.remove(id) { wanted.remove(id); }
+                        } else {
+                            record_session_error(store, id, &error);
+                            if matches!(&error, Error::Disconnected | Error::Transport(_)) {
+                                return Err(error);
+                            }
+                        }
                         if let Some(cancellation) = journal_cancellations.remove(id) { cancellation.abort(); }
                         journal_epochs.remove(id);
-                        if deferred_closes.remove(id) { wanted.remove(id); }
                         continue;
                     }
                     return Err(error);
@@ -1171,11 +1197,15 @@ async fn connected(
                                 Err(e) => Err(e),
                             }
                         } else { Ok(()) };
-                        if result.is_ok() { deferred_closes.remove(&id); }
+                        if result.is_ok() {
+                            deferred_closes.remove(&id);
+                            permanent_journal_errors.remove(&id);
+                        }
                         let _ = reply.send(result);
                     }
                     Command::Close(id, reply) => {
-                        if journal_epochs.contains_key(&id)
+                        if wanted.contains(&id)
+                            && !permanent_journal_errors.contains(&id)
                             && store.read(|s| s.sessions.get(&id).is_some_and(has_unsettled_run))
                         {
                             deferred_closes.insert(id);
