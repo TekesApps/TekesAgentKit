@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.6 — 2026-11-26
+
+- Attribute every `cancel_scope_at_epoch` attempt to the active open turn (`active_turn_target`) independent of whether `connection_epoch` matches `expected_epoch`, so retrying Stop at the current epoch on the same active turn clears a prior stale-epoch failure while preserving the failure if the turn ends without retry (#34).
+- Clear superseded same-turn `SessionErrorKind::Cancel` errors via `clear_superseded_cancel_error` when an in-epoch Stop retry encounters an unconfirmed HTTP/transport loss and `inspect_turn_terminal` confirms `TurnTerminal::ConfirmedAborted`, while keeping newer errors, explicit single rejections without retry, other turns, and other sessions isolated (#34).
+
 ## 0.6.5 — 2026-11-26
 
 - Gate background `try_spawn_history_acquire` on `published_lease_generation == history_lease_generation` and synchronously await `lease.release()` on stale/rolled-back `open_initial_session` cancellation so overlapping `select_session(C)` never acquires `C` before `RunController` publishes `C`, and stale `B` journals close on the wire before `open_initial_session(B)` returns `Err(Error::Disconnected)` (#40).

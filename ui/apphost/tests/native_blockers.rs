@@ -276,7 +276,11 @@ struct ErrorScopeEndpoint {
 
 struct ErrorScopeState {
     journal_txs: BTreeMap<String, mpsc::UnboundedSender<tekes_agent_contract::Result<Value>>>,
+    journal_entries_a: Vec<Value>,
+    inventory_tx: Option<mpsc::UnboundedSender<tekes_agent_contract::Result<Value>>>,
+    running_a: bool,
     reject_cancel_a: bool,
+    transport_error_cancel_a: bool,
     reject_cancel_b: bool,
     gate_cancel_a: bool,
     fail_create: bool,
@@ -287,12 +291,24 @@ impl ErrorScopeEndpoint {
         Self {
             inner: Arc::new(Mutex::new(ErrorScopeState {
                 journal_txs: BTreeMap::new(),
+                journal_entries_a: vec![
+                    json!({"event": {"type": "user/message", "seq": 0, "time": 1, "data": {"text": "init"}}}),
+                ],
+                inventory_tx: None,
+                running_a: false,
                 reject_cancel_a: true,
+                transport_error_cancel_a: false,
                 reject_cancel_b: false,
                 gate_cancel_a: false,
                 fail_create: false,
             })),
             cancel_gate_a: Arc::new(Notify::new()),
+        }
+    }
+
+    fn drop_connection(&self) {
+        if let Some(tx) = self.inner.lock().unwrap().inventory_tx.take() {
+            let _ = tx.send(Err(Error::Disconnected));
         }
     }
 }
@@ -340,19 +356,26 @@ impl SessionEndpoint for ErrorScopeSessionEndpoint {
     async fn follow(&self, target: StreamTarget) -> tekes_agent_contract::Result<FrameStream> {
         match target {
             StreamTarget::SessionInventory => {
+                let (tx, rx) = mpsc::unbounded_channel();
+                let running_a = {
+                    let mut guard = self.source.inner.lock().unwrap();
+                    guard.inventory_tx = Some(tx);
+                    guard.running_a
+                };
                 let baseline = json!({
                     "type": "baseline",
                     "generation": "g",
                     "snapshot": {
                         "items": [
-                            {"sessionId": "a", "running": false, "blank": false, "updatedAt": 10},
+                            {"sessionId": "a", "running": running_a, "blank": false, "updatedAt": 10},
                             {"sessionId": "b", "running": false, "blank": false, "updatedAt": 20}
                         ]
                     }
                 });
-                Ok(Box::pin(
-                    stream::once(async { Ok(baseline) }).chain(stream::pending()),
-                ))
+                let tail = stream::unfold(rx, |mut rx| async move {
+                    rx.recv().await.map(|item| (item, rx))
+                });
+                Ok(Box::pin(stream::once(async { Ok(baseline) }).chain(tail)))
             }
             StreamTarget::SessionControl => {
                 let baseline = json!({
@@ -373,20 +396,29 @@ impl SessionEndpoint for ErrorScopeSessionEndpoint {
             StreamTarget::SessionJournal { address, .. } => {
                 let sid = address.session_id.clone();
                 let (tx, rx) = mpsc::unbounded_channel();
-                self.source
-                    .inner
-                    .lock()
-                    .unwrap()
-                    .journal_txs
-                    .insert(sid.clone(), tx);
+                let entries = {
+                    let mut guard = self.source.inner.lock().unwrap();
+                    guard.journal_txs.insert(sid.clone(), tx);
+                    if sid == "a" {
+                        guard.journal_entries_a.clone()
+                    } else {
+                        vec![
+                            json!({"event": {"type": "user/message", "seq": 0, "time": 1, "data": {"text": "init"}}}),
+                        ]
+                    }
+                };
+                let through = entries
+                    .last()
+                    .and_then(|e| e["event"]["seq"].as_i64())
+                    .unwrap_or(0);
                 let snap = json!({
                     "type": "snapshot",
                     "snapshot": {
                         "sessionId": sid,
                         "generation": "g",
-                        "throughSequence": 0,
+                        "throughSequence": through,
                         "windowLimit": 50,
-                        "entries": [{"event": {"type": "user/message", "seq": 0, "time": 1, "data": {"text": "init"}}}],
+                        "entries": entries,
                         "hasMoreBefore": false
                     }
                 });
@@ -416,10 +448,17 @@ impl SessionEndpoint for ErrorScopeSessionEndpoint {
                 if sid == "a" && self.source.inner.lock().unwrap().gate_cancel_a {
                     self.source.cancel_gate_a.notified().await;
                 }
-                let reject = {
+                let (reject, transport_err) = {
                     let guard = self.source.inner.lock().unwrap();
-                    (sid == "a" && guard.reject_cancel_a) || (sid == "b" && guard.reject_cancel_b)
+                    (
+                        (sid == "a" && guard.reject_cancel_a)
+                            || (sid == "b" && guard.reject_cancel_b),
+                        sid == "a" && guard.transport_error_cancel_a,
+                    )
                 };
+                if transport_err {
+                    return Err(Error::Transport("receipt dropped".into()));
+                }
                 if reject {
                     return Err(Error::Remote(format!("cancel rejected ({sid})").into()));
                 }
@@ -722,6 +761,230 @@ fn session_cancel_error_isolated_in_transcript_and_tasks_queue_both_orders() {
     assert!(!has_panel_ep_cleared);
     assert_eq!(tr_err_ep_cleared, None);
     assert_eq!(tq_err_ep_cleared.as_deref(), Some(""));
+
+    rt.block_on(runtime.stop()).unwrap();
+}
+
+#[test]
+fn same_turn_stop_retry_clears_previous_error_in_transcript_and_tasks_queue() {
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    let endpoint = ErrorScopeEndpoint::new();
+    let runtime = rt.block_on(async {
+        let runtime = Arc::new(SessionRuntime::spawn(
+            "error-scope",
+            Arc::new(endpoint.clone()),
+        ));
+        runtime.wait_ready(Duration::from_secs(2)).await.unwrap();
+        runtime
+    });
+    let controller =
+        rt.block_on(async { Arc::new(RunController::new(Arc::clone(&runtime)).unwrap()) });
+    let workbench = SharedAgentWorkbench::new();
+    let wake: Arc<dyn UiWakeNotifier> = workbench.wake_hub();
+    let binding = {
+        let _guard = rt.enter();
+        RunWorkbenchBinding::new(
+            "error-scope",
+            Arc::clone(&runtime),
+            controller,
+            rt.handle().clone(),
+            wake,
+        )
+    };
+    binding.open_initial_session("b").unwrap();
+    {
+        endpoint.inner.lock().unwrap().reject_cancel_b = true;
+    }
+    binding.cancel_scope_at_epoch(999, &RunScope::main("error-scope", "b"));
+    for _ in 0..50 {
+        if binding.error_for_session(Some("b")).is_some() {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+
+    binding.select_session("a");
+    rt.block_on(wait_store(&runtime, |s| {
+        s.sessions.get("a").is_some_and(|sess| sess.journal_ready)
+    }));
+    workbench.attach_run_binding(Arc::clone(&binding));
+
+    let tx_a = endpoint.inner.lock().unwrap().journal_txs["a"].clone();
+    endpoint.inner.lock().unwrap().running_a = true;
+    tx_a.send(Ok(json!({
+        "type": "event",
+        "generation": "g",
+        "sessionId": "a",
+        "entry": {"event": {"type": "turn/start", "seq": 1, "time": 2, "data": {"turn": 1}}}
+    })))
+    .unwrap();
+    rt.block_on(wait_store(&runtime, |s| {
+        s.sessions.get("a").is_some_and(|sess| sess.run_open)
+    }));
+
+    let mut surfaces = PersistentSurfaces::new();
+    let scope_a = RunScope::main("error-scope", "a");
+
+    // 1. Stale-epoch Stop shows error in both panels -> same-turn new-epoch Stop retry clears both panels.
+    let old_epoch = runtime.inspect(|s| s.connection_epoch);
+    endpoint.drop_connection();
+    rt.block_on(wait_store(&runtime, |s| {
+        s.connection != tekes_agent_session::ConnectionState::Ready
+    }));
+    rt.block_on(wait_store(&runtime, |s| {
+        s.connection == tekes_agent_session::ConnectionState::Ready
+            && s.connection_epoch > old_epoch
+            && s.sessions.get("a").is_some_and(|sess| sess.journal_ready)
+    }));
+    let new_epoch = runtime.inspect(|s| s.connection_epoch);
+    let tx_a2 = endpoint.inner.lock().unwrap().journal_txs["a"].clone();
+    tx_a2
+        .send(Ok(json!({
+            "type": "event",
+            "generation": "g",
+            "sessionId": "a",
+            "entry": {"event": {"type": "turn/start", "seq": 1, "time": 2, "data": {"turn": 1}}}
+        })))
+        .unwrap();
+    rt.block_on(wait_store(&runtime, |s| s.sessions["a"].run_open));
+
+    binding.cancel_scope_at_epoch(old_epoch, &scope_a);
+    for _ in 0..50 {
+        if binding.error_for_session(Some("a")).is_some() {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    let ((has_panel, tr_err), tq_err) = inspect_rendered_errors(&workbench, &mut surfaces);
+    assert!(has_panel);
+    assert!(tr_err.is_some_and(|t| t.contains("Cancel failed")));
+    assert!(tq_err.is_some_and(|t| t.contains("Cancel failed")));
+
+    endpoint.inner.lock().unwrap().reject_cancel_a = false;
+    binding.cancel_scope_at_epoch(new_epoch, &scope_a);
+    for _ in 0..50 {
+        if binding.error_for_session(Some("a")).is_none() {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    let ((has_panel_cleared, tr_cleared), tq_cleared) =
+        inspect_rendered_errors(&workbench, &mut surfaces);
+    assert!(!has_panel_cleared);
+    assert_eq!(tr_cleared, None);
+    assert_eq!(tq_cleared.as_deref(), Some(""));
+
+    // 2. Same-turn 1st Stop explicit rejection -> aborted replay + 2nd Stop HTTP-only loss clears both panels,
+    // stays clear after B -> A, while B keeps its own error.
+    endpoint.inner.lock().unwrap().reject_cancel_a = true;
+    binding.cancel_scope_at_epoch(new_epoch, &scope_a);
+    for _ in 0..50 {
+        if binding.error_for_session(Some("a")).is_some() {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    let ((has_panel_rej, tr_rej), tq_rej) = inspect_rendered_errors(&workbench, &mut surfaces);
+    assert!(has_panel_rej);
+    assert!(tr_rej.is_some_and(|t| t.contains("cancel rejected (a)")));
+    assert!(tq_rej.is_some_and(|t| t.contains("cancel rejected (a)")));
+
+    {
+        let mut guard = endpoint.inner.lock().unwrap();
+        guard.reject_cancel_a = false;
+        guard.transport_error_cancel_a = true;
+        guard.gate_cancel_a = true;
+    }
+    binding.cancel_scope_at_epoch(new_epoch, &scope_a);
+    std::thread::sleep(Duration::from_millis(20));
+    endpoint.inner.lock().unwrap().running_a = false;
+    {
+        endpoint.inner.lock().unwrap().journal_entries_a = vec![
+            json!({"event": {"type": "user/message", "seq": 0, "time": 1, "data": {"text": "init"}}}),
+            json!({"event": {"type": "turn/start", "seq": 1, "time": 2, "data": {"turn": 1}}}),
+            json!({"event": {"type": "turn/end", "seq": 2, "time": 3, "data": {"turn": 1, "reason": "aborted"}}}),
+        ];
+    }
+    tx_a2
+        .send(Ok(json!({
+            "type": "event",
+            "generation": "g",
+            "sessionId": "a",
+            "entry": {"event": {"type": "turn/end", "seq": 2, "time": 3, "data": {"turn": 1, "reason": "aborted"}}}
+        })))
+        .unwrap();
+    rt.block_on(wait_store(&runtime, |s| !s.sessions["a"].run_open));
+    endpoint.inner.lock().unwrap().gate_cancel_a = false;
+    endpoint.cancel_gate_a.notify_waiters();
+    for _ in 0..50 {
+        if binding.error_for_session(Some("a")).is_none() {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    let ((has_panel_after, tr_after), tq_after) =
+        inspect_rendered_errors(&workbench, &mut surfaces);
+    assert!(!has_panel_after);
+    assert_eq!(tr_after, None);
+    assert_eq!(tq_after.as_deref(), Some(""));
+
+    // Switch B -> A: B still shows its own error, A remains clean.
+    binding.select_session("b");
+    rt.block_on(wait_store(&runtime, |s| s.sessions["b"].journal_ready));
+    let ((has_panel_b, tr_b), tq_b) = inspect_rendered_errors(&workbench, &mut surfaces);
+    assert!(has_panel_b);
+    assert!(tr_b.is_some_and(|t| t.contains("Cancel failed")));
+    assert!(tq_b.is_some_and(|t| t.contains("Cancel failed")));
+
+    binding.select_session("a");
+    rt.block_on(wait_store(&runtime, |s| {
+        s.sessions.get("a").is_some_and(|sess| sess.journal_ready)
+    }));
+    let ((has_panel_a2, tr_a2), tq_a2) = inspect_rendered_errors(&workbench, &mut surfaces);
+    assert!(!has_panel_a2);
+    assert_eq!(tr_a2, None);
+    assert_eq!(tq_a2.as_deref(), Some(""));
+
+    // 3. Control: stale-epoch Stop without retry preserves error across natural completion in both panels.
+    {
+        let mut guard = endpoint.inner.lock().unwrap();
+        guard.running_a = true;
+        guard.journal_entries_a.push(
+            json!({"event": {"type": "turn/start", "seq": 3, "time": 4, "data": {"turn": 2}}}),
+        );
+    }
+    let tx_a3 = endpoint.inner.lock().unwrap().journal_txs["a"].clone();
+    tx_a3
+        .send(Ok(json!({
+            "type": "event",
+            "generation": "g",
+            "sessionId": "a",
+            "entry": {"event": {"type": "turn/start", "seq": 3, "time": 4, "data": {"turn": 2}}}
+        })))
+        .unwrap();
+    rt.block_on(wait_store(&runtime, |s| s.sessions["a"].run_open));
+    binding.cancel_scope_at_epoch(old_epoch, &scope_a);
+    for _ in 0..50 {
+        if binding.error_for_session(Some("a")).is_some() {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    endpoint.inner.lock().unwrap().running_a = false;
+    tx_a3
+        .send(Ok(json!({
+            "type": "event",
+            "generation": "g",
+            "sessionId": "a",
+            "entry": {"event": {"type": "turn/end", "seq": 4, "time": 5, "data": {"turn": 2, "reason": "completed"}}}
+        })))
+        .unwrap();
+    rt.block_on(wait_store(&runtime, |s| !s.sessions["a"].run_open));
+    std::thread::sleep(Duration::from_millis(30));
+    let ((has_panel_ctrl, tr_ctrl), tq_ctrl) = inspect_rendered_errors(&workbench, &mut surfaces);
+    assert!(has_panel_ctrl);
+    assert!(tr_ctrl.is_some_and(|t| t.contains("Cancel failed")));
+    assert!(tq_ctrl.is_some_and(|t| t.contains("Cancel failed")));
 
     rt.block_on(runtime.stop()).unwrap();
 }
