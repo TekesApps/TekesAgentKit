@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.4 — 2026-11-26
+
+- Decouple `RunWorkbenchBinding` selection publication (`select_session`, `open_initial_session`, `create_session_async`) from `RunUiState` mutex locking via a dedicated `selection_publish` mutex so `RunController::subscribe().borrow()` read guards never stall UI-only getters (`session_error`, `error_for_session`, `last_error`, `sidebar_rows`), while keeping final selection, transcript history, and `SessionHistoryLease` consistent (#40).
+- Scope Stop error clearing and aborted-turn reconciliation strictly to the originating `cancel_scope_at_epoch` operation (`op_id`, `CancelTurnTarget`, and `start_error_seq`), move reconciliation to state-update paths so `session_error` and `error_for_session` are strictly read-only, and preserve next-turn cancel rejections, queue-edit errors, and other sessions' errors (#34).
+
 ## 0.6.3 — 2026-11-26
 
 - Preserve deferred active session subscriptions across transient handshake reconnect failures (`Error::Disconnected` / `Error::Transport(_)`) so the next healthy connection continues receiving durable `turn/end` before closing, while still retiring explicit permanent `Error::Remote(_)` server rejections (#56).

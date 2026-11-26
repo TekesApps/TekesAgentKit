@@ -34,6 +34,9 @@ struct BlockerTestEndpoint {
     journal_b_release: Arc<Notify>,
     cancel_disconnect_before_reply: Arc<AtomicBool>,
     cancel_entered: Arc<Notify>,
+    hold_cancel: Arc<AtomicBool>,
+    cancel_gate_entered: Arc<Notify>,
+    cancel_release: Arc<Notify>,
 }
 
 struct EndpointState {
@@ -46,6 +49,7 @@ struct EndpointState {
     inventory_tx: Option<mpsc::UnboundedSender<Result<Value>>>,
     running: BTreeMap<String, bool>,
     reject_cancel: bool,
+    reject_queue_update: bool,
     model_delay_a: bool,
     approval_delay_a: bool,
     closed: Vec<String>,
@@ -81,6 +85,7 @@ impl BlockerTestEndpoint {
                 inventory_tx: None,
                 running,
                 reject_cancel: false,
+                reject_queue_update: false,
                 model_delay_a: false,
                 approval_delay_a: false,
                 closed: Vec::new(),
@@ -99,6 +104,9 @@ impl BlockerTestEndpoint {
             journal_b_release: Arc::new(Notify::new()),
             cancel_disconnect_before_reply: Arc::new(AtomicBool::new(false)),
             cancel_entered: Arc::new(Notify::new()),
+            hold_cancel: Arc::new(AtomicBool::new(false)),
+            cancel_gate_entered: Arc::new(Notify::new()),
+            cancel_release: Arc::new(Notify::new()),
         }
     }
 
@@ -178,6 +186,7 @@ impl SessionEndpoint for TestSessionEndpoint {
         EndpointCapabilities::methods(&[
             "session.prompt",
             "session.cancel",
+            "session.updateQueue",
             "session.models",
             "session.selectModel",
             "approvals.policy",
@@ -329,6 +338,10 @@ impl SessionEndpoint for TestSessionEndpoint {
                 Ok(json!({ "mode": mode }))
             }
             "session.cancel" => {
+                if self.source.hold_cancel.swap(false, Ordering::AcqRel) {
+                    self.source.cancel_gate_entered.notify_waiters();
+                    self.source.cancel_release.notified().await;
+                }
                 if self
                     .source
                     .cancel_disconnect_before_reply
@@ -342,6 +355,12 @@ impl SessionEndpoint for TestSessionEndpoint {
                     return Err(Error::Remote("cancel rejected".into()));
                 }
                 Ok(json!({ "cancelled": true }))
+            }
+            "session.updateQueue" => {
+                if self.source.inner.lock().unwrap().reject_queue_update {
+                    return Err(Error::Remote("queue-item-not-found".into()));
+                }
+                Ok(json!({ "ok": true }))
             }
             "session.selectModel" | "approvals.select" => Ok(json!({ "ok": true })),
             "session.prompt" => Ok(json!({ "accepted": true })),
@@ -1152,11 +1171,25 @@ fn overlapping_open_initial_session_b_and_select_session_c_keeps_selection_histo
 
         endpoint.journal_b_release.notify_one();
         std::thread::sleep(Duration::from_millis(30));
+        assert!(!opener.is_finished() && !selector.is_finished());
+        let (done_tx, done_rx) = std::sync::mpsc::channel();
+        let binding_getter = &binding;
+        scope.spawn(move || {
+            let _ = binding_getter.session_error("a");
+            let _ = binding_getter.error_for_session(Some("a"));
+            let _ = binding_getter.last_error();
+            let _ = binding_getter.endpoint_id();
+            let _ = binding_getter.sidebar_rows();
+            let _ = done_tx.send(());
+        });
+        done_rx
+            .recv_timeout(Duration::from_millis(300))
+            .expect("public getters must not deadlock while watch guard held");
         drop(watch_guard);
 
         let b_res = opener.join().unwrap();
         selector.join().unwrap();
-        let _ = b_res;
+        assert!(matches!(b_res, Err(Error::Disconnected)));
     });
 
     rt.block_on(wait_store(&runtime, |s| {
@@ -1457,5 +1490,311 @@ fn interrupted_stop_receipt_reconciles_on_same_turn_aborted_and_preserves_reject
             .is_some_and(|e| e.contains("cancel rejected")),
         "explicit remote rejection must stay visible"
     );
+    rt.block_on(runtime.stop()).unwrap();
+}
+
+#[test]
+fn public_getters_return_while_watch_borrow_held_and_select_session_pending() {
+    let endpoint = BlockerTestEndpoint::new();
+    let (rt, runtime, binding) = setup_binding(&endpoint);
+    binding.open_initial_session("a").unwrap();
+    assert!(runtime.inspect(|s| s.sessions["a"].journal_ready));
+
+    let rx = binding.controller().subscribe();
+    std::thread::scope(|scope| {
+        let held = rx.borrow();
+        let (started_tx, started_rx) = std::sync::mpsc::channel();
+        let binding_c = &binding;
+        let selector = scope.spawn(move || {
+            started_tx.send(()).unwrap();
+            binding_c.select_session("c");
+        });
+        started_rx.recv_timeout(Duration::from_secs(1)).unwrap();
+        std::thread::sleep(Duration::from_millis(40));
+        assert!(
+            !selector.is_finished(),
+            "select_session must wait on watch borrow rather than blocking other callers on ui lock"
+        );
+        let (done_tx, done_rx) = std::sync::mpsc::channel();
+        let binding_getter = &binding;
+        scope.spawn(move || {
+            let err = binding_getter.session_error("a");
+            let efs = binding_getter.error_for_session(Some("a"));
+            let last = binding_getter.last_error();
+            let ep = binding_getter.endpoint_id();
+            let rows = binding_getter.sidebar_rows();
+            done_tx.send((err, efs, last, ep, rows.len())).unwrap();
+        });
+        let (err, efs, last, ep, row_count) = done_rx
+            .recv_timeout(Duration::from_millis(300))
+            .expect("public getters must return immediately while watch guard is held");
+        assert_eq!(err, None);
+        assert_eq!(efs, None);
+        assert_eq!(last, None);
+        assert_eq!(ep, "blocker-test");
+        assert_eq!(row_count, 3);
+        drop(held);
+        selector.join().unwrap();
+    });
+
+    rt.block_on(wait_store(&runtime, |s| {
+        s.sessions.get("c").is_some_and(|sess| sess.journal_ready)
+            && !s.sessions.get("a").is_some_and(|sess| sess.journal_ready)
+    }));
+    assert_eq!(
+        binding.current_scope().map(|s| s.session_id),
+        Some("c".to_owned())
+    );
+    rt.block_on(runtime.stop()).unwrap();
+}
+
+#[test]
+fn stale_stop_reply_and_disconnect_reconcile_preserve_next_turn_cancel_rejection_queue_edit_failure_and_other_session_errors()
+ {
+    let endpoint = BlockerTestEndpoint::new();
+    {
+        let mut guard = endpoint.inner.lock().unwrap();
+        guard.running.insert("a".to_owned(), true);
+        guard.journal_entries.insert(
+            "a".to_owned(),
+            vec![
+                json!({"event": {"type": "user/message", "seq": 0, "time": 1, "data": {"text": "t1"}}}),
+                json!({"event": {"type": "turn/start", "seq": 1, "time": 2, "data": {"turn": 1}}}),
+            ],
+        );
+        guard.running.insert("b".to_owned(), true);
+        guard.journal_entries.insert(
+            "b".to_owned(),
+            vec![
+                json!({"event": {"type": "user/message", "seq": 0, "time": 1, "data": {"text": "init-b"}}}),
+                json!({"event": {"type": "turn/start", "seq": 1, "time": 2, "data": {"turn": 1}}}),
+            ],
+        );
+    }
+    let (rt, runtime, binding) = setup_binding(&endpoint);
+
+    // Record an independent error on B that must remain untouched.
+    endpoint.inner.lock().unwrap().reject_cancel = true;
+    binding.open_initial_session("b").unwrap();
+    binding.cancel_scope(&RunScope::main("blocker-test", "b"));
+    for _ in 0..50 {
+        if binding.error_for_session(Some("b")).is_some() {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    assert!(binding.error_for_session(Some("b")).is_some());
+    endpoint.inner.lock().unwrap().reject_cancel = false;
+
+    // Select A on Turn 1 and issue Stop while holding session.cancel HTTP reply.
+    binding.select_session("a");
+    rt.block_on(wait_store(&runtime, |s| s.sessions["a"].journal_ready));
+    endpoint.hold_cancel.store(true, Ordering::Release);
+    binding.cancel_scope(&RunScope::main("blocker-test", "a"));
+    rt.block_on(endpoint.cancel_gate_entered.notified());
+
+    // Turn 1 aborts and Turn 2 starts on A while Turn 1's Stop HTTP reply is still held.
+    let tx_a = endpoint.inner.lock().unwrap().journal_txs["a"].clone();
+    tx_a.send(Ok(json!({
+        "type": "event",
+        "generation": "g",
+        "sessionId": "a",
+        "entry": {"event": {"type": "turn/end", "seq": 2, "time": 3, "data": {"turn": 1, "reason": "aborted"}}}
+    })))
+    .unwrap();
+    tx_a.send(Ok(json!({
+        "type": "event",
+        "generation": "g",
+        "sessionId": "a",
+        "entry": {"event": {"type": "turn/start", "seq": 4, "time": 4, "data": {"turn": 2}}}
+    })))
+    .unwrap();
+    {
+        let mut guard = endpoint.inner.lock().unwrap();
+        guard.journal_entries.insert(
+            "a".to_owned(),
+            vec![
+                json!({"event": {"type": "user/message", "seq": 0, "time": 1, "data": {"text": "t1"}}}),
+                json!({"event": {"type": "turn/start", "seq": 1, "time": 2, "data": {"turn": 1}}}),
+                json!({"event": {"type": "turn/end", "seq": 2, "time": 3, "data": {"turn": 1, "reason": "aborted"}}}),
+                json!({"event": {"type": "turn/start", "seq": 4, "time": 4, "data": {"turn": 2}}}),
+            ],
+        );
+    }
+    rt.block_on(wait_store(&runtime, |s| {
+        s.sessions["a"]
+            .entries
+            .values()
+            .any(|e| e.event.kind == "turn/start" && e.event.seq == 4)
+    }));
+
+    // Scenario A: Turn 2 queue edit failure must survive late Turn 1 Stop Ok reply.
+    endpoint.inner.lock().unwrap().reject_queue_update = true;
+    let epoch = runtime.inspect(|s| s.connection_epoch);
+    let q_res = binding.edit_queued_prompt_at_epoch_blocking(epoch, "a", "input:0", "new".into());
+    assert!(q_res.is_err());
+    let queue_err = binding.error_for_session(Some("a")).unwrap();
+    assert!(queue_err.contains("queue-item-not-found"));
+
+    endpoint.cancel_release.notify_one();
+    std::thread::sleep(Duration::from_millis(40));
+    assert_eq!(
+        binding.error_for_session(Some("a")).as_deref(),
+        Some(queue_err.as_str())
+    );
+    assert!(binding.error_for_session(Some("b")).is_some());
+
+    // Scenario B: Turn 1 Stop held -> Turn 2 queue edit failure -> disconnect + aborted replay -> Turn 1 Ok must all preserve queue edit failure.
+    binding.clear_session_error("a");
+    let epoch2 = runtime.inspect(|s| s.connection_epoch);
+    {
+        let mut guard = endpoint.inner.lock().unwrap();
+        guard.running.insert("a".to_owned(), true);
+        guard.journal_entries.insert(
+            "a".to_owned(),
+            vec![
+                json!({"event": {"type": "user/message", "seq": 10, "time": 10, "data": {"text": "t3"}}}),
+                json!({"event": {"type": "turn/start", "seq": 11, "time": 11, "data": {"turn": 3}}}),
+            ],
+        );
+    }
+    endpoint.drop_connection();
+    rt.block_on(wait_store(&runtime, |s| {
+        s.connection != tekes_agent_session::ConnectionState::Ready
+    }));
+    endpoint.unblock_reconnect();
+    rt.block_on(wait_store(&runtime, |s| {
+        s.connection == tekes_agent_session::ConnectionState::Ready
+            && s.connection_epoch > epoch2
+            && s.sessions["a"].journal_ready
+    }));
+
+    endpoint.hold_cancel.store(true, Ordering::Release);
+    binding.cancel_scope(&RunScope::main("blocker-test", "a"));
+    rt.block_on(endpoint.cancel_gate_entered.notified());
+
+    {
+        let mut guard = endpoint.inner.lock().unwrap();
+        guard.journal_entries.insert(
+            "a".to_owned(),
+            vec![
+                json!({"event": {"type": "user/message", "seq": 10, "time": 10, "data": {"text": "t3"}}}),
+                json!({"event": {"type": "turn/start", "seq": 11, "time": 11, "data": {"turn": 3}}}),
+                json!({"event": {"type": "turn/end", "seq": 12, "time": 12, "data": {"turn": 3, "reason": "aborted"}}}),
+                json!({"event": {"type": "turn/start", "seq": 13, "time": 13, "data": {"turn": 4}}}),
+            ],
+        );
+    }
+    let epoch3 = runtime.inspect(|s| s.connection_epoch);
+    let q_res2 =
+        binding.edit_queued_prompt_at_epoch_blocking(epoch3, "a", "input:10", "new2".into());
+    assert!(q_res2.is_err());
+
+    endpoint.drop_connection();
+    rt.block_on(wait_store(&runtime, |s| {
+        s.connection != tekes_agent_session::ConnectionState::Ready
+    }));
+    endpoint.unblock_reconnect();
+    rt.block_on(wait_store(&runtime, |s| {
+        s.connection == tekes_agent_session::ConnectionState::Ready
+            && s.connection_epoch > epoch3
+            && s.sessions["a"].journal_ready
+    }));
+    endpoint.cancel_release.notify_one();
+    std::thread::sleep(Duration::from_millis(40));
+    assert!(
+        binding
+            .error_for_session(Some("a"))
+            .as_deref()
+            .is_some_and(|e| e.contains("queue-item-not-found")),
+        "disconnect + stale Stop receipt must preserve queue edit error"
+    );
+
+    // Scenario C: Turn 3 delayed Stop -> Turn 4 cancel rejection -> Turn 3 Stop resolves / disconnects -> Turn 4 cancel rejection stays.
+    binding.clear_session_error("a");
+    {
+        let mut guard = endpoint.inner.lock().unwrap();
+        guard.running.insert("a".to_owned(), true);
+        guard.journal_entries.insert(
+            "a".to_owned(),
+            vec![
+                json!({"event": {"type": "user/message", "seq": 20, "time": 20, "data": {"text": "t5"}}}),
+                json!({"event": {"type": "turn/start", "seq": 21, "time": 21, "data": {"turn": 5}}}),
+            ],
+        );
+    }
+    let epoch4 = runtime.inspect(|s| s.connection_epoch);
+    endpoint.drop_connection();
+    rt.block_on(wait_store(&runtime, |s| {
+        s.connection != tekes_agent_session::ConnectionState::Ready
+    }));
+    endpoint.unblock_reconnect();
+    rt.block_on(wait_store(&runtime, |s| {
+        s.connection == tekes_agent_session::ConnectionState::Ready
+            && s.connection_epoch > epoch4
+            && s.sessions["a"].journal_ready
+    }));
+
+    endpoint.hold_cancel.store(true, Ordering::Release);
+    binding.cancel_scope(&RunScope::main("blocker-test", "a"));
+    rt.block_on(endpoint.cancel_gate_entered.notified());
+
+    let tx_a2 = endpoint.inner.lock().unwrap().journal_txs["a"].clone();
+    tx_a2
+        .send(Ok(json!({
+            "type": "event",
+            "generation": "g",
+            "sessionId": "a",
+            "entry": {"event": {"type": "turn/end", "seq": 22, "time": 22, "data": {"turn": 5, "reason": "aborted"}}}
+        })))
+        .unwrap();
+    tx_a2
+        .send(Ok(json!({
+            "type": "event",
+            "generation": "g",
+            "sessionId": "a",
+            "entry": {"event": {"type": "turn/start", "seq": 23, "time": 23, "data": {"turn": 6}}}
+        })))
+        .unwrap();
+    rt.block_on(wait_store(&runtime, |s| {
+        s.sessions["a"]
+            .entries
+            .values()
+            .any(|e| e.event.kind == "turn/start" && e.event.seq == 23)
+    }));
+
+    endpoint.inner.lock().unwrap().reject_cancel = true;
+    binding.cancel_scope(&RunScope::main("blocker-test", "a"));
+    for _ in 0..50 {
+        if binding.error_for_session(Some("a")).is_some() {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    assert!(
+        binding
+            .error_for_session(Some("a"))
+            .as_deref()
+            .is_some_and(|e| e.contains("cancel rejected"))
+    );
+
+    endpoint.cancel_release.notify_one();
+    std::thread::sleep(Duration::from_millis(40));
+    let rev_before = binding.ui_revision();
+    let read_a = binding.session_error("a");
+    let read_a2 = binding.error_for_session(Some("a"));
+    assert_eq!(read_a, read_a2);
+    assert!(
+        read_a
+            .as_deref()
+            .is_some_and(|e| e.contains("cancel rejected"))
+    );
+    assert_eq!(
+        binding.ui_revision(),
+        rev_before,
+        "read-only error getters must not bump ui_revision"
+    );
+    assert!(binding.error_for_session(Some("b")).is_some());
+
     rt.block_on(runtime.stop()).unwrap();
 }

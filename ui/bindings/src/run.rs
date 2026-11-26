@@ -104,13 +104,28 @@ impl SessionControlState {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-struct UncertainCancel {
+struct CancelTurnTarget {
     turn_start_seq: i64,
     turn_id: Option<Value>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
+struct UncertainCancel {
+    op_id: u64,
+    target: CancelTurnTarget,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum SessionErrorKind {
+    Cancel,
+    Other,
+}
+
+#[derive(Clone, Debug, PartialEq)]
 struct SessionErrorEntry {
+    seq: u64,
+    kind: SessionErrorKind,
+    cancel_target: Option<CancelTurnTarget>,
     message: String,
     uncertain_cancel: Option<UncertainCancel>,
 }
@@ -134,6 +149,7 @@ struct RunUiState {
     desired_history_session: Option<String>,
     history_lease: Option<SessionHistoryLease>,
     history_lease_generation: u64,
+    published_lease_generation: u64,
     history_acquire_attempted: Option<(u64, u64, String)>,
     dropped: bool,
     local_pins: BTreeSet<String>,
@@ -142,6 +158,8 @@ struct RunUiState {
     host_summary_sections: Vec<(String, Vec<(String, String)>)>,
     last_error: Option<String>,
     session_errors: BTreeMap<String, SessionErrorEntry>,
+    next_error_seq: u64,
+    next_cancel_op_id: u64,
     revision: u64,
 }
 
@@ -404,6 +422,7 @@ pub struct RunWorkbenchBinding {
     handle: Handle,
     wake: Arc<dyn UiWakeNotifier>,
     ui: Arc<Mutex<RunUiState>>,
+    selection_publish: Arc<Mutex<()>>,
     _watcher: tokio::task::JoinHandle<()>,
 }
 
@@ -458,6 +477,7 @@ impl RunWorkbenchBinding {
             desired_history_session: None,
             history_lease: None,
             history_lease_generation: 0,
+            published_lease_generation: 0,
             history_acquire_attempted: None,
             dropped: false,
             local_pins: BTreeSet::new(),
@@ -466,8 +486,11 @@ impl RunWorkbenchBinding {
             host_summary_sections: Vec::new(),
             last_error: None,
             session_errors: BTreeMap::new(),
+            next_error_seq: 0,
+            next_cancel_op_id: 0,
             revision: 1,
         }));
+        let selection_publish = Arc::new(Mutex::new(()));
         let mut run_rx = controller.subscribe();
         let mut store_rx = runtime.subscribe();
         let wake_clone = Arc::clone(&wake);
@@ -511,6 +534,7 @@ impl RunWorkbenchBinding {
             handle,
             wake,
             ui,
+            selection_publish,
             _watcher: watcher,
         })
     }
@@ -555,9 +579,6 @@ impl RunWorkbenchBinding {
     }
 
     pub fn session_error(&self, session_id: &str) -> Option<String> {
-        if reconcile_uncertain_cancels(&self.runtime, &self.ui) {
-            self.wake.wake();
-        }
         self.ui
             .lock()
             .expect("run ui lock")
@@ -569,9 +590,6 @@ impl RunWorkbenchBinding {
     /// Returns the active error to display for `session_id`: session-scoped failures
     /// first, falling back to endpoint-level failures (`last_error`).
     pub fn error_for_session(&self, session_id: Option<&str>) -> Option<String> {
-        if reconcile_uncertain_cancels(&self.runtime, &self.ui) {
-            self.wake.wake();
-        }
         let guard = self.ui.lock().expect("run ui lock");
         session_id
             .and_then(|sid| {
@@ -645,10 +663,8 @@ impl RunWorkbenchBinding {
     /// automatic history acquisition on reconnect.
     pub fn open_initial_session(&self, session_id: &str) -> Result<()> {
         let scope = RunScope::main(self.endpoint_id(), session_id);
-        let controller = Arc::clone(&self.controller);
+        scope.validate()?;
         let runtime = Arc::clone(&self.runtime);
-        let ui = Arc::clone(&self.ui);
-        let wake = Arc::clone(&self.wake);
         let sid = session_id.to_owned();
         let start_lease_gen = {
             let guard = self.ui.lock().expect("run ui lock");
@@ -657,31 +673,54 @@ impl RunWorkbenchBinding {
             }
             guard.history_lease_generation
         };
-        self.handle.block_on(async move {
-            let lease = runtime.acquire_history(&sid).await?;
-            let epoch = runtime.inspect(|s| s.connection_epoch);
-            let mut guard = ui.lock().expect("run ui lock");
+        let lease = self
+            .handle
+            .block_on(async move { runtime.acquire_history(&sid).await })?;
+        let epoch = self.runtime.inspect(|s| s.connection_epoch);
+        let pub_guard = self
+            .selection_publish
+            .lock()
+            .expect("selection publish lock");
+        let (lease_gen, prev_desired, prev_attempted, prev_lease) = {
+            let mut guard = self.ui.lock().expect("run ui lock");
             if guard.dropped || guard.history_lease_generation != start_lease_gen {
                 drop(guard);
+                drop(pub_guard);
                 drop(lease);
                 return Err(tekes_agent_contract::Error::Disconnected);
             }
-            if let Err(err) = controller.select(ComposerDestination::run(scope)) {
-                drop(guard);
-                drop(lease);
-                return Err(err);
-            }
+            let prev_desired = guard.desired_history_session.clone();
+            let prev_attempted = guard.history_acquire_attempted.clone();
             guard.history_lease_generation = guard.history_lease_generation.saturating_add(1);
             let lease_gen = guard.history_lease_generation;
-            guard.desired_history_session = Some(sid.clone());
-            guard.history_acquire_attempted = Some((lease_gen, epoch, sid));
+            guard.desired_history_session = Some(session_id.to_owned());
+            guard.history_acquire_attempted = Some((lease_gen, epoch, session_id.to_owned()));
             guard.revision = guard.revision.saturating_add(1);
-            let old_lease = guard.history_lease.replace(lease);
-            drop(guard);
-            drop(old_lease);
-            wake.wake();
-            Ok(())
-        })
+            let prev_lease = guard.history_lease.replace(lease);
+            (lease_gen, prev_desired, prev_attempted, prev_lease)
+        };
+        if let Err(err) = publish_latest_selection_locked(&pub_guard, &self.ui, &self.controller) {
+            let rolled_back_lease = {
+                let mut guard = self.ui.lock().expect("run ui lock");
+                if guard.history_lease_generation == lease_gen {
+                    guard.desired_history_session = prev_desired;
+                    guard.history_acquire_attempted = prev_attempted;
+                    let current = guard.history_lease.take();
+                    guard.history_lease = prev_lease;
+                    current
+                } else {
+                    prev_lease
+                }
+            };
+            drop(pub_guard);
+            drop(rolled_back_lease);
+            return Err(err);
+        }
+        drop(pub_guard);
+        drop(prev_lease);
+        reconcile_uncertain_cancels(&self.runtime, &self.ui);
+        self.wake.wake();
+        Ok(())
     }
 
     pub fn set_default_cwd(&self, cwd: impl Into<String>) {
@@ -793,8 +832,7 @@ impl RunWorkbenchBinding {
                 return;
             }
             let scope = RunScope::main(guard.endpoint_id.clone(), session_id);
-            let dest = ComposerDestination::run(scope);
-            if self.controller.select(dest).is_err() {
+            if scope.validate().is_err() {
                 return;
             }
             guard.history_lease_generation = guard.history_lease_generation.saturating_add(1);
@@ -813,6 +851,12 @@ impl RunWorkbenchBinding {
             (!same_lease, old_lease)
         };
         drop(old_lease);
+        let pub_guard = self
+            .selection_publish
+            .lock()
+            .expect("selection publish lock");
+        let _ = publish_latest_selection_locked(&pub_guard, &self.ui, &self.controller);
+        drop(pub_guard);
         if need_acquire {
             try_spawn_history_acquire(
                 &self.runtime,
@@ -839,11 +883,19 @@ impl RunWorkbenchBinding {
         let runtime = Arc::clone(&self.runtime);
         let controller = Arc::clone(&self.controller);
         let ui = Arc::clone(&self.ui);
+        let selection_publish = Arc::clone(&self.selection_publish);
         let wake = Arc::clone(&self.wake);
         let cwd = cwd.to_owned();
         self.handle.spawn(async move {
-            match create_session_async(runtime, controller, Arc::clone(&ui), Arc::clone(&wake), cwd)
-                .await
+            match create_session_async(
+                runtime,
+                controller,
+                Arc::clone(&ui),
+                selection_publish,
+                Arc::clone(&wake),
+                cwd,
+            )
+            .await
             {
                 Ok(_) => {
                     let mut guard = ui.lock().expect("run ui lock");
@@ -868,10 +920,17 @@ impl RunWorkbenchBinding {
         let runtime = Arc::clone(&self.runtime);
         let controller = Arc::clone(&self.controller);
         let ui = Arc::clone(&self.ui);
+        let selection_publish = Arc::clone(&self.selection_publish);
         let wake = Arc::clone(&self.wake);
         let cwd = cwd.to_owned();
-        self.handle
-            .block_on(create_session_async(runtime, controller, ui, wake, cwd))
+        self.handle.block_on(create_session_async(
+            runtime,
+            controller,
+            ui,
+            selection_publish,
+            wake,
+            cwd,
+        ))
     }
 
     pub fn set_draft_text(&self, destination: &ComposerDestination, text: String) {
@@ -951,6 +1010,10 @@ impl RunWorkbenchBinding {
             ComposerDestination::Run { scope } => Some(scope.session_id.clone()),
             _ => None,
         };
+        let start_error_seq = target_session
+            .as_deref()
+            .map(|sid| current_session_error_seq(&self.ui, sid))
+            .unwrap_or(0);
         let controller = Arc::clone(&self.controller);
         let ui = Arc::clone(&self.ui);
         let wake = Arc::clone(&self.wake);
@@ -958,7 +1021,7 @@ impl RunWorkbenchBinding {
             match controller.dispatch_with(ticket, None, &prep).await {
                 Ok(_) => {
                     if let Some(sid) = &target_session {
-                        record_session_error(&ui, sid, None);
+                        clear_session_error_if_not_newer(&ui, sid, start_error_seq);
                     } else {
                         let mut guard = ui.lock().expect("run ui lock");
                         guard.last_error = None;
@@ -1008,7 +1071,7 @@ impl RunWorkbenchBinding {
                 .values()
                 .rev()
                 .find_map(|entry| match entry.event.kind.as_str() {
-                    "turn/start" => Some(Some(UncertainCancel {
+                    "turn/start" => Some(Some(CancelTurnTarget {
                         turn_start_seq: entry.event.seq,
                         turn_id: entry
                             .event
@@ -1022,9 +1085,39 @@ impl RunWorkbenchBinding {
                 })
                 .flatten()
         });
+        let (op_id, start_error_seq) = {
+            let mut guard = self.ui.lock().expect("run ui lock");
+            guard.next_cancel_op_id = guard.next_cancel_op_id.saturating_add(1);
+            let op_id = guard.next_cancel_op_id;
+            let start_error_seq = guard
+                .session_errors
+                .get(&scope.session_id)
+                .map_or(0, |entry| entry.seq);
+            (op_id, start_error_seq)
+        };
         self.handle.spawn(async move {
             match controller.cancel_at_epoch(expected_epoch, &scope).await {
-                Ok(()) => record_session_error(&ui, &scope.session_id, None),
+                Ok(()) => {
+                    let mut guard = ui.lock().expect("run ui lock");
+                    let should_clear =
+                        guard
+                            .session_errors
+                            .get(&scope.session_id)
+                            .is_some_and(|entry| {
+                                entry
+                                    .uncertain_cancel
+                                    .as_ref()
+                                    .is_some_and(|uc| uc.op_id == op_id)
+                                    || (entry.seq <= start_error_seq
+                                        && entry.kind == SessionErrorKind::Cancel
+                                        && cancel_target.is_some()
+                                        && entry.cancel_target == cancel_target)
+                            });
+                    if should_clear {
+                        guard.session_errors.remove(&scope.session_id);
+                        guard.revision = guard.revision.saturating_add(1);
+                    }
+                }
                 Err(err) => {
                     let message = format!("Cancel failed: {err}");
                     let is_unconfirmed = matches!(
@@ -1033,35 +1126,47 @@ impl RunWorkbenchBinding {
                             | tekes_agent_contract::Error::Transport(_)
                             | tekes_agent_contract::Error::Timeout
                     );
-                    if is_unconfirmed && let Some(uc) = cancel_target {
-                        match runtime.inspect(|s| inspect_turn_terminal(s, &scope.session_id, &uc))
+                    if is_unconfirmed && let Some(target) = cancel_target.clone() {
+                        match runtime
+                            .inspect(|s| inspect_turn_terminal(s, &scope.session_id, &target))
                         {
                             TurnTerminal::ConfirmedAborted => {
-                                record_session_error(&ui, &scope.session_id, None);
+                                // Only resolve this operation if it had somehow inserted an uncertain entry;
+                                // never clear another operation's error.
                             }
                             TurnTerminal::ConfirmedOther => {
-                                record_session_error_entry(
+                                record_cancel_error_if_not_newer(
                                     &ui,
                                     &scope.session_id,
-                                    Some(SessionErrorEntry {
-                                        message,
-                                        uncertain_cancel: None,
-                                    }),
+                                    start_error_seq,
+                                    Some(target),
+                                    message,
+                                    None,
                                 );
                             }
                             TurnTerminal::Pending => {
-                                record_session_error_entry(
+                                let inserted_uncertain = record_cancel_error_if_not_newer(
                                     &ui,
                                     &scope.session_id,
-                                    Some(SessionErrorEntry {
-                                        message,
-                                        uncertain_cancel: Some(uc),
-                                    }),
+                                    start_error_seq,
+                                    Some(target.clone()),
+                                    message,
+                                    Some(UncertainCancel { op_id, target }),
                                 );
+                                if inserted_uncertain {
+                                    reconcile_uncertain_cancels(&runtime, &ui);
+                                }
                             }
                         }
                     } else {
-                        record_session_error(&ui, &scope.session_id, Some(message));
+                        record_cancel_error_if_not_newer(
+                            &ui,
+                            &scope.session_id,
+                            start_error_seq,
+                            cancel_target,
+                            message,
+                            None,
+                        );
                     }
                 }
             }
@@ -1604,6 +1709,7 @@ impl RunWorkbenchBinding {
             self.wake.wake();
             return Err(err);
         }
+        let start_error_seq = current_session_error_seq(&self.ui, session_id);
         let runtime = Arc::clone(&self.runtime);
         let runtime_check = Arc::clone(&self.runtime);
         let ui = Arc::clone(&self.ui);
@@ -1635,7 +1741,10 @@ impl RunWorkbenchBinding {
                 .await
                 .err()
                 .map(|err| err.to_string());
-            record_session_error(&ui, &sid, outcome);
+            match outcome {
+                Some(err) => record_session_error(&ui, &sid, Some(err)),
+                None => clear_session_error_if_not_newer(&ui, &sid, start_error_seq),
+            }
             wake.wake();
         });
         self.bump_ui();
@@ -1654,6 +1763,7 @@ impl RunWorkbenchBinding {
             self.wake.wake();
             return Err(err);
         }
+        let start_error_seq = current_session_error_seq(&self.ui, session_id);
         let runtime = Arc::clone(&self.runtime);
         let runtime_check = Arc::clone(&self.runtime);
         let sid = session_id.to_owned();
@@ -1682,11 +1792,10 @@ impl RunWorkbenchBinding {
                 )
                 .await
         });
-        record_session_error(
-            &self.ui,
-            session_id,
-            res.as_ref().err().map(ToString::to_string),
-        );
+        match &res {
+            Ok(_) => clear_session_error_if_not_newer(&self.ui, session_id, start_error_seq),
+            Err(err) => record_session_error(&self.ui, session_id, Some(err.to_string())),
+        }
         self.wake.wake();
         res.map(|_| ())
     }
@@ -1704,6 +1813,7 @@ impl RunWorkbenchBinding {
             self.wake.wake();
             return Err(err);
         }
+        let start_error_seq = current_session_error_seq(&self.ui, session_id);
         let runtime = Arc::clone(&self.runtime);
         let runtime_check = Arc::clone(&self.runtime);
         let ui = Arc::clone(&self.ui);
@@ -1738,7 +1848,10 @@ impl RunWorkbenchBinding {
                 .await
                 .err()
                 .map(|err| err.to_string());
-            record_session_error(&ui, &sid, outcome);
+            match outcome {
+                Some(err) => record_session_error(&ui, &sid, Some(err)),
+                None => clear_session_error_if_not_newer(&ui, &sid, start_error_seq),
+            }
             wake.wake();
         });
         self.bump_ui();
@@ -1758,6 +1871,7 @@ impl RunWorkbenchBinding {
             self.wake.wake();
             return Err(err);
         }
+        let start_error_seq = current_session_error_seq(&self.ui, session_id);
         let runtime = Arc::clone(&self.runtime);
         let runtime_check = Arc::clone(&self.runtime);
         let sid = session_id.to_owned();
@@ -1789,36 +1903,69 @@ impl RunWorkbenchBinding {
                 )
                 .await
         });
-        record_session_error(
-            &self.ui,
-            session_id,
-            res.as_ref().err().map(ToString::to_string),
-        );
+        match &res {
+            Ok(_) => clear_session_error_if_not_newer(&self.ui, session_id, start_error_seq),
+            Err(err) => record_session_error(&self.ui, session_id, Some(err.to_string())),
+        }
         self.wake.wake();
         res.map(|_| ())
     }
 }
 
-fn record_session_error(ui: &Mutex<RunUiState>, session_id: &str, error: Option<String>) {
-    record_session_error_entry(
-        ui,
-        session_id,
-        error.map(|message| SessionErrorEntry {
-            message,
-            uncertain_cancel: None,
-        }),
-    );
+fn publish_latest_selection_locked(
+    _pub_guard: &std::sync::MutexGuard<'_, ()>,
+    ui: &Mutex<RunUiState>,
+    controller: &RunController,
+) -> Result<()> {
+    loop {
+        let (target_gen, dest) = {
+            let guard = ui.lock().expect("run ui lock");
+            if guard.dropped {
+                return Err(tekes_agent_contract::Error::Disconnected);
+            }
+            if guard.published_lease_generation == guard.history_lease_generation {
+                return Ok(());
+            }
+            let dest = guard.desired_history_session.as_ref().map(|sid| {
+                ComposerDestination::run(RunScope::main(guard.endpoint_id.clone(), sid))
+            });
+            (guard.history_lease_generation, dest)
+        };
+        if let Some(dest) = dest {
+            controller.select(dest)?;
+        }
+        let mut guard = ui.lock().expect("run ui lock");
+        guard.published_lease_generation = guard.published_lease_generation.max(target_gen);
+        if guard.dropped || guard.history_lease_generation == target_gen {
+            return Ok(());
+        }
+    }
 }
 
-fn record_session_error_entry(
-    ui: &Mutex<RunUiState>,
-    session_id: &str,
-    entry: Option<SessionErrorEntry>,
-) {
+fn current_session_error_seq(ui: &Mutex<RunUiState>, session_id: &str) -> u64 {
+    ui.lock()
+        .expect("run ui lock")
+        .session_errors
+        .get(session_id)
+        .map_or(0, |entry| entry.seq)
+}
+
+fn record_session_error(ui: &Mutex<RunUiState>, session_id: &str, error: Option<String>) {
     let mut guard = ui.lock().expect("run ui lock");
-    match entry {
-        Some(entry) => {
-            guard.session_errors.insert(session_id.to_owned(), entry);
+    match error {
+        Some(message) => {
+            guard.next_error_seq = guard.next_error_seq.saturating_add(1);
+            let seq = guard.next_error_seq;
+            guard.session_errors.insert(
+                session_id.to_owned(),
+                SessionErrorEntry {
+                    seq,
+                    kind: SessionErrorKind::Other,
+                    cancel_target: None,
+                    message,
+                    uncertain_cancel: None,
+                },
+            );
         }
         None => {
             guard.session_errors.remove(session_id);
@@ -1827,10 +1974,59 @@ fn record_session_error_entry(
     guard.revision = guard.revision.saturating_add(1);
 }
 
+fn clear_session_error_if_not_newer(
+    ui: &Mutex<RunUiState>,
+    session_id: &str,
+    start_error_seq: u64,
+) {
+    let mut guard = ui.lock().expect("run ui lock");
+    let can_clear = guard
+        .session_errors
+        .get(session_id)
+        .is_some_and(|entry| entry.seq <= start_error_seq);
+    if can_clear {
+        guard.session_errors.remove(session_id);
+        guard.revision = guard.revision.saturating_add(1);
+    }
+}
+
+fn record_cancel_error_if_not_newer(
+    ui: &Mutex<RunUiState>,
+    session_id: &str,
+    start_error_seq: u64,
+    cancel_target: Option<CancelTurnTarget>,
+    message: String,
+    uncertain_cancel: Option<UncertainCancel>,
+) -> bool {
+    let mut guard = ui.lock().expect("run ui lock");
+    if guard
+        .session_errors
+        .get(session_id)
+        .is_some_and(|entry| entry.seq > start_error_seq)
+    {
+        return false;
+    }
+    guard.next_error_seq = guard.next_error_seq.saturating_add(1);
+    let seq = guard.next_error_seq;
+    let has_uncertain = uncertain_cancel.is_some();
+    guard.session_errors.insert(
+        session_id.to_owned(),
+        SessionErrorEntry {
+            seq,
+            kind: SessionErrorKind::Cancel,
+            cancel_target,
+            message,
+            uncertain_cancel,
+        },
+    );
+    guard.revision = guard.revision.saturating_add(1);
+    has_uncertain
+}
+
 fn inspect_turn_terminal(
     store: &tekes_agent_session::MemoryProjectionStore,
     session_id: &str,
-    uc: &UncertainCancel,
+    target: &CancelTurnTarget,
 ) -> TurnTerminal {
     if store.connection != ConnectionState::Ready {
         return TurnTerminal::Pending;
@@ -1841,10 +2037,10 @@ fn inspect_turn_terminal(
     if !session.journal_ready || session.journal_error.is_some() {
         return TurnTerminal::Pending;
     }
-    for (_, entry) in session.entries.range((uc.turn_start_seq + 1)..) {
+    for (_, entry) in session.entries.range((target.turn_start_seq + 1)..) {
         match entry.event.kind.as_str() {
             "turn/end" => {
-                if let Some(expected_turn) = &uc.turn_id
+                if let Some(expected_turn) = &target.turn_id
                     && entry.event.data.get("turn") != Some(expected_turn)
                 {
                     return TurnTerminal::ConfirmedOther;
@@ -1886,7 +2082,7 @@ fn reconcile_uncertain_cancels(runtime: &SessionRuntime, ui: &Mutex<RunUiState>)
         pending
             .into_iter()
             .map(|(sid, uc)| {
-                let terminal = inspect_turn_terminal(store, &sid, &uc);
+                let terminal = inspect_turn_terminal(store, &sid, &uc.target);
                 (sid, uc, terminal)
             })
             .collect()
@@ -1975,6 +2171,7 @@ fn try_spawn_history_acquire(
                 }
             };
             drop(displaced);
+            reconcile_uncertain_cancels(&runtime, &ui);
             if installed {
                 refresh_controls_async(runtime, controller, ui, Arc::clone(&wake), Some(sid)).await;
             }
@@ -2149,6 +2346,7 @@ async fn create_session_async(
     runtime: Arc<SessionRuntime>,
     controller: Arc<RunController>,
     ui: Arc<Mutex<RunUiState>>,
+    selection_publish: Arc<Mutex<()>>,
     wake: Arc<dyn UiWakeNotifier>,
     cwd: String,
 ) -> Result<String> {
@@ -2225,14 +2423,13 @@ async fn create_session_async(
             )
             .await;
     }
-    let scope = RunScope::main(endpoint_id, session_id.clone());
     let epoch = runtime.inspect(|s| s.connection_epoch);
     let (lease_gen, old_lease) = {
         let mut guard = ui.lock().expect("run ui lock");
         if guard.dropped {
             return Err(tekes_agent_contract::Error::Disconnected);
         }
-        let _ = controller.select(ComposerDestination::run(scope));
+        RunScope::main(endpoint_id, session_id.clone()).validate()?;
         guard.history_lease_generation = guard.history_lease_generation.saturating_add(1);
         let lease_gen = guard.history_lease_generation;
         guard.desired_history_session = Some(session_id.clone());
@@ -2250,6 +2447,10 @@ async fn create_session_async(
         (lease_gen, old)
     };
     drop(old_lease);
+    {
+        let pub_guard = selection_publish.lock().expect("selection publish lock");
+        let _ = publish_latest_selection_locked(&pub_guard, &ui, &controller);
+    }
     if let Ok(lease) = runtime.acquire_history(&session_id).await {
         let displaced = {
             let mut guard = ui.lock().expect("run ui lock");
