@@ -272,6 +272,9 @@ fn blocker1_pointer_stop_after_rendered_turn_never_clears_geometry_and_cancels_a
 struct ErrorScopeEndpoint {
     inner: Arc<Mutex<ErrorScopeState>>,
     cancel_gate_a: Arc<Notify>,
+    cancel_gate_entered: Arc<Notify>,
+    cancel_ok_entered: Arc<Notify>,
+    cancel_ok_release: Arc<Notify>,
 }
 
 struct ErrorScopeState {
@@ -283,6 +286,7 @@ struct ErrorScopeState {
     transport_error_cancel_a: bool,
     reject_cancel_b: bool,
     gate_cancel_a: bool,
+    gate_ok_a: bool,
     fail_create: bool,
 }
 
@@ -300,9 +304,13 @@ impl ErrorScopeEndpoint {
                 transport_error_cancel_a: false,
                 reject_cancel_b: false,
                 gate_cancel_a: false,
+                gate_ok_a: false,
                 fail_create: false,
             })),
             cancel_gate_a: Arc::new(Notify::new()),
+            cancel_gate_entered: Arc::new(Notify::new()),
+            cancel_ok_entered: Arc::new(Notify::new()),
+            cancel_ok_release: Arc::new(Notify::new()),
         }
     }
 
@@ -445,17 +453,28 @@ impl SessionEndpoint for ErrorScopeSessionEndpoint {
         match method {
             "session.cancel" => {
                 let sid = payload["sessionId"].as_str().unwrap_or("");
-                let (gate, reject, transport_err) = {
+                let (gate, gate_ok, reject, transport_err) = {
                     let guard = self.source.inner.lock().unwrap();
                     (
                         sid == "a" && guard.gate_cancel_a,
+                        sid == "a" && guard.gate_ok_a,
                         (sid == "a" && guard.reject_cancel_a)
                             || (sid == "b" && guard.reject_cancel_b),
                         sid == "a" && guard.transport_error_cancel_a,
                     )
                 };
                 if gate {
-                    self.source.cancel_gate_a.notified().await;
+                    let release = self.source.cancel_gate_a.notified();
+                    tokio::pin!(release);
+                    release.as_mut().enable();
+                    self.source.cancel_gate_entered.notify_one();
+                    release.await;
+                } else if gate_ok {
+                    let release = self.source.cancel_ok_release.notified();
+                    tokio::pin!(release);
+                    release.as_mut().enable();
+                    self.source.cancel_ok_entered.notify_one();
+                    release.await;
                 }
                 if transport_err {
                     return Err(Error::Transport("receipt dropped".into()));
@@ -1057,11 +1076,12 @@ fn overlapping_same_turn_stop_late_rejection_does_not_resurrect_error_in_transcr
         guard.reject_cancel_a = true;
     }
     binding.cancel_scope_at_epoch(epoch, &scope_a);
-    std::thread::sleep(Duration::from_millis(20));
+    rt.block_on(endpoint.cancel_gate_entered.notified());
 
     {
         let mut guard = endpoint.inner.lock().unwrap();
         guard.gate_cancel_a = false;
+        guard.gate_ok_a = true;
         guard.reject_cancel_a = false;
         guard.running_a = false;
         guard.journal_entries_a = vec![
@@ -1071,6 +1091,9 @@ fn overlapping_same_turn_stop_late_rejection_does_not_resurrect_error_in_transcr
         ];
     }
     binding.cancel_scope_at_epoch(epoch, &scope_a);
+    rt.block_on(endpoint.cancel_ok_entered.notified());
+    endpoint.inner.lock().unwrap().gate_ok_a = false;
+    endpoint.cancel_ok_release.notify_one();
     tx_a.send(Ok(json!({
         "type": "event",
         "generation": "g",
@@ -1083,8 +1106,8 @@ fn overlapping_same_turn_stop_late_rejection_does_not_resurrect_error_in_transcr
     let before_release = inspect_rendered_errors(&workbench, &mut surfaces);
     assert_eq!(before_release, ((false, None), Some(String::new())));
 
-    endpoint.cancel_gate_a.notify_waiters();
-    std::thread::sleep(Duration::from_millis(40));
+    endpoint.cancel_gate_a.notify_one();
+    std::thread::sleep(Duration::from_millis(30));
     let after_late_release = inspect_rendered_errors(&workbench, &mut surfaces);
     assert_eq!(after_late_release, ((false, None), Some(String::new())));
 
@@ -1143,6 +1166,101 @@ fn overlapping_same_turn_stop_late_rejection_does_not_resurrect_error_in_transcr
     }
     let after_ordered = inspect_rendered_errors(&workbench, &mut surfaces);
     assert_eq!(after_ordered, ((false, None), Some(String::new())));
+
+    // 3. Adjacent ("between") permutation on Turn 3: Click 1 (parked) -> Click 2 (parked) -> Recv 1 rejects -> Recv 2 succeeds -> both panels clear & B -> A stays clean.
+    endpoint.inner.lock().unwrap().running_a = false;
+    endpoint.inner.lock().unwrap().journal_entries_a.push(
+        json!({"event": {"type": "turn/end", "seq": 4, "time": 5, "data": {"turn": 2, "reason": "aborted"}}}),
+    );
+    tx_a2
+        .send(Ok(json!({
+            "type": "event",
+            "generation": "g",
+            "sessionId": "a",
+            "entry": {"event": {"type": "turn/end", "seq": 4, "time": 5, "data": {"turn": 2, "reason": "aborted"}}}
+        })))
+        .unwrap();
+    rt.block_on(wait_store(&runtime, |s| !s.sessions["a"].run_open));
+    endpoint.inner.lock().unwrap().running_a = true;
+    endpoint
+        .inner
+        .lock()
+        .unwrap()
+        .journal_entries_a
+        .push(json!({"event": {"type": "turn/start", "seq": 5, "time": 6, "data": {"turn": 3}}}));
+    tx_a2
+        .send(Ok(json!({
+            "type": "event",
+            "generation": "g",
+            "sessionId": "a",
+            "entry": {"event": {"type": "turn/start", "seq": 5, "time": 6, "data": {"turn": 3}}}
+        })))
+        .unwrap();
+    rt.block_on(wait_store(&runtime, |s| s.sessions["a"].run_open));
+
+    {
+        let mut guard = endpoint.inner.lock().unwrap();
+        guard.gate_cancel_a = true;
+        guard.reject_cancel_a = true;
+    }
+    binding.cancel_scope_at_epoch(epoch, &scope_a);
+    rt.block_on(endpoint.cancel_gate_entered.notified());
+
+    {
+        let mut guard = endpoint.inner.lock().unwrap();
+        guard.gate_cancel_a = false;
+        guard.gate_ok_a = true;
+        guard.reject_cancel_a = false;
+    }
+    binding.cancel_scope_at_epoch(epoch, &scope_a);
+    rt.block_on(endpoint.cancel_ok_entered.notified());
+
+    endpoint.cancel_gate_a.notify_one();
+    for _ in 0..200 {
+        if binding.error_for_session(Some("a")).is_some() {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    let ((has_panel_bt1, tr_bt1), tq_bt1) = inspect_rendered_errors(&workbench, &mut surfaces);
+    assert!(has_panel_bt1);
+    assert!(tr_bt1.is_some_and(|t| t.contains("cancel rejected (a)")));
+    assert!(tq_bt1.is_some_and(|t| t.contains("cancel rejected (a)")));
+
+    endpoint.cancel_ok_release.notify_one();
+    for _ in 0..200 {
+        if binding.error_for_session(Some("a")).is_none() {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    endpoint.inner.lock().unwrap().running_a = false;
+    endpoint.inner.lock().unwrap().journal_entries_a.push(
+        json!({"event": {"type": "turn/end", "seq": 6, "time": 7, "data": {"turn": 3, "reason": "aborted"}}}),
+    );
+    tx_a2
+        .send(Ok(json!({
+            "type": "event",
+            "generation": "g",
+            "sessionId": "a",
+            "entry": {"event": {"type": "turn/end", "seq": 6, "time": 7, "data": {"turn": 3, "reason": "aborted"}}}
+        })))
+        .unwrap();
+    rt.block_on(wait_store(&runtime, |s| !s.sessions["a"].run_open));
+    let after_between = inspect_rendered_errors(&workbench, &mut surfaces);
+    assert_eq!(after_between, ((false, None), Some(String::new())));
+
+    binding.select_session("b");
+    rt.block_on(wait_store(&runtime, |s| s.sessions["b"].journal_ready));
+    let ((has_panel_b2, tr_b2), tq_b2) = inspect_rendered_errors(&workbench, &mut surfaces);
+    assert!(has_panel_b2);
+    assert!(tr_b2.is_some_and(|t| t.contains("Cancel failed")));
+    assert!(tq_b2.is_some_and(|t| t.contains("Cancel failed")));
+
+    binding.select_session("a");
+    rt.block_on(wait_store(&runtime, |s| s.sessions["a"].journal_ready));
+    let after_b_to_a = inspect_rendered_errors(&workbench, &mut surfaces);
+    assert_eq!(after_b_to_a, ((false, None), Some(String::new())));
 
     rt.block_on(runtime.stop()).unwrap();
 }

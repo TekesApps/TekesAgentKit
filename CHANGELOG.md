@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.8 — 2026-11-27
+
+- Record the originating `cancel_op_id` on `SessionErrorEntry` and unify `clear_superseded_cancel_error` and `record_cancel_error_if_not_newer` under `is_older_same_turn_cancel` so same-turn Stop outcomes are ordered by initiating operation ID across all arrival orders—including when two overlapping Stops are dispatched, the earlier rejection arrives first, and the newer Stop confirms `Ok(())` or `ConfirmedAborted` afterward (#34).
+- Replace `Abortable` + `SelectAll` for session journal streams in `SessionRuntime` with `JournalStreams` so `Command::Close` (including cancelled `open_initial_session` rollback) synchronously drops the underlying `FrameStream` before replying `Ok(())`, closing idle/stale peer streams deterministically alongside lease and reconnect-intent revocation (#40).
+- Harden `ui/bindings` and `ui/apphost` `native_blockers` Stop tests with observable wake synchronization and full `between` / `overlap` / `ordered` coverage.
+
 ## 0.6.7 — 2026-11-26
 
 - Track per-session in-flight cancel operations (`SessionCancelTracking` / `CancelOpGuard`) in `RunUiState` so a newer confirmed same-turn Stop (`Ok(())`, `TurnTerminal::ConfirmedAborted`, or deferred `reconcile_uncertain_cancels`) supersedes any still-in-flight earlier failure for the same `(session, turn)`, even when the error slot was empty when the newer confirmation landed (#34).

@@ -10,6 +10,7 @@ use std::{
         Arc, RwLock,
         atomic::{AtomicU64, Ordering},
     },
+    task::{Context, Poll},
     time::Duration,
 };
 use tekes_agent_contract::*;
@@ -669,6 +670,94 @@ fn inventory_reader(
     let frames = futures_util::stream::Abortable::new(frames, registration);
     (handle, tagged(name.into(), epoch, Box::pin(frames)))
 }
+
+#[derive(Default)]
+struct JournalStreams {
+    entries: Vec<(String, u64, FrameStream)>,
+    cursor: usize,
+}
+
+impl JournalStreams {
+    fn insert(&mut self, id: String, epoch: u64, frames: FrameStream) {
+        if let Some(entry) = self.entries.iter_mut().find(|(sid, _, _)| sid == &id) {
+            entry.1 = epoch;
+            entry.2 = frames;
+        } else {
+            self.entries.push((id, epoch, frames));
+        }
+    }
+
+    /// Remove and synchronously drop the underlying `FrameStream` so peer cleanup hooks
+    /// (such as `LogicalStream::drop` enqueuing mux close) happen before `Command::Close`
+    /// replies `Ok(())`.
+    fn remove(&mut self, id: &str) {
+        self.entries.retain(|(sid, _, _)| sid != id);
+    }
+
+    fn poll_next_item(
+        &mut self,
+        cx: &mut Context<'_>,
+    ) -> Poll<Option<(String, u64, Result<Value>)>> {
+        let len = self.entries.len();
+        if len == 0 {
+            return Poll::Pending;
+        }
+        let start = self.cursor % len;
+        for offset in 0..len {
+            let idx = (start + offset) % len;
+            match self.entries[idx].2.poll_next_unpin(cx) {
+                Poll::Ready(Some(frame)) => {
+                    let id = &self.entries[idx].0;
+                    let epoch = self.entries[idx].1;
+                    self.cursor = idx.wrapping_add(1);
+                    return Poll::Ready(Some((format!("journal:{id}"), epoch, frame)));
+                }
+                Poll::Ready(None) => {
+                    let (id, epoch, _) = self.entries.swap_remove(idx);
+                    self.cursor = idx;
+                    return Poll::Ready(Some((
+                        format!("journal:{id}"),
+                        epoch,
+                        Err(Error::Disconnected),
+                    )));
+                }
+                Poll::Pending => {}
+            }
+        }
+        self.cursor = self.cursor.wrapping_add(1);
+        Poll::Pending
+    }
+}
+
+async fn next_tagged_frame(
+    streams: &mut SelectAll<TaggedStream>,
+    journals: &mut JournalStreams,
+    prefer_journals: bool,
+) -> Option<(String, u64, Result<Value>)> {
+    std::future::poll_fn(|cx| {
+        if prefer_journals {
+            if let Poll::Ready(item) = journals.poll_next_item(cx) {
+                return Poll::Ready(item);
+            }
+            match streams.poll_next_unpin(cx) {
+                Poll::Ready(Some(item)) => Poll::Ready(Some(item)),
+                Poll::Ready(None) if journals.entries.is_empty() => Poll::Ready(None),
+                Poll::Ready(None) | Poll::Pending => Poll::Pending,
+            }
+        } else {
+            match streams.poll_next_unpin(cx) {
+                Poll::Ready(Some(item)) => Poll::Ready(Some(item)),
+                Poll::Ready(None) => match journals.poll_next_item(cx) {
+                    Poll::Ready(item) => Poll::Ready(item),
+                    Poll::Pending if journals.entries.is_empty() => Poll::Ready(None),
+                    Poll::Pending => Poll::Pending,
+                },
+                Poll::Pending => journals.poll_next_item(cx),
+            }
+        }
+    })
+    .await
+}
 /// Revision notifications carry no history payload; reads hold only a short synchronous lock.
 struct RevisionedProjection {
     state: MemoryProjectionStore,
@@ -925,7 +1014,7 @@ async fn connected(
         streams.push(stream);
     }
     let mut journal_epochs = std::collections::BTreeMap::new();
-    let mut journal_cancellations = std::collections::BTreeMap::new();
+    let mut journals = JournalStreams::default();
     let mut permanent_journal_errors = BTreeSet::<String>::new();
     let mut next_journal_epoch = epoch * 1_000_000;
     let mut failed_deferred_closes = Vec::new();
@@ -934,14 +1023,13 @@ async fn connected(
         match add_journal(
             endpoint.as_ref(),
             store,
-            &mut streams,
+            &mut journals,
             id,
             next_journal_epoch,
         )
         .await
         {
-            Ok(cancellation) => {
-                journal_cancellations.insert(id.clone(), cancellation);
+            Ok(()) => {
                 journal_epochs.insert(id.clone(), next_journal_epoch);
             }
             Err(error) => {
@@ -965,6 +1053,7 @@ async fn connected(
         wanted.remove(&id);
     }
     let mut journal_retries = std::collections::BTreeMap::<String, usize>::new();
+    let mut prefer_journals = false;
     let mut baselines_ready = false;
     let baseline_deadline = tokio::time::sleep(Duration::from_secs(30));
     tokio::pin!(baseline_deadline);
@@ -988,11 +1077,10 @@ async fn connected(
             deferred_closes.remove(&id);
             wanted.remove(&id);
             journal_epochs.remove(&id);
-            if let Some(cancellation) = journal_cancellations.remove(&id) {
-                cancellation.abort();
-            }
+            journals.remove(&id);
             store.update(|s| s.reset_journal(&id));
         }
+        prefer_journals = !prefer_journals;
         tokio::select! {
             completed = earlier_reads.join_next(), if !earlier_reads.is_empty() => {
                 let fetched = match completed {
@@ -1071,15 +1159,15 @@ async fn connected(
                     if result.is_ok() && let Some(id) = &removed { deferred_closes.remove(id); }
                     if result.is_err() && let Some(id)=removed {
                         next_journal_epoch+=1;
-                        if let Ok(cancellation)=add_journal(endpoint.as_ref(),store,&mut streams,&id,next_journal_epoch).await {
-                            wanted.insert(id.clone());journal_epochs.insert(id.clone(),next_journal_epoch);journal_cancellations.insert(id,cancellation);
+                        if add_journal(endpoint.as_ref(),store,&mut journals,&id,next_journal_epoch).await.is_ok() {
+                            wanted.insert(id.clone());journal_epochs.insert(id,next_journal_epoch);
                         }
                     }
                     let _=reply.send(result);
                 }
             },
             _ = &mut baseline_deadline, if !baselines_ready => return Err(Error::Timeout),
-            frame = streams.next() => {
+            frame = next_tagged_frame(&mut streams, &mut journals, prefer_journals) => {
                 let Some((name, frame_epoch, frame)) = frame else { return Err(Error::Disconnected); };
                 if let Some(id) = name.strip_prefix("journal:") {
                     if journal_epochs.get(id) != Some(&frame_epoch) { continue; }
@@ -1103,15 +1191,14 @@ async fn connected(
                         let retryable = !matches!(&error, Error::Remote(_));
                         if retryable && *attempts < 5 {
                             *attempts += 1;
-                            if let Some(cancellation) = journal_cancellations.remove(id) { cancellation.abort(); }
+                            journals.remove(id);
                             store.update(|s| {
                                 s.reset_journal(id);
                                 if let Some(session) = s.sessions.get_mut(id) { session.journal_error = Some(error.to_string()); }
                             });
                             next_journal_epoch += 1;
-                            match add_journal(endpoint.as_ref(), store, &mut streams, id, next_journal_epoch).await {
-                                Ok(cancellation) => {
-                                    journal_cancellations.insert(id.to_owned(), cancellation);
+                            match add_journal(endpoint.as_ref(), store, &mut journals, id, next_journal_epoch).await {
+                                Ok(()) => {
                                     journal_epochs.insert(id.to_owned(), next_journal_epoch);
                                     continue;
                                 }
@@ -1138,7 +1225,7 @@ async fn connected(
                                 return Err(error);
                             }
                         }
-                        if let Some(cancellation) = journal_cancellations.remove(id) { cancellation.abort(); }
+                        journals.remove(id);
                         journal_epochs.remove(id);
                         continue;
                     }
@@ -1192,8 +1279,8 @@ async fn connected(
                         if !store.read(MemoryProjectionStore::ready) { let _ = reply.send(Err(Error::Disconnected)); continue; }
                         let result = if let std::collections::btree_map::Entry::Vacant(entry) = journal_epochs.entry(id.clone()) {
                             next_journal_epoch += 1;
-                            match add_journal(endpoint.as_ref(), store, &mut streams, &id, next_journal_epoch).await {
-                                Ok(cancellation) => { store.update(|s| {s.reset_journal(&id); if let Some(session)=s.sessions.get_mut(&id) {session.journal_error=None;}}); wanted.insert(id.clone()); journal_cancellations.insert(id.clone(), cancellation); entry.insert(next_journal_epoch); Ok(()) }
+                            match add_journal(endpoint.as_ref(), store, &mut journals, &id, next_journal_epoch).await {
+                                Ok(()) => { store.update(|s| {s.reset_journal(&id); if let Some(session)=s.sessions.get_mut(&id) {session.journal_error=None;}}); wanted.insert(id.clone()); entry.insert(next_journal_epoch); Ok(()) }
                                 Err(e) => Err(e),
                             }
                         } else { Ok(()) };
@@ -1213,8 +1300,10 @@ async fn connected(
                             continue;
                         }
                         deferred_closes.remove(&id);
-                        wanted.remove(&id); journal_epochs.remove(&id); store.update(|s| s.reset_journal(&id));
-                        if let Some(cancellation) = journal_cancellations.remove(&id) { cancellation.abort(); }
+                        wanted.remove(&id);
+                        journal_epochs.remove(&id);
+                        journals.remove(&id);
+                        store.update(|s| s.reset_journal(&id));
                         let _ = reply.send(Ok(()));
                     }
                     Command::Observe(id,path,reply)=>{
@@ -1269,7 +1358,8 @@ async fn connected(
                         let removed=if matches!(method.as_str(),"session.discard"|"session.archive") {
                             let id=payload["sessionId"].as_str().unwrap_or("").to_owned();
                             if wanted.remove(&id) {
-                                journal_epochs.remove(&id);if let Some(cancellation)=journal_cancellations.remove(&id) {cancellation.abort();}
+                                journal_epochs.remove(&id);
+                                journals.remove(&id);
                                 store.update(|s|s.reset_journal(&id));Some(id)
                             } else {None}
                         } else {None};
@@ -1323,10 +1413,10 @@ fn record_session_read_error(store: &SharedProjection, id: &str, error: &Error) 
 async fn add_journal(
     endpoint: &dyn SessionEndpoint,
     store: &SharedProjection,
-    streams: &mut SelectAll<TaggedStream>,
+    journals: &mut JournalStreams,
     id: &str,
     epoch: u64,
-) -> Result<futures_util::future::AbortHandle> {
+) -> Result<()> {
     let address = JournalAddress {
         session_id: id.into(),
     };
@@ -1359,10 +1449,8 @@ async fn add_journal(
         },
     };
     let frames = endpoint.follow(target).await?;
-    let (handle, registration) = futures_util::future::AbortHandle::new_pair();
-    let frames = futures_util::stream::Abortable::new(frames, registration);
-    streams.push(tagged(format!("journal:{id}"), epoch, Box::pin(frames)));
-    Ok(handle)
+    journals.insert(id.to_owned(), epoch, frames);
+    Ok(())
 }
 fn history_request(
     store: &SharedProjection,

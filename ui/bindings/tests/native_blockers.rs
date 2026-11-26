@@ -347,20 +347,26 @@ impl SessionEndpoint for TestSessionEndpoint {
             }
             "session.cancel" => {
                 if self.source.park_reject_cancel.swap(false, Ordering::AcqRel) {
-                    self.source.park_reject_entered.notify_waiters();
-                    self.source.park_reject_release.notified().await;
+                    let release = self.source.park_reject_release.notified();
+                    tokio::pin!(release);
+                    release.as_mut().enable();
+                    self.source.park_reject_entered.notify_one();
+                    release.await;
                     return Err(Error::Remote("cancel rejected".into()));
                 }
                 if self.source.hold_cancel.swap(false, Ordering::AcqRel) {
-                    self.source.cancel_gate_entered.notify_waiters();
-                    self.source.cancel_release.notified().await;
+                    let release = self.source.cancel_release.notified();
+                    tokio::pin!(release);
+                    release.as_mut().enable();
+                    self.source.cancel_gate_entered.notify_one();
+                    release.await;
                 }
                 if self
                     .source
                     .cancel_disconnect_before_reply
                     .swap(false, Ordering::AcqRel)
                 {
-                    self.source.cancel_entered.notify_waiters();
+                    self.source.cancel_entered.notify_one();
                     self.source.drop_connection();
                     return Err(Error::Disconnected);
                 }
@@ -421,6 +427,77 @@ fn setup_binding(
         wake,
     );
     (rt, runtime, binding)
+}
+
+#[derive(Default)]
+struct CountingWake {
+    count: AtomicUsize,
+}
+
+impl CountingWake {
+    fn count(&self) -> usize {
+        self.count.load(Ordering::Acquire)
+    }
+
+    fn wait_at_least(&self, target: usize) {
+        let deadline = std::time::Instant::now() + Duration::from_secs(2);
+        while self.count() < target {
+            assert!(
+                std::time::Instant::now() < deadline,
+                "timed out waiting for wake count {target}, got {}",
+                self.count()
+            );
+            std::thread::sleep(Duration::from_millis(10));
+        }
+    }
+}
+
+impl UiWakeNotifier for CountingWake {
+    fn wake(&self) {
+        self.count.fetch_add(1, Ordering::AcqRel);
+    }
+}
+
+fn wait_until(name: &str, pred: impl Fn() -> bool) {
+    let deadline = std::time::Instant::now() + Duration::from_secs(2);
+    while !pred() {
+        assert!(
+            std::time::Instant::now() < deadline,
+            "timed out waiting for {name}"
+        );
+        std::thread::sleep(Duration::from_millis(10));
+    }
+}
+
+fn setup_binding_with_wake(
+    endpoint: &BlockerTestEndpoint,
+) -> (
+    tokio::runtime::Runtime,
+    Arc<SessionRuntime>,
+    Arc<RunWorkbenchBinding>,
+    Arc<CountingWake>,
+) {
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    let handle = rt.handle().clone();
+    let runtime = rt.block_on(async {
+        let runtime = Arc::new(SessionRuntime::spawn(
+            "blocker-test",
+            Arc::new(endpoint.clone()),
+        ));
+        runtime.wait_ready(Duration::from_secs(2)).await.unwrap();
+        runtime
+    });
+    let controller =
+        rt.block_on(async { Arc::new(RunController::new(Arc::clone(&runtime)).unwrap()) });
+    let wake = Arc::new(CountingWake::default());
+    let binding = RunWorkbenchBinding::new(
+        "blocker-test",
+        Arc::clone(&runtime),
+        controller,
+        handle,
+        wake.clone(),
+    );
+    (rt, runtime, binding, wake)
 }
 
 async fn wait_store(runtime: &SessionRuntime, pred: impl Fn(&MemoryProjectionStore) -> bool) {
@@ -2218,16 +2295,13 @@ fn overlapping_same_turn_stop_late_rejection_is_superseded_while_later_turns_and
             ],
         );
     }
-    let (rt, runtime, binding) = setup_binding(&endpoint);
+    let (rt, runtime, binding, wake) = setup_binding_with_wake(&endpoint);
     binding.open_initial_session("b").unwrap();
     endpoint.inner.lock().unwrap().reject_cancel = true;
     binding.cancel_scope(&RunScope::main("blocker-test", "b"));
-    for _ in 0..50 {
-        if binding.error_for_session(Some("b")).is_some() {
-            break;
-        }
-        std::thread::sleep(Duration::from_millis(10));
-    }
+    wait_until("B cancel rejection visible", || {
+        binding.error_for_session(Some("b")).is_some()
+    });
     let b_err = binding.error_for_session(Some("b"));
     assert!(b_err.is_some());
     endpoint.inner.lock().unwrap().reject_cancel = false;
@@ -2236,6 +2310,10 @@ fn overlapping_same_turn_stop_late_rejection_is_superseded_while_later_turns_and
     rt.block_on(wait_store(&runtime, |s| {
         s.sessions["a"].journal_ready && s.sessions["a"].run_open
     }));
+    wait_until("session A controls settled", || {
+        binding.selected_model() == "model-a" && binding.selected_preset() == "Full Access"
+    });
+    std::thread::sleep(Duration::from_millis(20));
     let scope_a = RunScope::main("blocker-test", "a");
     let epoch = runtime.inspect(|s| s.connection_epoch);
 
@@ -2245,7 +2323,17 @@ fn overlapping_same_turn_stop_late_rejection_is_superseded_while_later_turns_and
     rt.block_on(endpoint.park_reject_entered.notified());
     assert_eq!(binding.error_for_session(Some("a")), None);
 
+    let w_stop2 = wake.count();
     binding.cancel_scope_at_epoch(epoch, &scope_a);
+    wake.wait_at_least(w_stop2 + 1);
+    assert_eq!(
+        endpoint
+            .rpcs()
+            .iter()
+            .filter(|(m, p)| m == "session.cancel" && p["sessionId"] == "a")
+            .count(),
+        2
+    );
     let tx_a = endpoint.inner.lock().unwrap().journal_txs["a"].clone();
     tx_a.send(Ok(json!({
         "type": "event",
@@ -2261,8 +2349,9 @@ fn overlapping_same_turn_stop_late_rejection_is_superseded_while_later_turns_and
         .running
         .insert("a".to_owned(), false);
     rt.block_on(wait_store(&runtime, |s| !s.sessions["a"].run_open));
+    let w_stop1 = wake.count();
     endpoint.park_reject_release.notify_one();
-    std::thread::sleep(Duration::from_millis(40));
+    wake.wait_at_least(w_stop1 + 1);
     let rev = binding.ui_revision();
     assert_eq!(binding.session_error("a"), None);
     assert_eq!(binding.error_for_session(Some("a")), None);
@@ -2306,10 +2395,13 @@ fn overlapping_same_turn_stop_late_rejection_is_superseded_while_later_turns_and
         .running
         .insert("a".to_owned(), false);
     rt.block_on(wait_store(&runtime, |s| !s.sessions["a"].run_open));
+    let w2 = wake.count();
     endpoint.cancel_release.notify_one();
-    std::thread::sleep(Duration::from_millis(30));
+    wake.wait_at_least(w2 + 1);
+    let w1 = wake.count();
     endpoint.park_reject_release.notify_one();
-    std::thread::sleep(Duration::from_millis(40));
+    wake.wait_at_least(w1 + 1);
+    assert_eq!(binding.session_error("a"), None);
     assert_eq!(binding.error_for_session(Some("a")), None);
 
     // 3. Overlapping Stop #1 parked rejection + Stop #2 HTTP loss Pending -> deferred reconcile_uncertain_cancels.
@@ -2332,16 +2424,12 @@ fn overlapping_same_turn_stop_late_rejection_is_superseded_while_later_turns_and
     rt.block_on(endpoint.park_reject_entered.notified());
 
     binding.cancel_scope_at_epoch(epoch, &scope_a);
-    for _ in 0..50 {
-        if binding
+    wait_until("Pending transport error recorded", || {
+        binding
             .error_for_session(Some("a"))
             .as_deref()
             .is_some_and(|e| e.contains("receipt socket closed"))
-        {
-            break;
-        }
-        std::thread::sleep(Duration::from_millis(10));
-    }
+    });
     tx_a.send(Ok(json!({
         "type": "event",
         "generation": "g",
@@ -2350,14 +2438,13 @@ fn overlapping_same_turn_stop_late_rejection_is_superseded_while_later_turns_and
     })))
     .unwrap();
     rt.block_on(wait_store(&runtime, |s| !s.sessions["a"].run_open));
-    for _ in 0..50 {
-        if binding.error_for_session(Some("a")).is_none() {
-            break;
-        }
-        std::thread::sleep(Duration::from_millis(10));
-    }
+    wait_until("deferred reconcile cleared A error", || {
+        binding.error_for_session(Some("a")).is_none()
+    });
+    let w3_rej = wake.count();
     endpoint.park_reject_release.notify_one();
-    std::thread::sleep(Duration::from_millis(40));
+    wake.wait_at_least(w3_rej + 1);
+    assert_eq!(binding.session_error("a"), None);
     assert_eq!(binding.error_for_session(Some("a")), None);
 
     // 4. Turn 4 succeeds via overlapping Stops -> Turn 5 Stop #3 rejects -> Turn 5 rejection preserved even after Turn 4 Stop #1 releases.
@@ -2373,7 +2460,9 @@ fn overlapping_same_turn_stop_late_rejection_is_superseded_while_later_turns_and
     endpoint.park_reject_cancel.store(true, Ordering::Release);
     binding.cancel_scope_at_epoch(epoch, &scope_a);
     rt.block_on(endpoint.park_reject_entered.notified());
+    let w4_ok = wake.count();
     binding.cancel_scope_at_epoch(epoch, &scope_a);
+    wake.wait_at_least(w4_ok + 1);
     tx_a.send(Ok(json!({
         "type": "event",
         "generation": "g",
@@ -2392,20 +2481,117 @@ fn overlapping_same_turn_stop_late_rejection_is_superseded_while_later_turns_and
     rt.block_on(wait_store(&runtime, |s| s.sessions["a"].run_open));
     endpoint.inner.lock().unwrap().reject_cancel = true;
     binding.cancel_scope_at_epoch(epoch, &scope_a);
-    for _ in 0..50 {
-        if binding.error_for_session(Some("a")).is_some() {
-            break;
-        }
-        std::thread::sleep(Duration::from_millis(10));
-    }
+    wait_until("Turn 5 Stop #3 rejection visible", || {
+        binding
+            .error_for_session(Some("a"))
+            .as_deref()
+            .is_some_and(|e| e.contains("cancel rejected"))
+    });
+    let w4_rej = wake.count();
     endpoint.park_reject_release.notify_one();
-    std::thread::sleep(Duration::from_millis(40));
+    wake.wait_at_least(w4_rej + 1);
     assert!(
         binding
             .error_for_session(Some("a"))
             .as_deref()
             .is_some_and(|e| e.contains("cancel rejected"))
     );
+    assert_eq!(binding.error_for_session(Some("b")), b_err);
+
+    // 5. Adjacent-order ("between") permutation: Click 1 -> Click 2 -> Recv 1 rejects -> Recv 2 succeeds Ok(()) AND HTTP loss ConfirmedAborted.
+    binding.clear_session_error("a");
+    endpoint.inner.lock().unwrap().reject_cancel = false;
+    tx_a.send(Ok(json!({
+        "type": "event",
+        "generation": "g",
+        "sessionId": "a",
+        "entry": {"event": {"type": "turn/end", "seq": 10, "time": 11, "data": {"turn": 5, "reason": "aborted"}}}
+    })))
+    .unwrap();
+    rt.block_on(wait_store(&runtime, |s| !s.sessions["a"].run_open));
+    tx_a.send(Ok(json!({
+        "type": "event",
+        "generation": "g",
+        "sessionId": "a",
+        "entry": {"event": {"type": "turn/start", "seq": 11, "time": 12, "data": {"turn": 6}}}
+    })))
+    .unwrap();
+    rt.block_on(wait_store(&runtime, |s| s.sessions["a"].run_open));
+
+    endpoint.park_reject_cancel.store(true, Ordering::Release);
+    binding.cancel_scope_at_epoch(epoch, &scope_a);
+    rt.block_on(endpoint.park_reject_entered.notified());
+
+    endpoint.hold_cancel.store(true, Ordering::Release);
+    binding.cancel_scope_at_epoch(epoch, &scope_a);
+    rt.block_on(endpoint.cancel_gate_entered.notified());
+
+    endpoint.park_reject_release.notify_one();
+    wait_until("between Recv 1 rejection visible", || {
+        binding
+            .session_error("a")
+            .as_deref()
+            .is_some_and(|e| e.contains("cancel rejected"))
+            && binding
+                .error_for_session(Some("a"))
+                .as_deref()
+                .is_some_and(|e| e.contains("cancel rejected"))
+    });
+
+    endpoint.cancel_release.notify_one();
+    wait_until("between Recv 2 clears error", || {
+        binding.session_error("a").is_none() && binding.error_for_session(Some("a")).is_none()
+    });
+    tx_a.send(Ok(json!({
+        "type": "event",
+        "generation": "g",
+        "sessionId": "a",
+        "entry": {"event": {"type": "turn/end", "seq": 12, "time": 13, "data": {"turn": 6, "reason": "aborted"}}}
+    })))
+    .unwrap();
+    rt.block_on(wait_store(&runtime, |s| !s.sessions["a"].run_open));
+    assert_eq!(binding.session_error("a"), None);
+    assert_eq!(binding.error_for_session(Some("a")), None);
+    assert_eq!(binding.error_for_session(Some("b")), b_err);
+
+    // 5b. "between" order when Stop #2 loses HTTP receipt after turn/end(aborted) is already visible (ConfirmedAborted).
+    tx_a.send(Ok(json!({
+        "type": "event",
+        "generation": "g",
+        "sessionId": "a",
+        "entry": {"event": {"type": "turn/start", "seq": 13, "time": 14, "data": {"turn": 7}}}
+    })))
+    .unwrap();
+    rt.block_on(wait_store(&runtime, |s| s.sessions["a"].run_open));
+    endpoint.park_reject_cancel.store(true, Ordering::Release);
+    binding.cancel_scope_at_epoch(epoch, &scope_a);
+    rt.block_on(endpoint.park_reject_entered.notified());
+
+    endpoint.inner.lock().unwrap().transport_error_cancel = true;
+    endpoint.hold_cancel.store(true, Ordering::Release);
+    binding.cancel_scope_at_epoch(epoch, &scope_a);
+    rt.block_on(endpoint.cancel_gate_entered.notified());
+
+    endpoint.park_reject_release.notify_one();
+    wait_until("between HTTP-loss Recv 1 rejection visible", || {
+        binding
+            .error_for_session(Some("a"))
+            .as_deref()
+            .is_some_and(|e| e.contains("cancel rejected"))
+    });
+
+    tx_a.send(Ok(json!({
+        "type": "event",
+        "generation": "g",
+        "sessionId": "a",
+        "entry": {"event": {"type": "turn/end", "seq": 14, "time": 15, "data": {"turn": 7, "reason": "aborted"}}}
+    })))
+    .unwrap();
+    rt.block_on(wait_store(&runtime, |s| !s.sessions["a"].run_open));
+    endpoint.cancel_release.notify_one();
+    wait_until("between HTTP-loss ConfirmedAborted clears error", || {
+        binding.session_error("a").is_none() && binding.error_for_session(Some("a")).is_none()
+    });
     assert_eq!(binding.error_for_session(Some("b")), b_err);
 
     rt.block_on(runtime.stop()).unwrap();
