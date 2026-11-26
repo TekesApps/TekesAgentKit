@@ -1083,3 +1083,29 @@ async fn permanent_remote_journal_error_retires_deferred_active_a_without_blocki
     lease_b.release().await.unwrap();
     r.stop().await.unwrap();
 }
+
+#[tokio::test]
+async fn releasing_history_lease_synchronously_drops_journal_stream_before_returning() {
+    let source = ControlledReconnectConnector::new();
+    let r = Arc::new(SessionRuntime::spawn(
+        "controlled-reconnect",
+        Arc::new(source.clone()),
+    ));
+    r.wait_ready(Duration::from_secs(2)).await.unwrap();
+
+    let lease_a = r.acquire_history("a").await.unwrap();
+    assert!(r.inspect(|s| s.sessions["a"].journal_ready));
+    assert!(source.closed_journals.lock().unwrap().is_empty());
+
+    lease_a.release().await.unwrap();
+    assert!(
+        source
+            .closed_journals
+            .lock()
+            .unwrap()
+            .contains(&(1, "a".to_owned())),
+        "FrameStream must drop synchronously inside Command::Close before release().await returns"
+    );
+    assert!(r.inspect(|s| !s.sessions.get("a").is_some_and(|sess| sess.journal_ready)));
+    r.stop().await.unwrap();
+}

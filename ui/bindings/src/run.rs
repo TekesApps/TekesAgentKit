@@ -137,6 +137,7 @@ enum SessionErrorKind {
 struct SessionErrorEntry {
     seq: u64,
     kind: SessionErrorKind,
+    cancel_op_id: Option<u64>,
     cancel_target: Option<CancelTurnTarget>,
     message: String,
     uncertain_cancel: Option<UncertainCancel>,
@@ -1177,13 +1178,7 @@ impl RunWorkbenchBinding {
             };
             match controller.cancel_at_epoch(expected_epoch, &scope).await {
                 Ok(()) => {
-                    clear_superseded_cancel_error(
-                        &ui,
-                        &scope.session_id,
-                        op_id,
-                        start_error_seq,
-                        &cancel_target,
-                    );
+                    clear_superseded_cancel_error(&ui, &scope.session_id, op_id, &cancel_target);
                 }
                 Err(err) => {
                     let message = format!("Cancel failed: {err}");
@@ -1205,7 +1200,6 @@ impl RunWorkbenchBinding {
                                     &ui,
                                     &scope.session_id,
                                     op_id,
-                                    start_error_seq,
                                     &cancel_target,
                                 );
                             }
@@ -2039,6 +2033,7 @@ fn record_session_error(ui: &Mutex<RunUiState>, session_id: &str, error: Option<
                 SessionErrorEntry {
                     seq,
                     kind: SessionErrorKind::Other,
+                    cancel_op_id: None,
                     cancel_target: None,
                     message,
                     uncertain_cancel: None,
@@ -2068,6 +2063,19 @@ fn clear_session_error_if_not_newer(
     }
 }
 
+fn is_older_same_turn_cancel(
+    entry: &SessionErrorEntry,
+    op_id: u64,
+    cancel_target: &Option<CancelTurnTarget>,
+) -> bool {
+    entry.kind == SessionErrorKind::Cancel
+        && cancel_target.is_some()
+        && entry.cancel_target == *cancel_target
+        && entry
+            .cancel_op_id
+            .is_some_and(|existing_op_id| existing_op_id < op_id)
+}
+
 fn record_cancel_error_if_not_newer(
     ui: &Mutex<RunUiState>,
     session_id: &str,
@@ -2081,11 +2089,9 @@ fn record_cancel_error_if_not_newer(
     if guard.is_superseded_by_confirmed_cancel(session_id, op_id, &cancel_target) {
         return false;
     }
-    if guard
-        .session_errors
-        .get(session_id)
-        .is_some_and(|entry| entry.seq > start_error_seq)
-    {
+    if guard.session_errors.get(session_id).is_some_and(|entry| {
+        entry.seq > start_error_seq && !is_older_same_turn_cancel(entry, op_id, &cancel_target)
+    }) {
         return false;
     }
     guard.next_error_seq = guard.next_error_seq.saturating_add(1);
@@ -2096,6 +2102,7 @@ fn record_cancel_error_if_not_newer(
         SessionErrorEntry {
             seq,
             kind: SessionErrorKind::Cancel,
+            cancel_op_id: Some(op_id),
             cancel_target,
             message,
             uncertain_cancel,
@@ -2137,7 +2144,6 @@ fn clear_superseded_cancel_error(
     ui: &Mutex<RunUiState>,
     session_id: &str,
     op_id: u64,
-    start_error_seq: u64,
     cancel_target: &Option<CancelTurnTarget>,
 ) -> bool {
     let mut guard = ui.lock().expect("run ui lock");
@@ -2146,10 +2152,7 @@ fn clear_superseded_cancel_error(
             .uncertain_cancel
             .as_ref()
             .is_some_and(|uc| uc.op_id == op_id)
-            || (entry.seq <= start_error_seq
-                && entry.kind == SessionErrorKind::Cancel
-                && cancel_target.is_some()
-                && entry.cancel_target == *cancel_target)
+            || is_older_same_turn_cancel(entry, op_id, cancel_target)
     });
     if should_clear {
         guard.session_errors.remove(session_id);
