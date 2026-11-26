@@ -359,14 +359,22 @@ async fn failed_epoch_preflight_does_not_suppress_the_first_real_recovery_dispat
     r.stop().await.unwrap();
 }
 
+type JournalTxMap =
+    std::collections::BTreeMap<(usize, String), tokio::sync::mpsc::UnboundedSender<Result<Value>>>;
+
 #[derive(Clone)]
 struct ControlledReconnectConnector {
     connects: Arc<AtomicUsize>,
     connect2_gate: Arc<tokio::sync::Notify>,
+    hold_inventory_conn2: Arc<std::sync::atomic::AtomicBool>,
+    inventory_follow_entered: Arc<tokio::sync::Notify>,
+    inventory_follow_release: Arc<tokio::sync::Notify>,
     followed_journals: Arc<Mutex<Vec<(usize, String)>>>,
+    closed_journals: Arc<Mutex<Vec<(usize, String)>>>,
     recovery_calls: Arc<Mutex<Vec<Value>>>,
     drop_inventory: Arc<tokio::sync::Notify>,
     journal_tx: Arc<Mutex<Option<tokio::sync::mpsc::UnboundedSender<Result<Value>>>>>,
+    journal_txs: Arc<Mutex<JournalTxMap>>,
     active_run: Arc<std::sync::atomic::AtomicBool>,
 }
 
@@ -375,10 +383,15 @@ impl ControlledReconnectConnector {
         Self {
             connects: Arc::new(AtomicUsize::new(0)),
             connect2_gate: Arc::new(tokio::sync::Notify::new()),
+            hold_inventory_conn2: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            inventory_follow_entered: Arc::new(tokio::sync::Notify::new()),
+            inventory_follow_release: Arc::new(tokio::sync::Notify::new()),
             followed_journals: Arc::new(Mutex::new(Vec::new())),
+            closed_journals: Arc::new(Mutex::new(Vec::new())),
             recovery_calls: Arc::new(Mutex::new(Vec::new())),
             drop_inventory: Arc::new(tokio::sync::Notify::new()),
             journal_tx: Arc::new(Mutex::new(None)),
+            journal_txs: Arc::new(Mutex::new(std::collections::BTreeMap::new())),
             active_run: Arc::new(std::sync::atomic::AtomicBool::new(false)),
         }
     }
@@ -436,13 +449,18 @@ impl SessionEndpoint for ControlledReconnectEndpoint {
     async fn follow(&self, target: StreamTarget) -> Result<FrameStream> {
         match target {
             StreamTarget::SessionInventory => {
+                if self.connection == 2 && self.source.hold_inventory_conn2.load(Ordering::SeqCst) {
+                    self.source.inventory_follow_entered.notify_waiters();
+                    self.source.inventory_follow_release.notified().await;
+                }
                 let frame = json!({
                     "type": "baseline",
                     "generation": "g",
                     "snapshot": {
                         "items": [
                             {"sessionId": "a", "running": self.source.active_run.load(Ordering::SeqCst), "blank": false, "updatedAt": 1},
-                            {"sessionId": "b", "running": false, "blank": false, "updatedAt": 1}
+                            {"sessionId": "b", "running": false, "blank": false, "updatedAt": 1},
+                            {"sessionId": "idle", "running": false, "blank": false, "updatedAt": 1}
                         ]
                     }
                 });
@@ -472,20 +490,39 @@ impl SessionEndpoint for ControlledReconnectEndpoint {
                 ))
             }
             StreamTarget::SessionJournal { address, .. } => {
+                struct JournalDrop {
+                    conn: usize,
+                    sid: String,
+                    closed_journals: Arc<Mutex<Vec<(usize, String)>>>,
+                }
+                impl Drop for JournalDrop {
+                    fn drop(&mut self) {
+                        self.closed_journals
+                            .lock()
+                            .unwrap()
+                            .push((self.conn, self.sid.clone()));
+                    }
+                }
                 self.source
                     .followed_journals
                     .lock()
                     .unwrap()
                     .push((self.connection, address.session_id.clone()));
-                let running = self.source.active_run.load(Ordering::SeqCst);
+                let running =
+                    address.session_id == "a" && self.source.active_run.load(Ordering::SeqCst);
+                let text = if address.session_id == "b" {
+                    "hist-b"
+                } else {
+                    "hi"
+                };
                 let entries = if running {
                     vec![
-                        json!({"event": {"type": "user/message", "seq": 0, "time": 1, "data": {"text": "hi"}}}),
+                        json!({"event": {"type": "user/message", "seq": 0, "time": 1, "data": {"text": text}}}),
                         json!({"event": {"type": "turn/start", "seq": 1, "time": 2, "data": {"turn": 1}}}),
                     ]
                 } else {
                     vec![
-                        json!({"event": {"type": "user/message", "seq": 0, "time": 1, "data": {"text": "hi"}}}),
+                        json!({"event": {"type": "user/message", "seq": 0, "time": 1, "data": {"text": text}}}),
                     ]
                 };
                 let through = entries.len().saturating_sub(1);
@@ -501,9 +538,19 @@ impl SessionEndpoint for ControlledReconnectEndpoint {
                     }
                 });
                 let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
-                *self.source.journal_tx.lock().unwrap() = Some(tx);
-                let tail = stream::unfold(rx, |mut rx| async move {
-                    rx.recv().await.map(|item| (item, rx))
+                *self.source.journal_tx.lock().unwrap() = Some(tx.clone());
+                self.source
+                    .journal_txs
+                    .lock()
+                    .unwrap()
+                    .insert((self.connection, address.session_id.clone()), tx);
+                let guard = JournalDrop {
+                    conn: self.connection,
+                    sid: address.session_id,
+                    closed_journals: self.source.closed_journals.clone(),
+                };
+                let tail = stream::unfold((rx, guard), |(mut rx, guard)| async move {
+                    rx.recv().await.map(|item| (item, (rx, guard)))
                 });
                 Ok(Box::pin(stream::once(async { Ok(snapshot) }).chain(tail)))
             }
@@ -673,5 +720,199 @@ async fn two_observers_keep_stream_on_partial_release_and_settle_running_session
             .is_some_and(|sess| !sess.journal_ready && !sess.run_open)
     })
     .await;
+    r.stop().await.unwrap();
+}
+
+#[tokio::test]
+async fn releasing_active_session_during_reconnect_handshake_waits_for_real_turn_end_while_b_is_ready()
+ {
+    let source = ControlledReconnectConnector::new();
+    source.active_run.store(true, Ordering::SeqCst);
+    let r = Arc::new(SessionRuntime::spawn(
+        "controlled-reconnect",
+        Arc::new(source.clone()),
+    ));
+    r.wait_ready(Duration::from_secs(2)).await.unwrap();
+
+    let lease_a = r.acquire_history("a").await.unwrap();
+    assert!(r.inspect(|s| s.sessions["a"].journal_ready && s.sessions["a"].run_open));
+
+    source.hold_inventory_conn2.store(true, Ordering::SeqCst);
+    source.drop_inventory.notify_one();
+    wait_store(&r, |s| s.connection != ConnectionState::Ready).await;
+
+    // Unblock connect2 so runtime enters follow(SessionInventory) handshake and pauses there.
+    let entered = source.inventory_follow_entered.notified();
+    source.connect2_gate.notify_one();
+    tokio::time::timeout(Duration::from_secs(2), entered)
+        .await
+        .unwrap();
+    assert!(r.inspect(|s| {
+        s.connection == ConnectionState::Connecting
+            && s.sessions["a"].run_open
+            && !s.sessions["a"].journal_ready
+    }));
+
+    // Release last observer of active A during the blocked inventory handshake.
+    let release_handle = tokio::spawn(async move { lease_a.release().await });
+    tokio::time::sleep(Duration::from_millis(25)).await;
+
+    // Complete handshake and immediately acquire B.
+    source.inventory_follow_release.notify_one();
+    wait_store(&r, |s| s.connection == ConnectionState::Ready).await;
+    let lease_b = r.acquire_history("b").await.unwrap();
+    assert!(r.inspect(|s| {
+        s.sessions["b"].journal_ready
+            && s.sessions["b"]
+                .entries
+                .values()
+                .all(|e| e.event.data["text"] == "hist-b")
+    }));
+
+    // Active A must be reopened on conn 2 and NOT closed before its real turn/end arrives.
+    assert!(
+        source
+            .followed_journals
+            .lock()
+            .unwrap()
+            .contains(&(2, "a".to_owned()))
+    );
+    tokio::time::sleep(Duration::from_millis(50)).await;
+    assert!(
+        !source
+            .closed_journals
+            .lock()
+            .unwrap()
+            .contains(&(2, "a".to_owned())),
+        "active A journal must stay open across handshake close until real turn/end arrives"
+    );
+    assert!(r.inspect(|s| s.sessions["a"].journal_ready && s.sessions["a"].run_open));
+
+    // Deliver real turn/end on conn 2 A journal -> runtime closes A journal cleanly afterward.
+    let tx_a = source.journal_txs.lock().unwrap()[&(2, "a".to_owned())].clone();
+    tx_a.send(Ok(json!({
+        "type": "event",
+        "generation": "g",
+        "sessionId": "a",
+        "entry": {
+            "event": {
+                "type": "turn/end",
+                "seq": 2,
+                "time": 4,
+                "data": {"turn": 1, "reason": "completed"}
+            }
+        }
+    })))
+    .unwrap();
+    wait_store(&r, |s| {
+        s.sessions
+            .get("a")
+            .is_some_and(|sess| !sess.journal_ready && !sess.run_open)
+    })
+    .await;
+    assert!(r.inspect(|s| {
+        s.sessions["a"]
+            .entries
+            .values()
+            .any(|e| e.event.kind == "turn/end")
+    }));
+    tokio::time::timeout(Duration::from_secs(2), async {
+        while !source
+            .closed_journals
+            .lock()
+            .unwrap()
+            .contains(&(2, "a".to_owned()))
+        {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .unwrap();
+    release_handle.await.unwrap().unwrap();
+    assert!(r.inspect(|s| s.sessions["b"].journal_ready));
+    lease_b.release().await.unwrap();
+    r.stop().await.unwrap();
+}
+
+#[tokio::test]
+async fn releasing_idle_session_during_reconnect_handshake_closes_immediately_and_second_observer_survives()
+ {
+    let source = ControlledReconnectConnector::new();
+    source.active_run.store(true, Ordering::SeqCst);
+    let r = Arc::new(SessionRuntime::spawn(
+        "controlled-reconnect",
+        Arc::new(source.clone()),
+    ));
+    r.wait_ready(Duration::from_secs(2)).await.unwrap();
+
+    let lease_a1 = r.acquire_history("a").await.unwrap();
+    let lease_a2 = r.acquire_history("a").await.unwrap();
+    let lease_idle = r.acquire_history("idle").await.unwrap();
+
+    source.hold_inventory_conn2.store(true, Ordering::SeqCst);
+    source.drop_inventory.notify_one();
+    wait_store(&r, |s| s.connection != ConnectionState::Ready).await;
+
+    let entered = source.inventory_follow_entered.notified();
+    source.connect2_gate.notify_one();
+    tokio::time::timeout(Duration::from_secs(2), entered)
+        .await
+        .unwrap();
+
+    // Release last observer of idle session AND one of two observers of running session A.
+    let rel_idle = tokio::spawn(async move { lease_idle.release().await });
+    let rel_a1 = tokio::spawn(async move { lease_a1.release().await });
+    tokio::time::sleep(Duration::from_millis(25)).await;
+
+    source.inventory_follow_release.notify_one();
+    wait_store(&r, |s| s.connection == ConnectionState::Ready).await;
+    rel_idle.await.unwrap().unwrap();
+    rel_a1.await.unwrap().unwrap();
+
+    // Idle session must close promptly on conn 2 while second observer keeps A alive through turn/end.
+    tokio::time::timeout(Duration::from_secs(2), async {
+        while !source
+            .closed_journals
+            .lock()
+            .unwrap()
+            .contains(&(2, "idle".to_owned()))
+        {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .unwrap();
+    assert!(!r.inspect(|s| s.sessions["idle"].journal_ready));
+
+    let tx_a = source.journal_txs.lock().unwrap()[&(2, "a".to_owned())].clone();
+    tx_a.send(Ok(json!({
+        "type": "event",
+        "generation": "g",
+        "sessionId": "a",
+        "entry": {
+            "event": {
+                "type": "turn/end",
+                "seq": 2,
+                "time": 4,
+                "data": {"turn": 1, "reason": "completed"}
+            }
+        }
+    })))
+    .unwrap();
+    wait_store(&r, |s| {
+        s.sessions["a"].journal_ready && !s.sessions["a"].run_open
+    })
+    .await;
+    assert!(
+        !source
+            .closed_journals
+            .lock()
+            .unwrap()
+            .contains(&(2, "a".to_owned())),
+        "second observer must keep A stream open even after turn/end"
+    );
+
+    lease_a2.release().await.unwrap();
+    wait_store(&r, |s| !s.sessions["a"].journal_ready).await;
     r.stop().await.unwrap();
 }

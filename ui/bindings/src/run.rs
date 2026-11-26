@@ -605,46 +605,50 @@ impl RunWorkbenchBinding {
             .map(|token| token.destination.clone())
     }
 
+    /// Synchronously selects `session_id` and opens its history lease.
+    ///
+    /// Atomic on error: if acquiring history fails (for example,
+    /// `Error::Disconnected`), the previous selection, existing history lease,
+    /// and subscription intent remain unchanged without scheduling a deferred
+    /// open. Use [`Self::select_session`] for non-blocking selection with
+    /// automatic history acquisition on reconnect.
     pub fn open_initial_session(&self, session_id: &str) -> Result<()> {
         let scope = RunScope::main(self.endpoint_id(), session_id);
         let controller = Arc::clone(&self.controller);
         let runtime = Arc::clone(&self.runtime);
         let ui = Arc::clone(&self.ui);
+        let wake = Arc::clone(&self.wake);
         let sid = session_id.to_owned();
-        let epoch = runtime.inspect(|s| s.connection_epoch);
-        let (lease_gen, old_lease) = {
-            let mut guard = self.ui.lock().expect("run ui lock");
+        let start_lease_gen = {
+            let guard = self.ui.lock().expect("run ui lock");
+            if guard.dropped {
+                return Err(tekes_agent_contract::Error::Disconnected);
+            }
+            guard.history_lease_generation
+        };
+        self.handle.block_on(async move {
+            let lease = runtime.acquire_history(&sid).await?;
+            let epoch = runtime.inspect(|s| s.connection_epoch);
+            let mut guard = ui.lock().expect("run ui lock");
+            if guard.dropped || guard.history_lease_generation != start_lease_gen {
+                drop(guard);
+                drop(lease);
+                return Err(tekes_agent_contract::Error::Disconnected);
+            }
+            if let Err(err) = controller.select(ComposerDestination::run(scope)) {
+                drop(guard);
+                drop(lease);
+                return Err(err);
+            }
             guard.history_lease_generation = guard.history_lease_generation.saturating_add(1);
             let lease_gen = guard.history_lease_generation;
             guard.desired_history_session = Some(sid.clone());
-            guard.history_acquire_attempted = Some((lease_gen, epoch, sid.clone()));
-            let old = if guard
-                .history_lease
-                .as_ref()
-                .is_some_and(|l| l.session_id() == sid)
-            {
-                None
-            } else {
-                guard.history_lease.take()
-            };
-            (lease_gen, old)
-        };
-        drop(old_lease);
-        self.handle.block_on(async move {
-            let lease = runtime.acquire_history(&sid).await?;
-            let displaced = {
-                let mut guard = ui.lock().expect("run ui lock");
-                if !guard.dropped
-                    && guard.history_lease_generation == lease_gen
-                    && guard.desired_history_session.as_deref() == Some(sid.as_str())
-                {
-                    guard.history_lease.replace(lease)
-                } else {
-                    Some(lease)
-                }
-            };
-            drop(displaced);
-            controller.select(ComposerDestination::run(scope))?;
+            guard.history_acquire_attempted = Some((lease_gen, epoch, sid));
+            guard.revision = guard.revision.saturating_add(1);
+            let old_lease = guard.history_lease.replace(lease);
+            drop(guard);
+            drop(old_lease);
+            wake.wake();
             Ok(())
         })
     }
@@ -746,6 +750,11 @@ impl RunWorkbenchBinding {
         ui.controls_for_read(session_id).to_preparation()
     }
 
+    /// Updates selection immediately and schedules history acquisition when ready.
+    ///
+    /// Unlike [`Self::open_initial_session`], selection made while disconnected
+    /// is preserved and acquires the selected session's history lease as soon as
+    /// `SessionRuntime` becomes `Ready`.
     pub fn select_session(&self, session_id: &str) {
         let endpoint_id = self.endpoint_id();
         let scope = RunScope::main(endpoint_id, session_id);

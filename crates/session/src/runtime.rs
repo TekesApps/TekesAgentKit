@@ -828,6 +828,22 @@ async fn run(
         }
     }
 }
+fn has_unsettled_run(session: &crate::SessionProjection) -> bool {
+    if session.run_open {
+        return true;
+    }
+    session
+        .entries
+        .values()
+        .rev()
+        .find_map(|entry| match entry.event.kind.as_str() {
+            "turn/start" => Some(true),
+            "turn/end" => Some(false),
+            _ => None,
+        })
+        .unwrap_or(false)
+}
+
 fn close_while_disconnected(
     id: String,
     reply: Reply<()>,
@@ -835,7 +851,7 @@ fn close_while_disconnected(
     deferred_closes: &mut BTreeSet<String>,
     store: &Arc<SharedProjection>,
 ) {
-    if store.read(|s| s.sessions.get(&id).is_some_and(|session| session.run_open)) {
+    if store.read(|s| s.sessions.get(&id).is_some_and(has_unsettled_run)) {
         deferred_closes.insert(id);
     } else {
         deferred_closes.remove(&id);
@@ -911,6 +927,7 @@ async fn connected(
     let mut journal_epochs = std::collections::BTreeMap::new();
     let mut journal_cancellations = std::collections::BTreeMap::new();
     let mut next_journal_epoch = epoch * 1_000_000;
+    let mut failed_deferred_closes = Vec::new();
     for id in wanted.iter() {
         next_journal_epoch += 1;
         match add_journal(
@@ -926,8 +943,17 @@ async fn connected(
                 journal_cancellations.insert(id.clone(), cancellation);
                 journal_epochs.insert(id.clone(), next_journal_epoch);
             }
-            Err(error) => record_session_error(store, id, &error),
+            Err(error) => {
+                record_session_error(store, id, &error);
+                if deferred_closes.contains(id) {
+                    failed_deferred_closes.push(id.clone());
+                }
+            }
         }
+    }
+    for id in failed_deferred_closes {
+        deferred_closes.remove(&id);
+        wanted.remove(&id);
     }
     let mut journal_retries = std::collections::BTreeMap::<String, usize>::new();
     let mut baselines_ready = false;
@@ -1087,6 +1113,7 @@ async fn connected(
                         } else { record_session_error(store, id, &error); }
                         if let Some(cancellation) = journal_cancellations.remove(id) { cancellation.abort(); }
                         journal_epochs.remove(id);
+                        if deferred_closes.remove(id) { wanted.remove(id); }
                         continue;
                     }
                     return Err(error);
@@ -1148,7 +1175,9 @@ async fn connected(
                         let _ = reply.send(result);
                     }
                     Command::Close(id, reply) => {
-                        if store.read(|s| s.sessions.get(&id).is_some_and(|session| session.journal_ready && session.run_open)) {
+                        if journal_epochs.contains_key(&id)
+                            && store.read(|s| s.sessions.get(&id).is_some_and(has_unsettled_run))
+                        {
                             deferred_closes.insert(id);
                             let _ = reply.send(Ok(()));
                             continue;

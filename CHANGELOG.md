@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.2 — 2026-11-26
+
+- Defer closing a running session's journal when its last observer detaches across a disconnect or during the reconnect `inventory`/`follow` handshake (`has_unsettled_run`), so `SessionRuntime` keeps the stream open until durable `turn/end` arrives on the reconnected journal while releasing idle sessions promptly.
+- Make `RunWorkbenchBinding::open_initial_session` atomic on error (`Error::Disconnected`), preserving prior selection, history lease, and subscription intent for both fresh bindings and previously selected sessions without scheduling an orphaned background acquire.
+- Add controllable-transport reconnect handshake and initial-open regression tests in `crates/session/tests/recovery_interest.rs` and `ui/bindings/tests/native_blockers.rs`, verified with `TekesUI v0.4.12` (`427c0e5d9e6fcdb0d71d203c402decdc05761df9`) and `TekesKernel v0.9.23` (`17662494`).
+
 ## 0.6.1 — 2026-11-26
 
 - Keep session operation errors (`cancel_scope_at_epoch`, `submit_destination` with run scope, and queue mutations) scoped per session in `RunUiState::session_errors`, add `RunWorkbenchBinding::error_for_session`, and route `TasksQueueAdapter`, `AgentRunAdapter`, and showcase `build_tasks_queue_model` through session-scoped lookup before falling back to endpoint-level `last_error`.
