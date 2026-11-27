@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.11 — 2026-11-27
+
+- Pin the list-level sidebar context menu (`SIDEBAR_CONTEXT_MENU_ID`) target when the menu opens (`open_list_menu_target`) and retire/close stale list menus during `SidebarSurface::sync` whenever the resolved target session changes, disappears, or flips archived state, while preserving keyboard `Shift+F10` focused-row targeting and per-row pointer menus (#52).
+- Hoist `suspended_journals` into `SessionRuntime::run` and reconcile in-flight archive/discard journal state across explicit `reconnect()` and WebSocket/transport drops (`reconcile_suspended_on_disconnect`, `close_while_disconnected`, and transient `add_journal` failure handling) so active observers retain their `session-journal` subscription and `sessions.recover` recovery without replaying `session.archive`, detached running sessions wait for `turn/end` then retire cleanly, and detached idle sessions never reopen (#56).
+
 ## 0.6.10 — 2026-11-27
 
 - Bind per-row context menus directly to `KeyedSelectableListContent` row mounts (`SIDEBAR_ROW_BASE + key`) inside `SidebarSurface`, capturing each clicked row's target session without changing the active selection, keeping keyboard/accessibility fallback on the focused/selected row, cancelling pending actions/renames when a clicked row disappears, and ignoring background empty-area secondary clicks (#52).
