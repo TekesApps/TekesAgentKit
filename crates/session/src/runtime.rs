@@ -42,11 +42,18 @@ type HistoryOwners =
     std::sync::Mutex<std::collections::BTreeMap<String, Arc<tokio::sync::Mutex<BTreeSet<String>>>>>;
 type Reply<T> = oneshot::Sender<Result<T>>;
 type OperationResult = Option<(
-    Option<String>,
+    Option<(String, u64)>,
     Option<RecoveryAdmission>,
     Reply<Value>,
     Result<Value>,
 )>;
+
+#[derive(Clone, Copy, Debug)]
+struct SuspendedJournal {
+    suspend_id: u64,
+    closed_while_suspended: bool,
+    was_running: bool,
+}
 #[derive(Default)]
 struct RecoveryTracking {
     unresolved: BTreeSet<String>,
@@ -917,6 +924,15 @@ async fn run(
         }
     }
 }
+fn session_has_active_run(session: &crate::SessionProjection) -> bool {
+    has_unsettled_run(session)
+        || session
+            .summary
+            .as_ref()
+            .and_then(|summary| summary["running"].as_bool())
+            == Some(true)
+}
+
 fn has_unsettled_run(session: &crate::SessionProjection) -> bool {
     if session.run_open {
         return true;
@@ -1016,6 +1032,8 @@ async fn connected(
     let mut journal_epochs = std::collections::BTreeMap::new();
     let mut journals = JournalStreams::default();
     let mut permanent_journal_errors = BTreeSet::<String>::new();
+    let mut suspended_journals = std::collections::BTreeMap::<String, SuspendedJournal>::new();
+    let mut next_suspend_id: u64 = 0;
     let mut next_journal_epoch = epoch * 1_000_000;
     let mut failed_deferred_closes = Vec::new();
     for id in wanted.iter() {
@@ -1156,11 +1174,59 @@ async fn connected(
                         }
                         remember_recovery(store, admission, outcome);
                     }
-                    if result.is_ok() && let Some(id) = &removed { deferred_closes.remove(id); }
-                    if result.is_err() && let Some(id)=removed {
-                        next_journal_epoch+=1;
-                        if add_journal(endpoint.as_ref(),store,&mut journals,&id,next_journal_epoch).await.is_ok() {
-                            wanted.insert(id.clone());journal_epochs.insert(id,next_journal_epoch);
+                    if let Some((id, suspend_id)) = removed {
+                        let suspended = if suspended_journals
+                            .get(&id)
+                            .is_some_and(|entry| entry.suspend_id == suspend_id)
+                        {
+                            suspended_journals.remove(&id)
+                        } else {
+                            None
+                        };
+                        if result.is_ok() {
+                            deferred_closes.remove(&id);
+                        } else if let Some(suspended) = suspended
+                            && !journal_epochs.contains_key(&id)
+                        {
+                            if !suspended.closed_while_suspended {
+                                next_journal_epoch += 1;
+                                if add_journal(
+                                    endpoint.as_ref(),
+                                    store,
+                                    &mut journals,
+                                    &id,
+                                    next_journal_epoch,
+                                )
+                                .await
+                                .is_ok()
+                                {
+                                    wanted.insert(id.clone());
+                                    journal_epochs.insert(id, next_journal_epoch);
+                                }
+                            } else {
+                                let still_running = !permanent_journal_errors.contains(&id)
+                                    && (suspended.was_running
+                                        || store.read(|s| {
+                                            s.sessions.get(&id).is_some_and(session_has_active_run)
+                                        }));
+                                if still_running {
+                                    next_journal_epoch += 1;
+                                    if add_journal(
+                                        endpoint.as_ref(),
+                                        store,
+                                        &mut journals,
+                                        &id,
+                                        next_journal_epoch,
+                                    )
+                                    .await
+                                    .is_ok()
+                                    {
+                                        wanted.insert(id.clone());
+                                        journal_epochs.insert(id.clone(), next_journal_epoch);
+                                        deferred_closes.insert(id);
+                                    }
+                                }
+                            }
                         }
                     }
                     let _=reply.send(result);
@@ -1287,10 +1353,21 @@ async fn connected(
                         if result.is_ok() {
                             deferred_closes.remove(&id);
                             permanent_journal_errors.remove(&id);
+                            suspended_journals.remove(&id);
                         }
                         let _ = reply.send(result);
                     }
                     Command::Close(id, reply) => {
+                        if let Some(suspended) = suspended_journals.get_mut(&id) {
+                            suspended.closed_while_suspended = true;
+                            if store.read(|s| {
+                                s.sessions.get(&id).is_some_and(session_has_active_run)
+                            }) {
+                                suspended.was_running = true;
+                            }
+                            let _ = reply.send(Ok(()));
+                            continue;
+                        }
                         if wanted.contains(&id)
                             && !permanent_journal_errors.contains(&id)
                             && store.read(|s| s.sessions.get(&id).is_some_and(has_unsettled_run))
@@ -1358,9 +1435,18 @@ async fn connected(
                         let removed=if matches!(method.as_str(),"session.discard"|"session.archive") {
                             let id=payload["sessionId"].as_str().unwrap_or("").to_owned();
                             if wanted.remove(&id) {
+                                let was_deferred = deferred_closes.remove(&id);
+                                let was_running = store.read(|s| s.sessions.get(&id).is_some_and(session_has_active_run));
                                 journal_epochs.remove(&id);
                                 journals.remove(&id);
-                                store.update(|s|s.reset_journal(&id));Some(id)
+                                store.update(|s|s.reset_journal(&id));
+                                next_suspend_id = next_suspend_id.saturating_add(1);
+                                suspended_journals.insert(id.clone(), SuspendedJournal {
+                                    suspend_id: next_suspend_id,
+                                    closed_while_suspended: was_deferred,
+                                    was_running,
+                                });
+                                Some((id, next_suspend_id))
                             } else {None}
                         } else {None};
                         let recovery_tracking = unresolved_recovery.clone();

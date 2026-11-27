@@ -115,7 +115,9 @@ pub const SIDEBAR_NEW_ICON_ID: ComponentId = ComponentId(620);
 pub const SIDEBAR_SEARCH_ICON_ID: ComponentId = ComponentId(621);
 pub const SIDEBAR_SETTINGS_ICON_ID: ComponentId = ComponentId(622);
 pub const SIDEBAR_RENAME_CANCEL_BTN_ID: ComponentId = ComponentId(623);
+pub const SIDEBAR_CONTEXT_MENUS_ID: ComponentId = ComponentId(626);
 pub const SIDEBAR_ROW_BASE: u64 = 10_000;
+pub const SIDEBAR_ROW_CONTEXT_MENU_BASE: u64 = 15_000;
 pub const SIDEBAR_ROW_DECOR_BASE: u64 = 50_000;
 
 // Summary surface: 700..=999 (+ passive rows 20_000+, decor 60_000+)

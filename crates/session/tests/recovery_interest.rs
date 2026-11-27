@@ -1109,3 +1109,401 @@ async fn releasing_history_lease_synchronously_drops_journal_stream_before_retur
     assert!(r.inspect(|s| !s.sessions.get("a").is_some_and(|sess| sess.journal_ready)));
     r.stop().await.unwrap();
 }
+
+type JournalSenderMap = Arc<
+    Mutex<
+        std::collections::BTreeMap<
+            (usize, String),
+            tokio::sync::mpsc::UnboundedSender<Result<Value>>,
+        >,
+    >,
+>;
+
+#[derive(Clone)]
+struct ArchiveSwitchConnector {
+    connects: Arc<AtomicUsize>,
+    followed_journals: Arc<Mutex<Vec<(usize, String)>>>,
+    closed_journals: Arc<Mutex<Vec<(usize, String)>>>,
+    recover_calls: Arc<Mutex<Vec<Value>>>,
+    running_a: Arc<std::sync::atomic::AtomicBool>,
+    park_archive: Arc<std::sync::atomic::AtomicBool>,
+    archive_entered: Arc<tokio::sync::Notify>,
+    archive_release: Arc<tokio::sync::Notify>,
+    archive_should_succeed: Arc<std::sync::atomic::AtomicBool>,
+    journal_txs: JournalSenderMap,
+}
+
+impl ArchiveSwitchConnector {
+    fn new(running_a: bool, archive_should_succeed: bool) -> Self {
+        Self {
+            connects: Arc::new(AtomicUsize::new(0)),
+            followed_journals: Arc::new(Mutex::new(Vec::new())),
+            closed_journals: Arc::new(Mutex::new(Vec::new())),
+            recover_calls: Arc::new(Mutex::new(Vec::new())),
+            running_a: Arc::new(std::sync::atomic::AtomicBool::new(running_a)),
+            park_archive: Arc::new(std::sync::atomic::AtomicBool::new(true)),
+            archive_entered: Arc::new(tokio::sync::Notify::new()),
+            archive_release: Arc::new(tokio::sync::Notify::new()),
+            archive_should_succeed: Arc::new(std::sync::atomic::AtomicBool::new(
+                archive_should_succeed,
+            )),
+            journal_txs: Arc::new(Mutex::new(std::collections::BTreeMap::new())),
+        }
+    }
+}
+
+struct ArchiveSwitchEndpoint {
+    connection: usize,
+    host: HostDescription,
+    source: ArchiveSwitchConnector,
+}
+
+#[async_trait]
+impl EndpointConnector for ArchiveSwitchConnector {
+    async fn connect(&self) -> Result<Arc<dyn SessionEndpoint>> {
+        let connection = self.connects.fetch_add(1, Ordering::SeqCst) + 1;
+        Ok(Arc::new(ArchiveSwitchEndpoint {
+            connection,
+            host: serde_json::from_value(json!({
+                "protocolVersion": 4,
+                "product": {"name": "Kernel", "version": "0.9.24"},
+                "capabilities": ["session-journal", "actionable-sync", "session-control-sync", "session-inventory-sync"],
+                "cwd": "/fixture",
+                "home": "/fixture",
+                "attachedSessions": 0,
+                "canOpenPath": false
+            }))
+            .unwrap(),
+            source: self.clone(),
+        }))
+    }
+}
+
+#[async_trait]
+impl SessionEndpoint for ArchiveSwitchEndpoint {
+    fn identity(&self) -> &str {
+        "archive-switch"
+    }
+    fn host(&self) -> &HostDescription {
+        &self.host
+    }
+    fn supports_recovery(&self) -> bool {
+        true
+    }
+    fn capabilities(&self) -> EndpointCapabilities {
+        EndpointCapabilities::methods(&["sessions.recover", "session.archive"])
+    }
+    async fn follow(&self, target: StreamTarget) -> Result<FrameStream> {
+        match target {
+            StreamTarget::SessionInventory => {
+                let running = self.source.running_a.load(Ordering::Acquire);
+                let baseline = json!({
+                    "type": "baseline",
+                    "generation": "g",
+                    "snapshot": {
+                        "items": [
+                            {"sessionId": "a", "running": running, "blank": false, "updatedAt": 10},
+                            {"sessionId": "b", "running": false, "blank": false, "updatedAt": 20}
+                        ]
+                    }
+                });
+                Ok(Box::pin(
+                    stream::once(async { Ok(baseline) }).chain(stream::pending()),
+                ))
+            }
+            StreamTarget::SessionControl => {
+                let baseline = json!({"type": "baseline", "generation": "g", "snapshot": {"queues": [], "jobs": [], "projections": []}});
+                Ok(Box::pin(
+                    stream::once(async { Ok(baseline) }).chain(stream::pending()),
+                ))
+            }
+            StreamTarget::Actionables => {
+                let reset = json!({"type": "reset", "generation": "g"});
+                Ok(Box::pin(
+                    stream::once(async { Ok(reset) }).chain(stream::pending()),
+                ))
+            }
+            StreamTarget::SessionJournal { address, .. } => {
+                struct DropGuard {
+                    conn: usize,
+                    sid: String,
+                    closed: Arc<Mutex<Vec<(usize, String)>>>,
+                }
+                impl Drop for DropGuard {
+                    fn drop(&mut self) {
+                        self.closed
+                            .lock()
+                            .unwrap()
+                            .push((self.conn, self.sid.clone()));
+                    }
+                }
+                let sid = address.session_id;
+                let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
+                self.source
+                    .followed_journals
+                    .lock()
+                    .unwrap()
+                    .push((self.connection, sid.clone()));
+                self.source
+                    .journal_txs
+                    .lock()
+                    .unwrap()
+                    .insert((self.connection, sid.clone()), tx);
+                let running = sid == "a" && self.source.running_a.load(Ordering::Acquire);
+                let entries = if running {
+                    vec![
+                        json!({"event": {"type": "turn/start", "seq": 0, "time": 1, "data": {"turn": 1}}}),
+                    ]
+                } else {
+                    vec![
+                        json!({"event": {"type": "user/message", "seq": 0, "time": 1, "data": {"text": "idle"}}}),
+                    ]
+                };
+                let snap = json!({
+                    "type": "snapshot",
+                    "snapshot": {
+                        "sessionId": sid,
+                        "generation": "g",
+                        "throughSequence": 0,
+                        "windowLimit": 50,
+                        "entries": entries,
+                        "hasMoreBefore": false
+                    }
+                });
+                let guard = DropGuard {
+                    conn: self.connection,
+                    sid,
+                    closed: self.source.closed_journals.clone(),
+                };
+                let tail = stream::unfold((rx, guard), |(mut rx, guard)| async move {
+                    rx.recv().await.map(|item| (item, (rx, guard)))
+                });
+                Ok(Box::pin(stream::once(async { Ok(snap) }).chain(tail)))
+            }
+            _ => Err(unsupported("unsupported stream")),
+        }
+    }
+    async fn history_page(&self, _: HistoryRequest) -> Result<HistoryPage> {
+        Err(unsupported("unsupported history"))
+    }
+    async fn respond(&self, _: &str, _: i64, _: Value) -> Result<()> {
+        Err(unsupported("unsupported respond"))
+    }
+    async fn call(&self, method: &str, payload: Value, _: &str) -> Result<Value> {
+        match method {
+            "session.archive" => {
+                if self.source.park_archive.swap(false, Ordering::AcqRel) {
+                    let release = self.source.archive_release.notified();
+                    tokio::pin!(release);
+                    release.as_mut().enable();
+                    self.source.archive_entered.notify_one();
+                    release.await;
+                }
+                if self.source.archive_should_succeed.load(Ordering::Acquire) {
+                    Ok(json!({ "archivedSessionIds": ["a"] }))
+                } else {
+                    Err(Error::Remote("session-running".into()))
+                }
+            }
+            "sessions.recover" => {
+                self.source
+                    .recover_calls
+                    .lock()
+                    .unwrap()
+                    .push(payload.clone());
+                Ok(json!({ "recoveredSessionIds": payload["sessionIds"] }))
+            }
+            other => Err(unsupported(other)),
+        }
+    }
+    async fn close(&self) {}
+}
+
+#[tokio::test]
+async fn rejected_archive_after_switch_observes_running_turn_then_drops_from_reconnect_and_recover()
+{
+    let source = ArchiveSwitchConnector::new(true, false);
+    let r = Arc::new(SessionRuntime::spawn(
+        "archive-switch",
+        Arc::new(source.clone()),
+    ));
+    r.wait_ready(Duration::from_secs(2)).await.unwrap();
+
+    let lease_a = r.acquire_history("a").await.unwrap();
+    assert!(r.inspect(|s| s.sessions["a"].journal_ready && s.sessions["a"].run_open));
+
+    let entered = source.archive_entered.notified();
+    let archive_task = tokio::spawn({
+        let r = r.clone();
+        async move { r.archive("a", "rpc-archive-a").await }
+    });
+    entered.await;
+
+    // Switch away to B while archive("a") is in flight: lease_a drops, B becomes ready.
+    lease_a.release().await.unwrap();
+    let lease_b = r.acquire_history("b").await.unwrap();
+    assert!(r.inspect(|s| s.sessions["b"].journal_ready && !s.sessions["a"].journal_ready));
+
+    // Release rejected archive response: A's journal reopens ONLY under deferred close to receive turn/end.
+    source.archive_release.notify_one();
+    assert!(archive_task.await.unwrap().is_err());
+    wait_store(&r, |s| {
+        s.sessions["a"].journal_ready && s.sessions["a"].run_open
+    })
+    .await;
+
+    // Deliver A's turn/end -> A retires immediately, while B remains ready.
+    source.running_a.store(false, Ordering::Release);
+    let tx_a = source.journal_txs.lock().unwrap()[&(1, "a".to_owned())].clone();
+    tx_a.send(Ok(json!({
+        "type": "event",
+        "generation": "g",
+        "sessionId": "a",
+        "entry": {"event": {"type": "turn/end", "seq": 1, "time": 2, "data": {"turn": 1, "reason": "completed"}}}
+    })))
+    .unwrap();
+    wait_store(&r, |s| !s.sessions["a"].journal_ready).await;
+    assert!(r.inspect(|s| s.sessions["b"].journal_ready));
+
+    // Reconnect: ONLY B is opened on mux and requested in sessions.recover.
+    source.recover_calls.lock().unwrap().clear();
+    r.reconnect().await.unwrap();
+    let conn2_journals: Vec<_> = source
+        .followed_journals
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|(c, _)| *c == 2)
+        .map(|(_, sid)| sid.clone())
+        .collect();
+    assert_eq!(conn2_journals, vec!["b".to_owned()]);
+    let conn2_recovers = source.recover_calls.lock().unwrap().clone();
+    assert_eq!(conn2_recovers, vec![json!({ "sessionIds": ["b"] })]);
+    assert!(r.inspect(|s| s.sessions["b"].journal_ready && !s.sessions["a"].journal_ready));
+
+    lease_b.release().await.unwrap();
+    r.stop().await.unwrap();
+}
+
+#[tokio::test]
+async fn rejected_archive_after_switch_on_idle_session_does_not_reopen_journal() {
+    let source = ArchiveSwitchConnector::new(false, false);
+    let r = Arc::new(SessionRuntime::spawn(
+        "archive-switch",
+        Arc::new(source.clone()),
+    ));
+    r.wait_ready(Duration::from_secs(2)).await.unwrap();
+
+    let lease_a = r.acquire_history("a").await.unwrap();
+    let entered = source.archive_entered.notified();
+    let archive_task = tokio::spawn({
+        let r = r.clone();
+        async move { r.archive("a", "rpc-archive-a").await }
+    });
+    entered.await;
+
+    lease_a.release().await.unwrap();
+    let lease_b = r.acquire_history("b").await.unwrap();
+    let opens_before = source.followed_journals.lock().unwrap().len();
+    source.archive_release.notify_one();
+    assert!(archive_task.await.unwrap().is_err());
+
+    r.reconnect().await.unwrap();
+    let new_opens = source.followed_journals.lock().unwrap()[opens_before..].to_vec();
+    assert_eq!(new_opens, vec![(2, "b".to_owned())]);
+    assert_eq!(
+        source.recover_calls.lock().unwrap().last(),
+        Some(&json!({ "sessionIds": ["b"] }))
+    );
+    assert!(r.inspect(|s| !s.sessions["a"].journal_ready && s.sessions["b"].journal_ready));
+
+    lease_b.release().await.unwrap();
+    r.stop().await.unwrap();
+}
+
+#[tokio::test]
+async fn rejected_archive_while_staying_on_session_restores_journal() {
+    let source = ArchiveSwitchConnector::new(true, false);
+    let r = Arc::new(SessionRuntime::spawn(
+        "archive-switch",
+        Arc::new(source.clone()),
+    ));
+    r.wait_ready(Duration::from_secs(2)).await.unwrap();
+
+    let lease_a = r.acquire_history("a").await.unwrap();
+    let entered = source.archive_entered.notified();
+    let archive_task = tokio::spawn({
+        let r = r.clone();
+        async move { r.archive("a", "rpc-archive-a").await }
+    });
+    entered.await;
+    assert!(r.inspect(|s| !s.sessions["a"].journal_ready));
+
+    source.archive_release.notify_one();
+    assert!(archive_task.await.unwrap().is_err());
+    wait_store(&r, |s| {
+        s.sessions["a"].journal_ready && s.sessions["a"].run_open
+    })
+    .await;
+
+    source.recover_calls.lock().unwrap().clear();
+    r.reconnect().await.unwrap();
+    let conn2_journals: Vec<_> = source
+        .followed_journals
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|(c, _)| *c == 2)
+        .map(|(_, sid)| sid.clone())
+        .collect();
+    assert_eq!(conn2_journals, vec!["a".to_owned()]);
+    assert_eq!(
+        source.recover_calls.lock().unwrap().as_slice(),
+        &[json!({ "sessionIds": ["a"] })]
+    );
+
+    lease_a.release().await.unwrap();
+    r.stop().await.unwrap();
+}
+
+#[tokio::test]
+async fn accepted_archive_after_switch_preserves_other_sessions_journal() {
+    let source = ArchiveSwitchConnector::new(true, true);
+    let r = Arc::new(SessionRuntime::spawn(
+        "archive-switch",
+        Arc::new(source.clone()),
+    ));
+    r.wait_ready(Duration::from_secs(2)).await.unwrap();
+
+    let lease_a = r.acquire_history("a").await.unwrap();
+    let entered = source.archive_entered.notified();
+    let archive_task = tokio::spawn({
+        let r = r.clone();
+        async move { r.archive("a", "rpc-archive-a").await }
+    });
+    entered.await;
+
+    lease_a.release().await.unwrap();
+    let lease_b = r.acquire_history("b").await.unwrap();
+    source.archive_release.notify_one();
+    assert!(archive_task.await.unwrap().is_ok());
+
+    r.reconnect().await.unwrap();
+    let conn2_journals: Vec<_> = source
+        .followed_journals
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|(c, _)| *c == 2)
+        .map(|(_, sid)| sid.clone())
+        .collect();
+    assert_eq!(conn2_journals, vec!["b".to_owned()]);
+    assert_eq!(
+        source.recover_calls.lock().unwrap().last(),
+        Some(&json!({ "sessionIds": ["b"] }))
+    );
+    assert!(r.inspect(|s| s.sessions["b"].journal_ready && !s.sessions["a"].journal_ready));
+
+    lease_b.release().await.unwrap();
+    r.stop().await.unwrap();
+}
