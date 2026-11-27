@@ -51,6 +51,14 @@ struct EndpointState {
     journal_closes: Vec<(usize, String)>,
     inventory_tx: Option<mpsc::UnboundedSender<Result<Value>>>,
     running: BTreeMap<String, bool>,
+    custom_items: Option<Vec<Value>>,
+    control_projections: Vec<Value>,
+    archived_ids: Vec<String>,
+    use_workspace_stream: bool,
+    rename_seq: i64,
+    reject_rename: bool,
+    reject_archive: bool,
+    reject_unarchive: bool,
     reject_cancel: bool,
     transport_error_cancel: bool,
     reject_queue_update: bool,
@@ -88,6 +96,14 @@ impl BlockerTestEndpoint {
                 journal_closes: Vec::new(),
                 inventory_tx: None,
                 running,
+                custom_items: None,
+                control_projections: Vec::new(),
+                archived_ids: Vec::new(),
+                use_workspace_stream: false,
+                rename_seq: 10,
+                reject_rename: false,
+                reject_archive: false,
+                reject_unarchive: false,
                 reject_cancel: false,
                 transport_error_cancel: false,
                 reject_queue_update: false,
@@ -160,17 +176,21 @@ impl EndpointConnector for BlockerTestEndpoint {
                 self.reconnect_permit.notified().await;
             }
         }
+        let mut caps = vec![
+            "session-journal",
+            "actionable-sync",
+            "session-control-sync",
+            "session-inventory-sync",
+        ];
+        if self.inner.lock().unwrap().use_workspace_stream {
+            caps.push("workspace-sync");
+        }
         Ok(Arc::new(TestSessionEndpoint {
             conn,
             host: serde_json::from_value(json!({
                 "protocolVersion": 4,
                 "product": {"name": "Kernel", "version": "0.9.23"},
-                "capabilities": [
-                    "session-journal",
-                    "actionable-sync",
-                    "session-control-sync",
-                    "session-inventory-sync"
-                ],
+                "capabilities": caps,
                 "cwd": "/fixture",
                 "home": "/fixture",
                 "attachedSessions": 0,
@@ -195,6 +215,9 @@ impl SessionEndpoint for TestSessionEndpoint {
             "session.prompt",
             "session.cancel",
             "session.updateQueue",
+            "session.rename",
+            "session.archive",
+            "session.unarchive",
             "session.models",
             "session.selectModel",
             "approvals.policy",
@@ -211,11 +234,13 @@ impl SessionEndpoint for TestSessionEndpoint {
                 }
                 let (tx, rx) = mpsc::unbounded_channel();
                 let mut guard = self.source.inner.lock().unwrap();
-                let items = vec![
-                    json!({"sessionId": "a", "running": guard.running["a"], "blank": false, "updatedAt": 10}),
-                    json!({"sessionId": "b", "running": guard.running["b"], "blank": false, "updatedAt": 20}),
-                    json!({"sessionId": "c", "running": guard.running["c"], "blank": false, "updatedAt": 30}),
-                ];
+                let items = guard.custom_items.clone().unwrap_or_else(|| {
+                    vec![
+                        json!({"sessionId": "a", "running": guard.running["a"], "blank": false, "updatedAt": 10}),
+                        json!({"sessionId": "b", "running": guard.running["b"], "blank": false, "updatedAt": 20}),
+                        json!({"sessionId": "c", "running": guard.running["c"], "blank": false, "updatedAt": 30}),
+                    ]
+                });
                 guard.inventory_tx = Some(tx);
                 let baseline =
                     json!({"type": "baseline", "generation": "g", "snapshot": {"items": items}});
@@ -224,8 +249,24 @@ impl SessionEndpoint for TestSessionEndpoint {
                 });
                 Ok(Box::pin(stream::once(async { Ok(baseline) }).chain(tail)))
             }
+            StreamTarget::WorkspaceInventory => {
+                let guard = self.source.inner.lock().unwrap();
+                let baseline = json!({
+                    "type": "baseline",
+                    "generation": "g",
+                    "snapshot": {
+                        "items": [],
+                        "archivedSessionIds": guard.archived_ids.clone(),
+                        "pinnedSessionIds": []
+                    }
+                });
+                Ok(Box::pin(
+                    stream::once(async { Ok(baseline) }).chain(stream::pending()),
+                ))
+            }
             StreamTarget::SessionControl => {
-                let baseline = json!({"type": "baseline", "generation": "g", "snapshot": {"queues": [], "jobs": [], "projections": []}});
+                let projections = self.source.inner.lock().unwrap().control_projections.clone();
+                let baseline = json!({"type": "baseline", "generation": "g", "snapshot": {"queues": [], "jobs": [], "projections": projections}});
                 Ok(Box::pin(
                     stream::once(async { Ok(baseline) }).chain(stream::pending()),
                 ))
@@ -383,6 +424,55 @@ impl SessionEndpoint for TestSessionEndpoint {
                     return Err(Error::Remote("queue-item-not-found".into()));
                 }
                 Ok(json!({ "ok": true }))
+            }
+            "session.rename" => {
+                let sid = payload["sessionId"].as_str().unwrap_or("").to_owned();
+                let title = payload["title"].as_str().unwrap_or("").to_owned();
+                let mut guard = self.source.inner.lock().unwrap();
+                if guard.reject_rename {
+                    return Err(Error::Remote("rename rejected".into()));
+                }
+                guard.rename_seq += 1;
+                let seq = guard.rename_seq;
+                if let Some(items) = guard.custom_items.as_mut()
+                    && let Some(item) = items.iter_mut().find(|item| item["sessionId"] == sid)
+                {
+                    item["projections"] = json!({
+                        "asOfSeq": seq,
+                        "values": { "title": title }
+                    });
+                }
+                Ok(json!({ "seq": seq, "title": title }))
+            }
+            "session.archive" => {
+                let sid = payload["sessionId"].as_str().unwrap_or("").to_owned();
+                let mut guard = self.source.inner.lock().unwrap();
+                if guard.reject_archive {
+                    return Err(Error::Remote("archive rejected".into()));
+                }
+                if let Some(items) = guard.custom_items.as_mut() {
+                    items.retain(|item| item["sessionId"] != sid);
+                }
+                if !guard.archived_ids.iter().any(|id| id == &sid) {
+                    guard.archived_ids.push(sid);
+                }
+                Ok(json!({ "archivedSessionIds": guard.archived_ids.clone() }))
+            }
+            "session.unarchive" => {
+                let sid = payload["sessionId"].as_str().unwrap_or("").to_owned();
+                let mut guard = self.source.inner.lock().unwrap();
+                if guard.reject_unarchive || !guard.archived_ids.iter().any(|id| id == &sid) {
+                    return Err(Error::Remote(
+                        format!("session-not-found: {sid}").into(),
+                    ));
+                }
+                guard.archived_ids.retain(|id| id != &sid);
+                if let Some(items) = guard.custom_items.as_mut()
+                    && !items.iter().any(|item| item["sessionId"] == sid)
+                {
+                    items.push(json!({"sessionId": sid, "running": false, "blank": false, "updatedAt": 25}));
+                }
+                Ok(json!({ "sessionId": sid }))
             }
             "session.selectModel" | "approvals.select" => Ok(json!({ "ok": true })),
             "session.prompt" => Ok(json!({ "accepted": true })),
@@ -2593,6 +2683,225 @@ fn overlapping_same_turn_stop_late_rejection_is_superseded_while_later_turns_and
         binding.session_error("a").is_none() && binding.error_for_session(Some("a")).is_none()
     });
     assert_eq!(binding.error_for_session(Some("b")), b_err);
+
+    rt.block_on(runtime.stop()).unwrap();
+}
+
+#[test]
+fn sidebar_title_uses_canonical_projections_and_replaces_or_reverts_local_rename() {
+    let endpoint = BlockerTestEndpoint::new();
+    {
+        let mut guard = endpoint.inner.lock().unwrap();
+        guard.custom_items = Some(vec![
+            json!({
+                "sessionId": "a",
+                "running": false,
+                "blank": false,
+                "updatedAt": 10,
+                "title": "Legacy A"
+            }),
+            json!({
+                "sessionId": "b",
+                "running": false,
+                "blank": false,
+                "updatedAt": 20,
+                "projections": {"asOfSeq": 10, "values": {"title": "Acceptance B"}}
+            }),
+            json!({
+                "sessionId": "c",
+                "running": false,
+                "blank": false,
+                "updatedAt": 30,
+                "title": "Stale Legacy C",
+                "name": "Stale Name C"
+            }),
+            json!({
+                "sessionId": "d",
+                "running": false,
+                "blank": false,
+                "updatedAt": 40
+            }),
+        ]);
+        guard.control_projections = vec![json!({
+            "sessionId": "c",
+            "projections": {"asOfSeq": 5, "values": {"title": null}}
+        })];
+    }
+
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    let runtime = rt.block_on(async {
+        let runtime = Arc::new(SessionRuntime::spawn(
+            "blocker-test",
+            Arc::new(endpoint.clone()),
+        ));
+        runtime.wait_ready(Duration::from_secs(2)).await.unwrap();
+        runtime
+    });
+    let controller = rt.block_on(async { Arc::new(RunController::new(Arc::clone(&runtime)).unwrap()) });
+    let wake = Arc::new(CountingWake::default());
+    let binding = {
+        let _guard = rt.enter();
+        RunWorkbenchBinding::new(
+            "blocker-test",
+            Arc::clone(&runtime),
+            controller,
+            rt.handle().clone(),
+            wake.clone(),
+        )
+    };
+    binding.open_initial_session("a").unwrap();
+
+    let rows = binding.sidebar_rows();
+    let title_for = |id: &str| {
+        binding
+            .sidebar_rows()
+            .into_iter()
+            .find(|r| r.session_id == id)
+            .map(|r| r.title)
+    };
+    assert_eq!(title_for("a").as_deref(), Some("Legacy A"));
+    assert_eq!(title_for("b").as_deref(), Some("Acceptance B"));
+    assert_eq!(title_for("c").as_deref(), Some("New conversation"));
+    assert_eq!(title_for("d").as_deref(), Some("New conversation"));
+    assert_eq!(rows.len(), 4);
+
+    binding.set_search_query("Acceptance B".to_owned());
+    let hits = binding.sidebar_rows();
+    assert_eq!(hits.len(), 1);
+    assert_eq!(hits[0].session_id, "b");
+    binding.set_search_query(String::new());
+
+    binding.rename_session("b", "B via binding".to_owned());
+    wait_until("local rename RPC sent", || {
+        endpoint.rpcs().iter().any(|(m, p)| {
+            m == "session.rename" && p["sessionId"] == "b" && p["title"] == "B via binding"
+        })
+    });
+    rt.block_on(runtime.rename("b", "B authoritative newer title", "ext-rename"))
+        .unwrap();
+    rt.block_on(runtime.reconnect()).unwrap();
+    wait_until("reconnected title matches newer authority", || {
+        title_for("b").as_deref() == Some("B authoritative newer title")
+    });
+
+    // Rejected rename must report session error and revert back to the authoritative title.
+    endpoint.inner.lock().unwrap().reject_rename = true;
+    binding.rename_session("b", "Rejected B Title".to_owned());
+    wait_until("rejected rename records session error and reverts", || {
+        binding
+            .session_error("b")
+            .as_deref()
+            .is_some_and(|e| e.contains("Rename failed"))
+            && title_for("b").as_deref() == Some("B authoritative newer title")
+    });
+    assert_eq!(binding.session_error("a"), None);
+
+    rt.block_on(runtime.stop()).unwrap();
+}
+
+#[test]
+fn sidebar_archive_and_unarchive_preserve_authoritative_state_and_route_explicitly() {
+    let endpoint = BlockerTestEndpoint::new();
+    {
+        let mut guard = endpoint.inner.lock().unwrap();
+        guard.use_workspace_stream = true;
+        guard.custom_items = Some(vec![
+            json!({"sessionId": "a", "running": false, "blank": false, "updatedAt": 10}),
+            json!({"sessionId": "b", "running": false, "blank": false, "updatedAt": 20, "projections": {"asOfSeq": 1, "values": {"title": "Restorable B"}}}),
+        ]);
+    }
+
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    let runtime = rt.block_on(async {
+        let runtime = Arc::new(SessionRuntime::spawn(
+            "blocker-test",
+            Arc::new(endpoint.clone()),
+        ));
+        runtime.wait_ready(Duration::from_secs(2)).await.unwrap();
+        runtime
+    });
+    let controller = rt.block_on(async { Arc::new(RunController::new(Arc::clone(&runtime)).unwrap()) });
+    let binding = {
+        let _guard = rt.enter();
+        RunWorkbenchBinding::new(
+            "blocker-test",
+            Arc::clone(&runtime),
+            controller,
+            rt.handle().clone(),
+            Arc::new(NoopWakeNotifier),
+        )
+    };
+    binding.open_initial_session("a").unwrap();
+
+    // 1. Archive B -> reconnect removes B from active inventory.
+    binding.archive_session("b");
+    wait_until("first archive RPC finished", || {
+        endpoint
+            .rpcs()
+            .iter()
+            .any(|(m, p)| m == "session.archive" && p["sessionId"] == "b")
+    });
+    rt.block_on(runtime.reconnect()).unwrap();
+    assert!(
+        !binding
+            .sidebar_rows()
+            .into_iter()
+            .any(|r| r.session_id == "b")
+    );
+
+    // 2. Independent external unarchive + reconnect -> B returns as active (archived == false).
+    rt.block_on(runtime.unarchive("b", "ext-restore"))
+        .unwrap();
+    rt.block_on(runtime.reconnect()).unwrap();
+    let b_row = binding
+        .sidebar_rows()
+        .into_iter()
+        .find(|r| r.session_id == "b")
+        .expect("restored B visible");
+    assert!(!b_row.archived);
+
+    // 3. Second archive_session MUST send session.archive (never session.unarchive).
+    let prev_rpc_len = endpoint.rpcs().len();
+    binding.archive_session("b");
+    wait_until("second archive RPC sent", || {
+        endpoint.rpcs()[prev_rpc_len..]
+            .iter()
+            .any(|(m, p)| m == "session.archive" && p["sessionId"] == "b")
+    });
+    assert!(
+        !endpoint.rpcs()[prev_rpc_len..]
+            .iter()
+            .any(|(m, _)| m == "session.unarchive")
+    );
+    rt.block_on(runtime.reconnect()).unwrap();
+
+    // 4. Restore again, then verify unarchive_session failure reports error and preserves active state,
+    // and archive_session failure reports error and reverts optimistic archive state.
+    rt.block_on(runtime.unarchive("b", "ext-restore-2"))
+        .unwrap();
+    rt.block_on(runtime.reconnect()).unwrap();
+    binding.unarchive_session("b");
+    wait_until("unarchive on active B surfaces session error", || {
+        binding
+            .session_error("b")
+            .as_deref()
+            .is_some_and(|e| e.contains("Unarchive failed"))
+    });
+    assert_eq!(binding.session_error("a"), None);
+
+    endpoint.inner.lock().unwrap().reject_archive = true;
+    binding.archive_session("b");
+    wait_until("rejected archive surfaces error and keeps B unarchived", || {
+        binding
+            .session_error("b")
+            .as_deref()
+            .is_some_and(|e| e.contains("Archive failed"))
+            && binding
+                .sidebar_rows()
+                .into_iter()
+                .find(|r| r.session_id == "b")
+                .is_some_and(|r| !r.archived)
+    });
 
     rt.block_on(runtime.stop()).unwrap();
 }

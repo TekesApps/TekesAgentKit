@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.9 — 2026-11-27
+
+- Resolve sidebar display and search titles via `tekes_agent_presentation::canonical_session_title` (reading `session.projections["title"]` and `summary.projections.values.title` while preserving projected nulls/clears, legacy `title`/`name` fallbacks, and `"New conversation"` defaults), replace permanent `local_titles` with authority/epoch-bounded `PendingRename` state so newer confirmed projections and reconnects supersede local edits, and surface rejected renames in `session_error` / `error_for_session` (#42).
+- Replace `archive_session`'s local toggle and `local_archived` set with explicit `archive_session` (`session.archive`) and `unarchive_session` (`session.unarchive`) bindings backed by authority/epoch-bounded `PendingArchiveOp` state, update `SidebarSurface` context menu entries dynamically between `"Archive"` (`["archive"]`) and `"Unarchive"` (`["unarchive"]`), wire AppHost/demo `SidebarIntent::UnarchiveSession`, and surface rejected archive/unarchive errors per session (#42).
+
 ## 0.6.8 — 2026-11-27
 
 - Record the originating `cancel_op_id` on `SessionErrorEntry` and unify `clear_superseded_cancel_error` and `record_cancel_error_if_not_newer` under `is_older_same_turn_cancel` so same-turn Stop outcomes are ordered by initiating operation ID across all arrival orders—including when two overlapping Stops are dispatched, the earlier rejection arrives first, and the newer Stop confirms `Ok(())` or `ConfirmedAborted` afterward (#34).
