@@ -10,9 +10,10 @@ use tekes_ui_controls::{
     ButtonVariant, ScrollArea,
     composition::{
         Button, ComponentId, Content, ContentActionKind, ContentActionPayload, ContentActionRecord,
-        ContentHost, KeyedSelectableListContent, ListDisplayUpdate, ListIntentKind, ListRowDisplay,
-        MenuContent, MenuEntry, ScrollContent, SearchCommandKind, SearchFieldContent,
-        SelectableListContent, StackContent, TextFieldContent, TextSubmitPolicy,
+        ContentActionSource, ContentHost, KeyedSelectableListContent, ListDisplayUpdate,
+        ListIntentKind, ListRowDisplay, MenuContent, MenuEntry, MenuSelection, ScrollContent,
+        SearchCommandKind, SearchFieldContent, SelectableListContent, StackContent,
+        TextFieldContent, TextSubmitPolicy,
     },
     extended::{KeyedListItem, KeyedListSnapshot, ListBudget, ListDatasetKey, ListItemKey},
     layout::Insets,
@@ -50,12 +51,23 @@ pub enum SidebarIntent {
     OpenSettings,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct RowContextMenuState {
+    session_id: String,
+    row_id: ComponentId,
+    row_mount: u64,
+    menu_id: ComponentId,
+    archived: bool,
+}
+
 #[derive(Debug)]
 pub struct SidebarSurface {
     next_key: u64,
     id_to_key: BTreeMap<String, ListItemKey>,
     key_to_id: BTreeMap<ListItemKey, String>,
     row_archived: BTreeMap<String, bool>,
+    row_context_menus: BTreeMap<ComponentId, RowContextMenuState>,
+    last_row_sigs: BTreeMap<ListItemKey, String>,
     last_sig: String,
     last_selected_session: Option<String>,
     last_menu_archived: Option<bool>,
@@ -78,6 +90,8 @@ impl SidebarSurface {
             id_to_key: BTreeMap::new(),
             key_to_id: BTreeMap::new(),
             row_archived: BTreeMap::new(),
+            row_context_menus: BTreeMap::new(),
+            last_row_sigs: BTreeMap::new(),
             last_sig: String::new(),
             last_selected_session: None,
             last_menu_archived: None,
@@ -178,6 +192,10 @@ impl SidebarSurface {
             MenuContent::context_menu("Thread actions", Self::context_menu_entries(false))
                 .expect("valid sidebar context menu entries"),
         );
+        let row_context_menus = Content::new(
+            SIDEBAR_CONTEXT_MENUS_ID,
+            StackContent::vertical(0.0, Vec::new()),
+        );
 
         StackContent::vertical(
             Spacing::Regular.value(),
@@ -189,6 +207,7 @@ impl SidebarSurface {
                 rename_slot,
                 Content::new(SIDEBAR_SETTINGS_BTN_ID, settings_btn),
                 context_menu,
+                row_context_menus,
             ],
         )
         .with_flexible_child(SIDEBAR_LIST_SCROLL_ID)
@@ -197,6 +216,27 @@ impl SidebarSurface {
 
     pub fn bind_context_menu(host: &mut ContentHost) {
         let _ = host.bind_context_menu(SIDEBAR_LIST_ID, SIDEBAR_CONTEXT_MENU_ID);
+    }
+
+    /// Context menu `ComponentId` bound to `session_id`'s rendered row, if currently mounted.
+    pub fn row_context_menu_id(&self, session_id: &str) -> Option<ComponentId> {
+        self.row_context_menus
+            .values()
+            .find(|state| state.session_id == session_id)
+            .map(|state| state.menu_id)
+    }
+
+    /// Currently open context menu `ComponentId` (row-targeted or list-level), if any.
+    pub fn open_context_menu_id(&self, host: &ContentHost) -> Option<ComponentId> {
+        self.row_context_menus
+            .keys()
+            .copied()
+            .chain(std::iter::once(SIDEBAR_CONTEXT_MENU_ID))
+            .find(|menu_id| {
+                host.get(*menu_id)
+                    .and_then(|node| node.component::<MenuContent>())
+                    .is_some_and(MenuContent::is_open)
+            })
     }
 
     fn key_for(&mut self, session_id: &str) -> ListItemKey {
@@ -277,13 +317,15 @@ impl SidebarSurface {
         self.set_search_visible(host, show_search);
 
         let mut sig = String::new();
+        let mut new_row_sigs = BTreeMap::new();
         let mut list_items = Vec::with_capacity(rows.len());
         let mut display_items = Vec::with_capacity(rows.len());
         let mut display_rows = Vec::with_capacity(rows.len());
 
         self.row_archived.clear();
         for row in rows {
-            self.row_archived.insert(row.session_id.clone(), row.archived);
+            self.row_archived
+                .insert(row.session_id.clone(), row.archived);
             let key = self.key_for(&row.session_id);
             let icon_name = if row.running {
                 "tekes-progress"
@@ -299,23 +341,31 @@ impl SidebarSurface {
             } else {
                 row.title.clone()
             };
-            sig.push_str(&format!("{}:{}:{icon_name}:{}|", key.0, row.folder, title));
+            let row_sig = format!("{}:{}:{icon_name}:{}", key.0, row.folder, title);
+            sig.push_str(&row_sig);
+            sig.push('|');
             list_items.push(KeyedListItem {
                 key,
                 name: title.clone(),
             });
             display_items.push(key);
-            let decor_base = SIDEBAR_ROW_DECOR_BASE + key.0 * 4;
-            display_rows.push(ListRowDisplay {
-                key,
-                row_id: ComponentId(SIDEBAR_ROW_BASE + key.0),
-                display: ListDisplayUpdate::Replace(icon_row(
+            let display = if self.last_row_sigs.get(&key) == Some(&row_sig) {
+                ListDisplayUpdate::Keep
+            } else {
+                let decor_base = SIDEBAR_ROW_DECOR_BASE + key.0 * 4;
+                ListDisplayUpdate::Replace(icon_row(
                     ComponentId(decor_base),
                     ComponentId(decor_base + 1),
                     ComponentId(decor_base + 2),
                     icon_name,
                     title,
-                )),
+                ))
+            };
+            new_row_sigs.insert(key, row_sig);
+            display_rows.push(ListRowDisplay {
+                key,
+                row_id: ComponentId(SIDEBAR_ROW_BASE + key.0),
+                display,
             });
         }
 
@@ -331,6 +381,7 @@ impl SidebarSurface {
                 .is_ok()
             {
                 self.last_sig = sig;
+                self.last_row_sigs = new_row_sigs;
                 list_replaced = true;
             }
         }
@@ -344,19 +395,161 @@ impl SidebarSurface {
             self.last_selected_session = sel_owned;
         }
 
-        let selected_archived = selected_session_id
+        if let Some(sid) = self.renaming_session_id.as_deref()
+            && !self.row_archived.contains_key(sid)
+        {
+            self.renaming_session_id = None;
+            self.set_rename_visible(host, false, "");
+        }
+
+        let obsolete_menus: Vec<ComponentId> = self
+            .row_context_menus
+            .iter()
+            .filter_map(|(menu_id, state)| {
+                (!self.row_archived.contains_key(&state.session_id)).then_some(*menu_id)
+            })
+            .collect();
+        for menu_id in obsolete_menus {
+            self.row_context_menus.remove(&menu_id);
+            let _ = host.remove(menu_id);
+        }
+
+        for row in rows {
+            let Some(&key) = self.id_to_key.get(&row.session_id) else {
+                continue;
+            };
+            let row_id = ComponentId(SIDEBAR_ROW_BASE + key.0);
+            let menu_id = ComponentId(SIDEBAR_ROW_CONTEXT_MENU_BASE + key.0);
+            let Some(row_mount) = host.get(row_id).map(|node| node.mount_identity()) else {
+                continue;
+            };
+            if let Some(existing) = self.row_context_menus.get_mut(&menu_id) {
+                if existing.archived != row.archived
+                    && let Some(menu) = host
+                        .get_mut(menu_id)
+                        .and_then(|c| c.component_mut::<MenuContent>())
+                    && menu
+                        .set_entries(Self::context_menu_entries(row.archived))
+                        .is_ok()
+                {
+                    existing.archived = row.archived;
+                }
+                if (existing.row_mount != row_mount
+                    || existing.row_id != row_id
+                    || existing.session_id != row.session_id)
+                    && host.bind_context_menu(row_id, menu_id).is_ok()
+                {
+                    existing.session_id = row.session_id.clone();
+                    existing.row_id = row_id;
+                    existing.row_mount = row_mount;
+                }
+            } else if let Ok(menu) = MenuContent::context_menu(
+                "Thread actions",
+                Self::context_menu_entries(row.archived),
+            ) && host
+                .insert(SIDEBAR_CONTEXT_MENUS_ID, Content::new(menu_id, menu))
+                .is_ok()
+            {
+                if host.bind_context_menu(row_id, menu_id).is_ok() {
+                    self.row_context_menus.insert(
+                        menu_id,
+                        RowContextMenuState {
+                            session_id: row.session_id.clone(),
+                            row_id,
+                            row_mount,
+                            menu_id,
+                            archived: row.archived,
+                        },
+                    );
+                } else {
+                    let _ = host.remove(menu_id);
+                }
+            }
+        }
+
+        let fallback_target = host
+            .get(SIDEBAR_LIST_ID)
+            .and_then(|c| c.component::<KeyedSelectableListContent>())
+            .and_then(|list| list.focused_key().or_else(|| list.selected_key()))
+            .and_then(|key| self.key_to_id.get(&key).map(String::as_str))
+            .or(selected_session_id);
+        let fallback_archived = fallback_target
             .and_then(|sid| self.row_archived.get(sid).copied())
             .unwrap_or(false);
-        if self.last_menu_archived != Some(selected_archived)
+        if self.last_menu_archived != Some(fallback_archived)
             && let Some(menu) = host
                 .get_mut(SIDEBAR_CONTEXT_MENU_ID)
                 .and_then(|c| c.component_mut::<MenuContent>())
             && menu
-                .set_entries(Self::context_menu_entries(selected_archived))
+                .set_entries(Self::context_menu_entries(fallback_archived))
                 .is_ok()
         {
-            self.last_menu_archived = Some(selected_archived);
+            self.last_menu_archived = Some(fallback_archived);
         }
+    }
+
+    fn dispatch_menu_action(
+        &mut self,
+        host: &mut ContentHost,
+        sid: &str,
+        sel: &MenuSelection,
+        out: &mut Vec<SidebarIntent>,
+    ) {
+        let Some(&archived) = self.row_archived.get(sid) else {
+            return;
+        };
+        match sel.value_path() {
+            Some([action]) if action == "pin" => {
+                out.push(SidebarIntent::TogglePin(sid.to_owned()));
+            }
+            Some([action]) if action == "rename" => {
+                self.renaming_session_id = Some(sid.to_owned());
+                self.set_rename_visible(host, true, "");
+            }
+            Some([action]) if action == "archive" => {
+                out.push(SidebarIntent::ArchiveSession(sid.to_owned()));
+            }
+            Some([action]) if action == "unarchive" => {
+                out.push(SidebarIntent::UnarchiveSession(sid.to_owned()));
+            }
+            Some(_) => {}
+            None => match sel.index() {
+                0 => out.push(SidebarIntent::TogglePin(sid.to_owned())),
+                1 => {
+                    self.renaming_session_id = Some(sid.to_owned());
+                    self.set_rename_visible(host, true, "");
+                }
+                2 => {
+                    if archived {
+                        out.push(SidebarIntent::UnarchiveSession(sid.to_owned()));
+                    } else {
+                        out.push(SidebarIntent::ArchiveSession(sid.to_owned()));
+                    }
+                }
+                _ => {}
+            },
+        }
+    }
+
+    fn submit_rename(&mut self, host: &mut ContentHost, out: &mut Vec<SidebarIntent>) {
+        if let Some(sid) = self
+            .renaming_session_id
+            .as_deref()
+            .filter(|sid| self.row_archived.contains_key(*sid))
+            && let Some(field) = host
+                .get(SIDEBAR_RENAME_INPUT_ID)
+                .and_then(|c| c.component::<TextFieldContent>())
+        {
+            let title = field.text().trim().to_owned();
+            if !title.is_empty() {
+                out.push(SidebarIntent::RenameSession {
+                    session_id: sid.to_owned(),
+                    title,
+                });
+            }
+        }
+        self.renaming_session_id = None;
+        self.set_rename_visible(host, false, "");
     }
 
     pub fn handle_actions(
@@ -404,62 +597,46 @@ impl SidebarSurface {
                 }
                 continue;
             }
-            if let Some(ContentActionPayload::MenuSelection(sel)) = &record.payload
-                && record.action.target == SIDEBAR_CONTEXT_MENU_ID
-            {
-                if let Some(sid) = selected_session_id {
-                    match sel.value_path() {
-                        Some([action]) if action == "pin" => {
-                            out.push(SidebarIntent::TogglePin(sid.to_owned()));
-                        }
-                        Some([action]) if action == "rename" => {
-                            self.renaming_session_id = Some(sid.to_owned());
-                            self.set_rename_visible(host, true, "");
-                        }
-                        Some([action]) if action == "archive" => {
-                            out.push(SidebarIntent::ArchiveSession(sid.to_owned()));
-                        }
-                        Some([action]) if action == "unarchive" => {
-                            out.push(SidebarIntent::UnarchiveSession(sid.to_owned()));
-                        }
-                        Some(_) => {}
-                        None => match sel.index() {
-                            0 => out.push(SidebarIntent::TogglePin(sid.to_owned())),
-                            1 => {
-                                self.renaming_session_id = Some(sid.to_owned());
-                                self.set_rename_visible(host, true, "");
-                            }
-                            2 => {
-                                if self.row_archived.get(sid).copied().unwrap_or(false) {
-                                    out.push(SidebarIntent::UnarchiveSession(sid.to_owned()));
-                                } else {
-                                    out.push(SidebarIntent::ArchiveSession(sid.to_owned()));
-                                }
-                            }
-                            _ => {}
-                        },
+            if let Some(ContentActionPayload::MenuSelection(sel)) = &record.payload {
+                if let Some(state) = self.row_context_menus.get(&record.action.target).cloned() {
+                    let request_matches = sel.context_request().is_some_and(|req| {
+                        req.owner() == state.row_id && req.owner_mount() == state.row_mount
+                    });
+                    let row_still_mounted = host
+                        .get(state.row_id)
+                        .is_some_and(|node| node.mount_identity() == state.row_mount);
+                    if request_matches && row_still_mounted {
+                        self.dispatch_menu_action(host, &state.session_id, sel, &mut out);
                     }
+                    continue;
                 }
-                continue;
+                if record.action.target == SIDEBAR_CONTEXT_MENU_ID {
+                    if sel
+                        .context_request()
+                        .is_some_and(|req| req.source() == ContentActionSource::Pointer)
+                    {
+                        continue;
+                    }
+                    let target_sid = host
+                        .get(SIDEBAR_LIST_ID)
+                        .and_then(|c| c.component::<KeyedSelectableListContent>())
+                        .and_then(|list| list.focused_key().or_else(|| list.selected_key()))
+                        .and_then(|key| self.key_to_id.get(&key).cloned())
+                        .or_else(|| {
+                            selected_session_id
+                                .filter(|sid| self.row_archived.contains_key(*sid))
+                                .map(str::to_owned)
+                        });
+                    if let Some(sid) = target_sid {
+                        self.dispatch_menu_action(host, &sid, sel, &mut out);
+                    }
+                    continue;
+                }
             }
             if record.action.target == SIDEBAR_RENAME_INPUT_ID
                 && matches!(record.action.kind, ContentActionKind::Submit)
             {
-                if let Some(sid) = self.renaming_session_id.as_deref().or(selected_session_id)
-                    && let Some(field) = host
-                        .get(SIDEBAR_RENAME_INPUT_ID)
-                        .and_then(|c| c.component::<TextFieldContent>())
-                {
-                    let title = field.text().trim().to_owned();
-                    if !title.is_empty() {
-                        out.push(SidebarIntent::RenameSession {
-                            session_id: sid.to_owned(),
-                            title,
-                        });
-                    }
-                }
-                self.renaming_session_id = None;
-                self.set_rename_visible(host, false, "");
+                self.submit_rename(host, &mut out);
                 continue;
             }
             if matches!(record.action.kind, ContentActionKind::Activate) {
@@ -476,24 +653,7 @@ impl SidebarSurface {
                             let _ = host.focus(Some(SIDEBAR_SEARCH_ID), true);
                         }
                     }
-                    id if id == SIDEBAR_RENAME_BTN_ID => {
-                        if let Some(sid) =
-                            self.renaming_session_id.as_deref().or(selected_session_id)
-                            && let Some(field) = host
-                                .get(SIDEBAR_RENAME_INPUT_ID)
-                                .and_then(|c| c.component::<TextFieldContent>())
-                        {
-                            let title = field.text().trim().to_owned();
-                            if !title.is_empty() {
-                                out.push(SidebarIntent::RenameSession {
-                                    session_id: sid.to_owned(),
-                                    title,
-                                });
-                            }
-                        }
-                        self.renaming_session_id = None;
-                        self.set_rename_visible(host, false, "");
-                    }
+                    id if id == SIDEBAR_RENAME_BTN_ID => self.submit_rename(host, &mut out),
                     id if id == SIDEBAR_RENAME_CANCEL_BTN_ID => {
                         self.renaming_session_id = None;
                         self.set_rename_visible(host, false, "");

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.6.10 — 2026-11-27
+
+- Bind per-row context menus directly to `KeyedSelectableListContent` row mounts (`SIDEBAR_ROW_BASE + key`) inside `SidebarSurface`, capturing each clicked row's target session without changing the active selection, keeping keyboard/accessibility fallback on the focused/selected row, cancelling pending actions/renames when a clicked row disappears, and ignoring background empty-area secondary clicks (#52).
+- Gate `RunWorkbenchBinding::rename_session` and `submit_archive_transition` completion/rejection error reporting and error clearing by per-session latest `op_id` (`SessionSidebarOpTracking`), so delayed earlier `Rename failed` or earlier `Ok` receipts neither clobber newer successes nor mask latest rejections (#42).
+- Suspend `SessionRuntime` active-run journals across in-flight `session.archive`/`session.discard` calls (`SuspendedJournal`) and inspect the latest close intent (`closed_while_suspended`) plus active-run state when an archive RPC rejects, keeping detached running sessions deferred-close-only until terminal `turn/end` and preventing released idle sessions from re-entering `wanted` or `sessions.recover` (#56, #42).
+- Skip full `MemoryProjectionStore` snapshots in `reconcile_sidebar_overrides` when both pending sidebar maps are empty, inspect only required session fields/epochs across `sidebar_rows` and sidebar mutations, and remove the write-only `PendingArchiveOp.in_flight` field (#42).
+
 ## 0.6.9 — 2026-11-27
 
 - Resolve sidebar display and search titles via `tekes_agent_presentation::canonical_session_title` (reading `session.projections["title"]` and `summary.projections.values.title` while preserving projected nulls/clears, legacy `title`/`name` fallbacks, and `"New conversation"` defaults), replace permanent `local_titles` with authority/epoch-bounded `PendingRename` state so newer confirmed projections and reconnects supersede local edits, and surface rejected renames in `session_error` / `error_for_session` (#42).

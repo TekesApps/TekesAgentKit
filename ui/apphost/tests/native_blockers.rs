@@ -10,10 +10,10 @@ use tekes_agent_apphost::{
 };
 use tekes_agent_components_ui::{
     COMPOSER_SEND_BTN_ID, ComposerIntent, ComposerSurface, RUN_CONTAINER_STACK_ID,
-    ResponsiveWidthMode, SIDEBAR_CONTEXT_MENU_ID, SIDEBAR_LIST_ID, SidebarFilterSelection,
-    SidebarIntent, SidebarRowModel, SidebarSurface, TASKS_ERROR_ID, TRANSCRIPT_ERROR_PANEL_ID,
-    TRANSCRIPT_ROOT_ID, TRANSCRIPT_STATUS_ID, TasksQueueSurface, TasksQueueViewModel,
-    TranscriptSurface,
+    ResponsiveWidthMode, SIDEBAR_CONTEXT_MENU_ID, SIDEBAR_LIST_ID, SIDEBAR_RENAME_BTN_ID,
+    SIDEBAR_RENAME_INPUT_ID, SidebarFilterSelection, SidebarIntent, SidebarRowModel,
+    SidebarSurface, TASKS_ERROR_ID, TRANSCRIPT_ERROR_PANEL_ID, TRANSCRIPT_ROOT_ID,
+    TRANSCRIPT_STATUS_ID, TasksQueueSurface, TasksQueueViewModel, TranscriptSurface,
 };
 use tekes_agent_contract::{
     EndpointCapabilities, EndpointConnector, Error, FrameStream, HistoryPage, HistoryRequest,
@@ -1385,32 +1385,39 @@ fn session_sidebar_container_renders_confirmed_titles_matches_search_and_routes_
     let mut surface = SidebarSurface::new();
     let mut text = TestTextBackend::new();
 
-    let sync_sidebar = |host: &mut ContentHost, surface: &mut SidebarSurface, text: &mut TestTextBackend| {
-        let rows: Vec<SidebarRowModel> = binding
-            .sidebar_rows()
-            .into_iter()
-            .map(|r| SidebarRowModel {
-                session_id: r.session_id,
-                title: r.title,
-                folder: r.folder,
-                activity: r.activity,
-                running: r.running,
-                pinned: r.pinned,
-                archived: r.archived,
-            })
-            .collect();
-        let selected = binding.current_scope().map(|s| s.session_id);
-        surface.sync(
-            host,
-            &rows,
-            selected.as_deref(),
-            SidebarFilterSelection::All,
-            ResponsiveWidthMode::Expanded,
-        );
-        let rect = Rect::new(0.0, 0.0, 320.0, 640.0);
-        host.render(&mut Scene::new(), text, rect, rect, Palette::from(Theme::LIGHT))
+    let sync_sidebar =
+        |host: &mut ContentHost, surface: &mut SidebarSurface, text: &mut TestTextBackend| {
+            let rows: Vec<SidebarRowModel> = binding
+                .sidebar_rows()
+                .into_iter()
+                .map(|r| SidebarRowModel {
+                    session_id: r.session_id,
+                    title: r.title,
+                    folder: r.folder,
+                    activity: r.activity,
+                    running: r.running,
+                    pinned: r.pinned,
+                    archived: r.archived,
+                })
+                .collect();
+            let selected = binding.current_scope().map(|s| s.session_id);
+            surface.sync(
+                host,
+                &rows,
+                selected.as_deref(),
+                SidebarFilterSelection::All,
+                ResponsiveWidthMode::Expanded,
+            );
+            let rect = Rect::new(0.0, 0.0, 320.0, 640.0);
+            host.render(
+                &mut Scene::new(),
+                text,
+                rect,
+                rect,
+                Palette::from(Theme::LIGHT),
+            )
             .unwrap();
-    };
+        };
 
     sync_sidebar(&mut host, &mut surface, &mut text);
     let menu_binding = host
@@ -1426,7 +1433,10 @@ fn session_sidebar_container_renders_confirmed_titles_matches_search_and_routes_
             .collect()
     };
     let names = visible_names(&host);
-    assert!(names.iter().any(|n| n == "Acceptance B"), "names: {names:?}");
+    assert!(
+        names.iter().any(|n| n == "Acceptance B"),
+        "names: {names:?}"
+    );
 
     binding.select_session("b");
     rt.block_on(wait_store(&runtime, |s| s.sessions["b"].journal_ready));
@@ -1439,8 +1449,14 @@ fn session_sidebar_container_renders_confirmed_titles_matches_search_and_routes_
         host.request_context_menu(menu_binding, ContentActionSource::Accessibility)
             .unwrap();
         let rect = Rect::new(0.0, 0.0, 320.0, 640.0);
-        host.render(&mut Scene::new(), text, rect, rect, Palette::from(Theme::LIGHT))
-            .unwrap();
+        host.render(
+            &mut Scene::new(),
+            text,
+            rect,
+            rect,
+            Palette::from(Theme::LIGHT),
+        )
+        .unwrap();
         let part_id = host
             .get(SIDEBAR_CONTEXT_MENU_ID)
             .and_then(|c| c.component::<MenuContent>())
@@ -1513,7 +1529,11 @@ fn session_sidebar_container_renders_confirmed_titles_matches_search_and_routes_
     binding.select_session("c");
     rt.block_on(wait_store(&runtime, |s| s.sessions["c"].journal_ready));
     sync_sidebar(&mut host, &mut surface, &mut text);
-    assert!(visible_names(&host).iter().any(|n| n == "Archived C (Archived)"));
+    assert!(
+        visible_names(&host)
+            .iter()
+            .any(|n| n == "Archived C (Archived)")
+    );
     let c_rpc_start = endpoint.inner.lock().unwrap().rpcs.len();
     trigger_menu_item(&mut host, &mut surface, &mut text, "Unarchive");
     for _ in 0..80 {
@@ -1532,6 +1552,370 @@ fn session_sidebar_container_renders_confirmed_titles_matches_search_and_routes_
             .any(|(m, p)| m == "session.unarchive" && p["sessionId"] == "c")
     );
     assert!(!c_rpcs.iter().any(|(m, _)| m == "session.archive"));
+
+    rt.block_on(runtime.stop()).unwrap();
+}
+
+#[test]
+fn sidebar_secondary_click_targets_clicked_row_preserving_selection_and_cancels_when_row_disappears()
+ {
+    let endpoint = ErrorScopeEndpoint::new();
+    {
+        let mut guard = endpoint.inner.lock().unwrap();
+        guard.custom_items = Some(vec![
+            json!({"sessionId": "a", "running": false, "blank": false, "updatedAt": 10, "projections": {"asOfSeq": 1, "values": {"title": "Acceptance A"}}}),
+            json!({"sessionId": "b", "running": false, "blank": false, "updatedAt": 20, "status": "archived", "projections": {"asOfSeq": 2, "values": {"title": "Archived B"}}}),
+            json!({"sessionId": "c", "running": false, "blank": false, "updatedAt": 30, "projections": {"asOfSeq": 3, "values": {"title": "Acceptance C"}}}),
+        ]);
+        guard.archived_ids = vec!["b".to_owned()];
+    }
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    let runtime = rt.block_on(async {
+        let runtime = Arc::new(SessionRuntime::spawn(
+            "error-scope",
+            Arc::new(endpoint.clone()),
+        ));
+        runtime.wait_ready(Duration::from_secs(2)).await.unwrap();
+        runtime
+    });
+    let controller =
+        rt.block_on(async { Arc::new(RunController::new(Arc::clone(&runtime)).unwrap()) });
+    let workbench = SharedAgentWorkbench::new();
+    let binding = {
+        let _guard = rt.enter();
+        RunWorkbenchBinding::new(
+            "error-scope",
+            Arc::clone(&runtime),
+            controller,
+            rt.handle().clone(),
+            workbench.wake_hub(),
+        )
+    };
+    binding.open_initial_session("a").unwrap();
+    workbench.attach_run_binding(Arc::clone(&binding));
+
+    let main = AgentRunContainer::build("run", workbench.clone()).unwrap();
+    let sidebar = SessionSidebarContainer::build("sidebar", workbench).unwrap();
+    let _app = AppWindow::from_containers(
+        vec![sidebar.into(), main.into()],
+        PresentationOptions::new("run").nav_bar("sidebar"),
+    )
+    .unwrap();
+
+    let mut host = ContentHost::new(SidebarSurface::build_content()).unwrap();
+    host.set_window_active(true);
+    host.set_action_events(true);
+    SidebarSurface::bind_context_menu(&mut host);
+    let mut surface = SidebarSurface::new();
+    let mut text = TestTextBackend::new();
+    let rect = Rect::new(0.0, 0.0, 320.0, 640.0);
+
+    let sync_sidebar =
+        |host: &mut ContentHost, surface: &mut SidebarSurface, text: &mut TestTextBackend| {
+            let rows: Vec<SidebarRowModel> = binding
+                .sidebar_rows()
+                .into_iter()
+                .map(|r| SidebarRowModel {
+                    session_id: r.session_id,
+                    title: r.title,
+                    folder: r.folder,
+                    activity: r.activity,
+                    running: r.running,
+                    pinned: r.pinned,
+                    archived: r.archived,
+                })
+                .collect();
+            let selected = binding.current_scope().map(|s| s.session_id);
+            surface.sync(
+                host,
+                &rows,
+                selected.as_deref(),
+                SidebarFilterSelection::All,
+                ResponsiveWidthMode::Expanded,
+            );
+            host.render(
+                &mut Scene::new(),
+                text,
+                rect,
+                rect,
+                Palette::from(Theme::LIGHT),
+            )
+            .unwrap();
+        };
+
+    let row_center = |host: &ContentHost, label: &str| -> Point {
+        let frame = host
+            .get(SIDEBAR_LIST_ID)
+            .and_then(|n| n.component::<KeyedSelectableListContent>())
+            .unwrap()
+            .semantic_parts()
+            .into_iter()
+            .find(|p| p.semantics.name == label)
+            .unwrap_or_else(|| panic!("missing row `{label}`"))
+            .frame;
+        Point::new(
+            frame.origin.x + frame.size.width * 0.5,
+            frame.origin.y + frame.size.height * 0.5,
+        )
+    };
+
+    let dispatch_row_menu = |host: &mut ContentHost,
+                             surface: &mut SidebarSurface,
+                             text: &mut TestTextBackend,
+                             row_label: &str,
+                             expected_sid: &str,
+                             item_label: &str|
+     -> Vec<SidebarIntent> {
+        let point = row_center(host, row_label);
+        let resp = host
+            .event_with_text(
+                &ContentEvent::Pointer(PointerEvent {
+                    position: point,
+                    phase: PointerPhase::Down,
+                    button: Some(PointerButton::Secondary),
+                    modifiers: PointerModifiers::default(),
+                    click_count: 1,
+                }),
+                text,
+            )
+            .unwrap();
+        assert!(
+            resp.consumed,
+            "secondary click on `{row_label}` must consume"
+        );
+        host.render(
+            &mut Scene::new(),
+            text,
+            rect,
+            rect,
+            Palette::from(Theme::LIGHT),
+        )
+        .unwrap();
+        let menu_id = surface
+            .open_context_menu_id(host)
+            .expect("row context menu must open");
+        assert_eq!(Some(menu_id), surface.row_context_menu_id(expected_sid));
+        let part_id = host
+            .get(menu_id)
+            .and_then(|c| c.component::<MenuContent>())
+            .unwrap()
+            .semantic_parts()
+            .into_iter()
+            .find(|p| p.semantics.role == ContentRole::MenuItem && p.semantics.name == item_label)
+            .unwrap_or_else(|| panic!("expected menu item `{item_label}` on `{expected_sid}`"))
+            .index;
+        let pick_resp =
+            host.accessibility_action(menu_id, Some(part_id), AccessibilityAction::Press);
+        assert!(pick_resp.activated);
+        let records = host.drain_action_records();
+        let selected = binding.current_scope().map(|s| s.session_id);
+        surface.handle_actions(host, selected.as_deref(), &records)
+    };
+
+    sync_sidebar(&mut host, &mut surface, &mut text);
+    assert_eq!(binding.current_scope().unwrap().session_id, "a");
+
+    // 1. While A is selected, right-clicking archived B opens B's menu ("Unarchive") and dispatches to B.
+    let intents = dispatch_row_menu(
+        &mut host,
+        &mut surface,
+        &mut text,
+        "Archived B (Archived)",
+        "b",
+        "Unarchive",
+    );
+    assert_eq!(
+        intents,
+        vec![SidebarIntent::UnarchiveSession("b".to_owned())]
+    );
+    assert_eq!(binding.current_scope().unwrap().session_id, "a");
+    let rpc_start = endpoint.inner.lock().unwrap().rpcs.len();
+    binding.unarchive_session("b");
+    for _ in 0..80 {
+        if endpoint.inner.lock().unwrap().rpcs[rpc_start..]
+            .iter()
+            .any(|(m, p)| m == "session.unarchive" && p["sessionId"] == "b")
+        {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    rt.block_on(runtime.reconnect()).unwrap();
+    sync_sidebar(&mut host, &mut surface, &mut text);
+
+    // 2. While A is selected, right-clicking active C -> Archive targets C, NOT A.
+    let rpc_start_c = endpoint.inner.lock().unwrap().rpcs.len();
+    let intents_c = dispatch_row_menu(
+        &mut host,
+        &mut surface,
+        &mut text,
+        "Acceptance C",
+        "c",
+        "Archive",
+    );
+    assert_eq!(
+        intents_c,
+        vec![SidebarIntent::ArchiveSession("c".to_owned())]
+    );
+    for intent in intents_c {
+        if let SidebarIntent::ArchiveSession(sid) = intent {
+            binding.archive_session(&sid);
+        }
+    }
+    for _ in 0..80 {
+        if endpoint.inner.lock().unwrap().rpcs[rpc_start_c..]
+            .iter()
+            .any(|(m, p)| m == "session.archive" && p["sessionId"] == "c")
+        {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    let c_rpcs = endpoint.inner.lock().unwrap().rpcs[rpc_start_c..].to_vec();
+    assert!(
+        c_rpcs
+            .iter()
+            .any(|(m, p)| m == "session.archive" && p["sessionId"] == "c")
+    );
+    assert!(
+        !c_rpcs
+            .iter()
+            .any(|(m, p)| m == "session.archive" && p["sessionId"] == "a")
+    );
+    assert_eq!(binding.current_scope().unwrap().session_id, "a");
+    rt.block_on(runtime.reconnect()).unwrap();
+    sync_sidebar(&mut host, &mut surface, &mut text);
+
+    // 3. While A is selected, Pin / Unpin and Rename on visible B target B while keeping A selected.
+    let pin_intents = dispatch_row_menu(
+        &mut host,
+        &mut surface,
+        &mut text,
+        "Archived B (Archived)",
+        "b",
+        "Pin / Unpin",
+    );
+    assert_eq!(pin_intents, vec![SidebarIntent::TogglePin("b".to_owned())]);
+    assert_eq!(binding.current_scope().unwrap().session_id, "a");
+
+    let rename_open = dispatch_row_menu(
+        &mut host,
+        &mut surface,
+        &mut text,
+        "Archived B (Archived)",
+        "b",
+        "Rename",
+    );
+    assert!(rename_open.is_empty());
+    host.render(
+        &mut Scene::new(),
+        &mut text,
+        rect,
+        rect,
+        Palette::from(Theme::LIGHT),
+    )
+    .unwrap();
+    host.get_mut(SIDEBAR_RENAME_INPUT_ID)
+        .and_then(|n| n.component_mut::<tekes_ui_controls::composition::TextFieldContent>())
+        .unwrap()
+        .insert_text("B Renamed Off Selection", None);
+    let save_resp =
+        host.accessibility_action(SIDEBAR_RENAME_BTN_ID, None, AccessibilityAction::Press);
+    assert!(save_resp.activated);
+    let save_records = host.drain_action_records();
+    let rename_intents = surface.handle_actions(&mut host, Some("a"), &save_records);
+    assert_eq!(
+        rename_intents,
+        vec![SidebarIntent::RenameSession {
+            session_id: "b".to_owned(),
+            title: "B Renamed Off Selection".to_owned(),
+        }]
+    );
+    assert_eq!(binding.current_scope().unwrap().session_id, "a");
+
+    // 4. Empty space right-click inside SIDEBAR_LIST_ID does NOT target selected A.
+    let list_frame = host.get(SIDEBAR_LIST_ID).unwrap().frame();
+    let empty_point = Point::new(
+        list_frame.origin.x + list_frame.size.width * 0.5,
+        list_frame.origin.y + list_frame.size.height - 10.0,
+    );
+    let _ = host.event_with_text(
+        &ContentEvent::Pointer(PointerEvent {
+            position: empty_point,
+            phase: PointerPhase::Down,
+            button: Some(PointerButton::Secondary),
+            modifiers: PointerModifiers::default(),
+            click_count: 1,
+        }),
+        &mut text,
+    );
+    host.render(
+        &mut Scene::new(),
+        &mut text,
+        rect,
+        rect,
+        Palette::from(Theme::LIGHT),
+    )
+    .unwrap();
+    if host
+        .get(SIDEBAR_CONTEXT_MENU_ID)
+        .and_then(|c| c.component::<MenuContent>())
+        .is_some_and(MenuContent::is_open)
+    {
+        let part_id = host
+            .get(SIDEBAR_CONTEXT_MENU_ID)
+            .and_then(|c| c.component::<MenuContent>())
+            .unwrap()
+            .semantic_parts()
+            .into_iter()
+            .find(|p| p.semantics.role == ContentRole::MenuItem && p.semantics.name == "Archive")
+            .unwrap()
+            .index;
+        let _ = host.accessibility_action(
+            SIDEBAR_CONTEXT_MENU_ID,
+            Some(part_id),
+            AccessibilityAction::Press,
+        );
+        let empty_records = host.drain_action_records();
+        let empty_intents = surface.handle_actions(&mut host, Some("a"), &empty_records);
+        assert!(
+            empty_intents.is_empty(),
+            "empty-space pointer menu must not hit A: {empty_intents:?}"
+        );
+    }
+
+    // 5. If clicked row B disappears after menu/rename opened, action cancels (never falls back to A).
+    let open_rename = dispatch_row_menu(
+        &mut host,
+        &mut surface,
+        &mut text,
+        "Archived B (Archived)",
+        "b",
+        "Rename",
+    );
+    assert!(open_rename.is_empty());
+    host.get_mut(SIDEBAR_RENAME_INPUT_ID)
+        .and_then(|n| n.component_mut::<tekes_ui_controls::composition::TextFieldContent>())
+        .unwrap()
+        .insert_text("Should Cancel", None);
+    let only_a = vec![SidebarRowModel {
+        session_id: "a".to_owned(),
+        title: "Acceptance A".to_owned(),
+        folder: "默认".to_owned(),
+        activity: "idle".to_owned(),
+        running: false,
+        pinned: false,
+        archived: false,
+    }];
+    surface.sync(
+        &mut host,
+        &only_a,
+        Some("a"),
+        SidebarFilterSelection::All,
+        ResponsiveWidthMode::Expanded,
+    );
+    assert!(host.get(SIDEBAR_RENAME_INPUT_ID).is_none());
+    assert!(surface.row_context_menu_id("b").is_none());
 
     rt.block_on(runtime.stop()).unwrap();
 }

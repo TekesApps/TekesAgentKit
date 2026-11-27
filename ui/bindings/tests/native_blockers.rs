@@ -42,6 +42,8 @@ struct BlockerTestEndpoint {
     park_reject_release: Arc<Notify>,
 }
 
+type RenameGate = (Arc<Notify>, Arc<Notify>, std::result::Result<(), String>);
+
 struct EndpointState {
     rpcs: Vec<(String, Value)>,
     journal_txs: BTreeMap<String, mpsc::UnboundedSender<Result<Value>>>,
@@ -57,6 +59,7 @@ struct EndpointState {
     use_workspace_stream: bool,
     rename_seq: i64,
     reject_rename: bool,
+    rename_gates: BTreeMap<String, RenameGate>,
     reject_archive: bool,
     reject_unarchive: bool,
     reject_cancel: bool,
@@ -102,6 +105,7 @@ impl BlockerTestEndpoint {
                 use_workspace_stream: false,
                 rename_seq: 10,
                 reject_rename: false,
+                rename_gates: BTreeMap::new(),
                 reject_archive: false,
                 reject_unarchive: false,
                 reject_cancel: false,
@@ -265,7 +269,13 @@ impl SessionEndpoint for TestSessionEndpoint {
                 ))
             }
             StreamTarget::SessionControl => {
-                let projections = self.source.inner.lock().unwrap().control_projections.clone();
+                let projections = self
+                    .source
+                    .inner
+                    .lock()
+                    .unwrap()
+                    .control_projections
+                    .clone();
                 let baseline = json!({"type": "baseline", "generation": "g", "snapshot": {"queues": [], "jobs": [], "projections": projections}});
                 Ok(Box::pin(
                     stream::once(async { Ok(baseline) }).chain(stream::pending()),
@@ -428,9 +438,30 @@ impl SessionEndpoint for TestSessionEndpoint {
             "session.rename" => {
                 let sid = payload["sessionId"].as_str().unwrap_or("").to_owned();
                 let title = payload["title"].as_str().unwrap_or("").to_owned();
+                let gate = {
+                    self.source
+                        .inner
+                        .lock()
+                        .unwrap()
+                        .rename_gates
+                        .remove(&title)
+                };
+                if let Some((entered, release, forced_outcome)) = gate {
+                    let wait = release.notified();
+                    tokio::pin!(wait);
+                    wait.as_mut().enable();
+                    entered.notify_waiters();
+                    wait.await;
+                    if let Err(err) = forced_outcome {
+                        return Err(Error::Remote(err.into()));
+                    }
+                }
                 let mut guard = self.source.inner.lock().unwrap();
                 if guard.reject_rename {
                     return Err(Error::Remote("rename rejected".into()));
+                }
+                if title.len() > 256 {
+                    return Err(Error::Remote("title-invalid: too long".into()));
                 }
                 guard.rename_seq += 1;
                 let seq = guard.rename_seq;
@@ -441,6 +472,31 @@ impl SessionEndpoint for TestSessionEndpoint {
                         "asOfSeq": seq,
                         "values": { "title": title }
                     });
+                }
+                if let Some(tx) = guard.inventory_tx.clone() {
+                    let updated = guard
+                        .custom_items
+                        .as_ref()
+                        .and_then(|items| {
+                            items.iter().find(|item| item["sessionId"] == sid).cloned()
+                        })
+                        .unwrap_or_else(|| {
+                            json!({
+                                "sessionId": sid,
+                                "running": guard.running.get(&sid).copied().unwrap_or(false),
+                                "blank": false,
+                                "updatedAt": 20,
+                                "projections": {
+                                    "asOfSeq": seq,
+                                    "values": { "title": title }
+                                }
+                            })
+                        });
+                    let _ = tx.send(Ok(json!({
+                        "type": "upsert",
+                        "generation": "g",
+                        "session": updated
+                    })));
                 }
                 Ok(json!({ "seq": seq, "title": title }))
             }
@@ -462,9 +518,7 @@ impl SessionEndpoint for TestSessionEndpoint {
                 let sid = payload["sessionId"].as_str().unwrap_or("").to_owned();
                 let mut guard = self.source.inner.lock().unwrap();
                 if guard.reject_unarchive || !guard.archived_ids.iter().any(|id| id == &sid) {
-                    return Err(Error::Remote(
-                        format!("session-not-found: {sid}").into(),
-                    ));
+                    return Err(Error::Remote(format!("session-not-found: {sid}").into()));
                 }
                 guard.archived_ids.retain(|id| id != &sid);
                 if let Some(items) = guard.custom_items.as_mut()
@@ -2737,7 +2791,8 @@ fn sidebar_title_uses_canonical_projections_and_replaces_or_reverts_local_rename
         runtime.wait_ready(Duration::from_secs(2)).await.unwrap();
         runtime
     });
-    let controller = rt.block_on(async { Arc::new(RunController::new(Arc::clone(&runtime)).unwrap()) });
+    let controller =
+        rt.block_on(async { Arc::new(RunController::new(Arc::clone(&runtime)).unwrap()) });
     let wake = Arc::new(CountingWake::default());
     let binding = {
         let _guard = rt.enter();
@@ -2820,7 +2875,8 @@ fn sidebar_archive_and_unarchive_preserve_authoritative_state_and_route_explicit
         runtime.wait_ready(Duration::from_secs(2)).await.unwrap();
         runtime
     });
-    let controller = rt.block_on(async { Arc::new(RunController::new(Arc::clone(&runtime)).unwrap()) });
+    let controller =
+        rt.block_on(async { Arc::new(RunController::new(Arc::clone(&runtime)).unwrap()) });
     let binding = {
         let _guard = rt.enter();
         RunWorkbenchBinding::new(
@@ -2850,8 +2906,7 @@ fn sidebar_archive_and_unarchive_preserve_authoritative_state_and_route_explicit
     );
 
     // 2. Independent external unarchive + reconnect -> B returns as active (archived == false).
-    rt.block_on(runtime.unarchive("b", "ext-restore"))
-        .unwrap();
+    rt.block_on(runtime.unarchive("b", "ext-restore")).unwrap();
     rt.block_on(runtime.reconnect()).unwrap();
     let b_row = binding
         .sidebar_rows()
@@ -2891,17 +2946,146 @@ fn sidebar_archive_and_unarchive_preserve_authoritative_state_and_route_explicit
 
     endpoint.inner.lock().unwrap().reject_archive = true;
     binding.archive_session("b");
-    wait_until("rejected archive surfaces error and keeps B unarchived", || {
-        binding
-            .session_error("b")
-            .as_deref()
-            .is_some_and(|e| e.contains("Archive failed"))
-            && binding
+    wait_until(
+        "rejected archive surfaces error and keeps B unarchived",
+        || {
+            binding
+                .session_error("b")
+                .as_deref()
+                .is_some_and(|e| e.contains("Archive failed"))
+                && binding
+                    .sidebar_rows()
+                    .into_iter()
+                    .find(|r| r.session_id == "b")
+                    .is_some_and(|r| !r.archived)
+        },
+    );
+
+    rt.block_on(runtime.stop()).unwrap();
+}
+
+#[test]
+fn rename_receipt_ordering_drops_stale_rejection_and_preserves_latest_error() {
+    let endpoint = BlockerTestEndpoint::new();
+    {
+        let mut guard = endpoint.inner.lock().unwrap();
+        guard.custom_items = Some(vec![
+            json!({"sessionId": "a", "running": false, "blank": false, "updatedAt": 10, "projections": {"asOfSeq": 1, "values": {"title": "Acceptance A"}}}),
+            json!({"sessionId": "b", "running": false, "blank": false, "updatedAt": 20, "projections": {"asOfSeq": 10, "values": {"title": "Acceptance B"}}}),
+        ]);
+    }
+    let old_invalid_entered = Arc::new(Notify::new());
+    let old_invalid_release = Arc::new(Notify::new());
+    let old_valid_entered = Arc::new(Notify::new());
+    let old_valid_release = Arc::new(Notify::new());
+    let before_new_rejection_entered = Arc::new(Notify::new());
+    let before_new_rejection_release = Arc::new(Notify::new());
+    {
+        let mut guard = endpoint.inner.lock().unwrap();
+        guard.rename_gates.insert(
+            "X".repeat(257),
+            (
+                Arc::clone(&old_invalid_entered),
+                Arc::clone(&old_invalid_release),
+                Err("title-invalid".to_owned()),
+            ),
+        );
+        guard.rename_gates.insert(
+            "Earlier valid title".to_owned(),
+            (
+                Arc::clone(&old_valid_entered),
+                Arc::clone(&old_valid_release),
+                Ok(()),
+            ),
+        );
+        guard.rename_gates.insert(
+            "Earlier before rejected correction".to_owned(),
+            (
+                Arc::clone(&before_new_rejection_entered),
+                Arc::clone(&before_new_rejection_release),
+                Ok(()),
+            ),
+        );
+    }
+
+    let (rt, runtime, binding) = setup_binding(&endpoint);
+    binding.open_initial_session("a").unwrap();
+
+    let wait_title = |expected: &str| {
+        for _ in 0..80 {
+            if binding
                 .sidebar_rows()
                 .into_iter()
                 .find(|r| r.session_id == "b")
-                .is_some_and(|r| !r.archived)
-    });
+                .is_some_and(|r| r.title == expected)
+            {
+                return;
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        panic!("timed out waiting for title `{expected}`");
+    };
+    wait_title("Acceptance B");
+
+    // Case 1: old invalid held -> newer valid succeeds -> delayed old rejection must NOT show Rename failed.
+    let gate_1 = old_invalid_entered.notified();
+    binding.rename_session("b", "X".repeat(257));
+    rt.block_on(gate_1);
+    binding.rename_session("b", "After invalid newer title".to_owned());
+    wait_title("After invalid newer title");
+    std::thread::sleep(Duration::from_millis(40));
+    assert_eq!(binding.session_error("b"), None);
+
+    old_invalid_release.notify_one();
+    std::thread::sleep(Duration::from_millis(80));
+    assert_eq!(binding.session_error("b"), None);
+    assert_eq!(binding.session_error("a"), None);
+    assert_eq!(binding.current_scope().unwrap().session_id, "a");
+    wait_title("After invalid newer title");
+    binding.set_search_query("After invalid newer title".to_owned());
+    assert!(
+        binding
+            .sidebar_rows()
+            .into_iter()
+            .any(|r| r.session_id == "b" && r.title == "After invalid newer title")
+    );
+    binding.set_search_query(String::new());
+
+    // Case 2: old valid held -> newer valid succeeds -> delayed old success keeps newest title & clean error.
+    let gate_2 = old_valid_entered.notified();
+    binding.rename_session("b", "Earlier valid title".to_owned());
+    rt.block_on(gate_2);
+    binding.rename_session("b", "After valid newer title".to_owned());
+    wait_title("After valid newer title");
+    old_valid_release.notify_one();
+    std::thread::sleep(Duration::from_millis(80));
+    assert_eq!(binding.session_error("b"), None);
+    assert_eq!(binding.session_error("a"), None);
+    wait_title("After valid newer title");
+
+    // Case 3: earlier valid held -> latest invalid rejects (error recorded) -> old valid resolves -> latest error kept.
+    let gate_3 = before_new_rejection_entered.notified();
+    binding.rename_session("b", "Earlier before rejected correction".to_owned());
+    rt.block_on(gate_3);
+    binding.rename_session("b", "Y".repeat(257));
+    for _ in 0..80 {
+        if binding.session_error("b").is_some() {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    let latest_err = binding.session_error("b");
+    assert!(
+        latest_err
+            .as_deref()
+            .is_some_and(|e| e.contains("Rename failed"))
+    );
+
+    before_new_rejection_release.notify_one();
+    std::thread::sleep(Duration::from_millis(80));
+    assert_eq!(binding.session_error("b"), latest_err);
+    assert_eq!(binding.session_error("a"), None);
+    assert_eq!(binding.current_scope().unwrap().session_id, "a");
 
     rt.block_on(runtime.stop()).unwrap();
 }
