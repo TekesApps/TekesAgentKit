@@ -814,13 +814,38 @@ impl ProjectionSubscription {
     }
 }
 
+#[derive(Default)]
+struct ConnectionInterest {
+    wanted: BTreeSet<String>,
+    deferred_closes: BTreeSet<String>,
+    suspended_journals: std::collections::BTreeMap<String, SuspendedJournal>,
+}
+
+impl ConnectionInterest {
+    fn reconcile_suspended_on_disconnect(&mut self, store: &Arc<SharedProjection>) {
+        // Reconnects abort in-flight archive/discard RPCs without replaying them, so any
+        // session whose journal was suspended for an unconfirmed lifecycle mutation must
+        // resume according to its still-valid observer / running-turn intent.
+        for (id, suspended) in std::mem::take(&mut self.suspended_journals) {
+            if !suspended.closed_while_suspended {
+                self.deferred_closes.remove(&id);
+                self.wanted.insert(id);
+            } else if suspended.was_running
+                || store.read(|s| s.sessions.get(&id).is_some_and(session_has_active_run))
+            {
+                self.wanted.insert(id.clone());
+                self.deferred_closes.insert(id);
+            }
+        }
+    }
+}
+
 async fn run(
     connector: Arc<dyn EndpointConnector>,
     mut commands: mpsc::Receiver<Command>,
     store: Arc<SharedProjection>,
 ) {
-    let mut wanted = BTreeSet::new();
-    let mut deferred_closes = BTreeSet::new();
+    let mut interest = ConnectionInterest::default();
     // Unknown/omitted recovery outcomes cannot be replayed by a later automatic
     // stream reconnect. An explicit sessions.recover call can reconcile them.
     let unresolved_recovery = Arc::new(std::sync::Mutex::new(RecoveryTracking::default()));
@@ -837,7 +862,7 @@ async fn run(
                     Some(Command::Stop(reply)) => { store.update(|s| s.connection = ConnectionState::Stopped); let _ = reply.send(Ok(())); return; }
                     Some(Command::Reconnect(reply)) => { let _ = reply.send(Ok(())); }
                     Some(Command::Close(id, reply)) => {
-                        close_while_disconnected(id, reply, &mut wanted, &mut deferred_closes, &store);
+                        close_while_disconnected(id, reply, &mut interest.wanted, &mut interest.deferred_closes, &store);
                     }
                     Some(command) => reject(command),
                     None => return,
@@ -871,8 +896,7 @@ async fn run(
                         endpoint.clone(),
                         &mut commands,
                         &store,
-                        &mut wanted,
-                        &mut deferred_closes,
+                        &mut interest,
                         &unresolved_recovery,
                         epoch,
                     )
@@ -886,10 +910,12 @@ async fn run(
         match result {
             Ok(true) => return,
             Ok(false) => {
+                interest.reconcile_suspended_on_disconnect(&store);
                 failures = 0;
                 continue;
             }
             Err(error) => {
+                interest.reconcile_suspended_on_disconnect(&store);
                 // Long healthy connections reset the failure budget; repeated bad baselines do not.
                 if connected_at.elapsed() >= Duration::from_secs(30) {
                     failures = 0;
@@ -913,7 +939,7 @@ async fn run(
                             Some(Command::Reconnect(reply)) => { failures = 0; let _ = reply.send(Ok(())); continue 'connections; }
                             Some(Command::Stop(reply)) => { store.update(|s| s.connection = ConnectionState::Stopped); let _ = reply.send(Ok(())); return; }
                             Some(Command::Close(id, reply)) => {
-                                close_while_disconnected(id, reply, &mut wanted, &mut deferred_closes, &store);
+                                close_while_disconnected(id, reply, &mut interest.wanted, &mut interest.deferred_closes, &store);
                             }
                             Some(command) => reject(command),
                             None => return,
@@ -956,7 +982,9 @@ fn close_while_disconnected(
     deferred_closes: &mut BTreeSet<String>,
     store: &Arc<SharedProjection>,
 ) {
-    if store.read(|s| s.sessions.get(&id).is_some_and(has_unsettled_run)) {
+    if wanted.contains(&id)
+        && store.read(|s| s.sessions.get(&id).is_some_and(session_has_active_run))
+    {
         deferred_closes.insert(id);
     } else {
         deferred_closes.remove(&id);
@@ -991,11 +1019,15 @@ async fn connected(
     endpoint: Arc<dyn SessionEndpoint>,
     commands: &mut mpsc::Receiver<Command>,
     store: &Arc<SharedProjection>,
-    wanted: &mut BTreeSet<String>,
-    deferred_closes: &mut BTreeSet<String>,
+    interest: &mut ConnectionInterest,
     unresolved_recovery: &SharedRecoveryTracking,
     epoch: u64,
 ) -> Result<bool> {
+    let ConnectionInterest {
+        wanted,
+        deferred_closes,
+        suspended_journals,
+    } = interest;
     let connection_epoch = store.read(|state| state.connection_epoch);
     let mut operations: tokio::task::JoinSet<OperationResult> = tokio::task::JoinSet::new();
     let mut earlier_reads = tokio::task::JoinSet::<EarlierResult>::new();
@@ -1032,7 +1064,6 @@ async fn connected(
     let mut journal_epochs = std::collections::BTreeMap::new();
     let mut journals = JournalStreams::default();
     let mut permanent_journal_errors = BTreeSet::<String>::new();
-    let mut suspended_journals = std::collections::BTreeMap::<String, SuspendedJournal>::new();
     let mut next_suspend_id: u64 = 0;
     let mut next_journal_epoch = epoch * 1_000_000;
     let mut failed_deferred_closes = Vec::new();
@@ -1188,9 +1219,18 @@ async fn connected(
                         } else if let Some(suspended) = suspended
                             && !journal_epochs.contains_key(&id)
                         {
-                            if !suspended.closed_while_suspended {
+                            let should_restore = if !suspended.closed_while_suspended {
+                                true
+                            } else {
+                                !permanent_journal_errors.contains(&id)
+                                    && (suspended.was_running
+                                        || store.read(|s| {
+                                            s.sessions.get(&id).is_some_and(session_has_active_run)
+                                        }))
+                            };
+                            if should_restore {
                                 next_journal_epoch += 1;
-                                if add_journal(
+                                match add_journal(
                                     endpoint.as_ref(),
                                     store,
                                     &mut journals,
@@ -1198,32 +1238,41 @@ async fn connected(
                                     next_journal_epoch,
                                 )
                                 .await
-                                .is_ok()
                                 {
-                                    wanted.insert(id.clone());
-                                    journal_epochs.insert(id, next_journal_epoch);
-                                }
-                            } else {
-                                let still_running = !permanent_journal_errors.contains(&id)
-                                    && (suspended.was_running
-                                        || store.read(|s| {
-                                            s.sessions.get(&id).is_some_and(session_has_active_run)
-                                        }));
-                                if still_running {
-                                    next_journal_epoch += 1;
-                                    if add_journal(
-                                        endpoint.as_ref(),
-                                        store,
-                                        &mut journals,
-                                        &id,
-                                        next_journal_epoch,
-                                    )
-                                    .await
-                                    .is_ok()
-                                    {
+                                    Ok(()) => {
                                         wanted.insert(id.clone());
                                         journal_epochs.insert(id.clone(), next_journal_epoch);
-                                        deferred_closes.insert(id);
+                                        if suspended.closed_while_suspended {
+                                            deferred_closes.insert(id);
+                                        } else {
+                                            deferred_closes.remove(&id);
+                                        }
+                                    }
+                                    Err(error) => {
+                                        if matches!(&error, Error::Remote(_)) {
+                                            record_session_read_error(store, &id, &error);
+                                            permanent_journal_errors.insert(id.clone());
+                                            if !suspended.closed_while_suspended {
+                                                deferred_closes.remove(&id);
+                                                wanted.insert(id);
+                                            }
+                                        } else {
+                                            record_session_error(store, &id, &error);
+                                            if matches!(
+                                                &error,
+                                                Error::Disconnected | Error::Transport(_)
+                                            ) {
+                                                if suspended.closed_while_suspended {
+                                                    wanted.insert(id.clone());
+                                                    deferred_closes.insert(id);
+                                                } else {
+                                                    deferred_closes.remove(&id);
+                                                    wanted.insert(id);
+                                                }
+                                                let _ = reply.send(result);
+                                                return Err(error);
+                                            }
+                                        }
                                     }
                                 }
                             }

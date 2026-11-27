@@ -40,6 +40,10 @@ struct BlockerTestEndpoint {
     park_reject_cancel: Arc<AtomicBool>,
     park_reject_entered: Arc<Notify>,
     park_reject_release: Arc<Notify>,
+    park_archive: Arc<AtomicBool>,
+    park_archive_entered: Arc<Notify>,
+    park_archive_release: Arc<Notify>,
+    supports_recovery: Arc<AtomicBool>,
 }
 
 type RenameGate = (Arc<Notify>, Arc<Notify>, std::result::Result<(), String>);
@@ -135,6 +139,10 @@ impl BlockerTestEndpoint {
             park_reject_cancel: Arc::new(AtomicBool::new(false)),
             park_reject_entered: Arc::new(Notify::new()),
             park_reject_release: Arc::new(Notify::new()),
+            park_archive: Arc::new(AtomicBool::new(false)),
+            park_archive_entered: Arc::new(Notify::new()),
+            park_archive_release: Arc::new(Notify::new()),
+            supports_recovery: Arc::new(AtomicBool::new(false)),
         }
     }
 
@@ -214,6 +222,9 @@ impl SessionEndpoint for TestSessionEndpoint {
     fn host(&self) -> &HostDescription {
         &self.host
     }
+    fn supports_recovery(&self) -> bool {
+        self.source.supports_recovery.load(Ordering::Acquire)
+    }
     fn capabilities(&self) -> EndpointCapabilities {
         EndpointCapabilities::methods(&[
             "session.prompt",
@@ -222,6 +233,7 @@ impl SessionEndpoint for TestSessionEndpoint {
             "session.rename",
             "session.archive",
             "session.unarchive",
+            "sessions.recover",
             "session.models",
             "session.selectModel",
             "approvals.policy",
@@ -501,6 +513,13 @@ impl SessionEndpoint for TestSessionEndpoint {
                 Ok(json!({ "seq": seq, "title": title }))
             }
             "session.archive" => {
+                if self.source.park_archive.swap(false, Ordering::AcqRel) {
+                    let release = self.source.park_archive_release.notified();
+                    tokio::pin!(release);
+                    release.as_mut().enable();
+                    self.source.park_archive_entered.notify_one();
+                    release.await;
+                }
                 let sid = payload["sessionId"].as_str().unwrap_or("").to_owned();
                 let mut guard = self.source.inner.lock().unwrap();
                 if guard.reject_archive {
@@ -514,6 +533,7 @@ impl SessionEndpoint for TestSessionEndpoint {
                 }
                 Ok(json!({ "archivedSessionIds": guard.archived_ids.clone() }))
             }
+            "sessions.recover" => Ok(json!({ "recoveredSessionIds": payload["sessionIds"] })),
             "session.unarchive" => {
                 let sid = payload["sessionId"].as_str().unwrap_or("").to_owned();
                 let mut guard = self.source.inner.lock().unwrap();
@@ -3086,6 +3106,130 @@ fn rename_receipt_ordering_drops_stale_rejection_and_preserves_latest_error() {
     assert_eq!(binding.session_error("b"), latest_err);
     assert_eq!(binding.session_error("a"), None);
     assert_eq!(binding.current_scope().unwrap().session_id, "a");
+
+    rt.block_on(runtime.stop()).unwrap();
+}
+
+#[test]
+fn archive_in_flight_reconnect_and_ws_drop_preserve_selected_running_subscription() {
+    let endpoint = BlockerTestEndpoint::new();
+    endpoint.supports_recovery.store(true, Ordering::Release);
+    {
+        let mut guard = endpoint.inner.lock().unwrap();
+        guard.use_workspace_stream = true;
+        guard.running.insert("a".to_owned(), true);
+        guard.reject_archive = true;
+        guard.journal_entries.insert(
+            "a".to_owned(),
+            vec![
+                json!({"event": {"type": "turn/start", "seq": 0, "time": 1, "data": {"turn": 1}}}),
+            ],
+        );
+        guard.custom_items = Some(vec![
+            json!({"sessionId": "a", "running": true, "blank": false, "updatedAt": 10, "projections": {"asOfSeq": 1, "values": {"title": "Running A"}}}),
+            json!({"sessionId": "b", "running": false, "blank": false, "updatedAt": 20, "projections": {"asOfSeq": 1, "values": {"title": "Idle B"}}}),
+        ]);
+    }
+    let (rt, runtime, binding) = setup_binding(&endpoint);
+    binding.open_initial_session("a").unwrap();
+    rt.block_on(wait_store(&runtime, |s| {
+        s.sessions["a"].journal_ready && s.sessions["a"].run_open
+    }));
+
+    // 1. Explicit reconnect while archive_session("a") is in-flight preserves lease & recovery and does not replay archive.
+    endpoint.park_archive.store(true, Ordering::Release);
+    let entered_1 = endpoint.park_archive_entered.notified();
+    binding.archive_session("a");
+    rt.block_on(entered_1);
+    rt.block_on(runtime.reconnect()).unwrap();
+    endpoint.park_archive_release.notify_one();
+
+    rt.block_on(wait_store(&runtime, |s| {
+        s.connection_epoch >= 2 && s.sessions["a"].journal_ready && s.sessions["a"].run_open
+    }));
+    let archive_rpcs_1 = endpoint
+        .rpcs()
+        .iter()
+        .filter(|(m, p)| m == "session.archive" && p["sessionId"] == "a")
+        .count();
+    assert_eq!(archive_rpcs_1, 1);
+    assert_eq!(
+        endpoint
+            .rpcs()
+            .iter()
+            .rfind(|(m, _)| m == "sessions.recover")
+            .map(|(_, p)| p.clone()),
+        Some(json!({ "sessionIds": ["a"] }))
+    );
+
+    // 2. Transport / WS drop while archive_session("a") is in-flight also restores lease, recovery, and delivers final answer without B->A switch.
+    endpoint.park_archive.store(true, Ordering::Release);
+    let entered_2 = endpoint.park_archive_entered.notified();
+    binding.archive_session("a");
+    rt.block_on(entered_2);
+    endpoint.drop_connection();
+    endpoint.unblock_reconnect();
+    endpoint.park_archive_release.notify_one();
+
+    rt.block_on(wait_store(&runtime, |s| {
+        s.connection_epoch >= 3 && s.sessions["a"].journal_ready && s.sessions["a"].run_open
+    }));
+    let archive_rpcs_2 = endpoint
+        .rpcs()
+        .iter()
+        .filter(|(m, p)| m == "session.archive" && p["sessionId"] == "a")
+        .count();
+    assert_eq!(archive_rpcs_2, 2);
+    assert_eq!(
+        endpoint
+            .rpcs()
+            .iter()
+            .rfind(|(m, _)| m == "sessions.recover")
+            .map(|(_, p)| p.clone()),
+        Some(json!({ "sessionIds": ["a"] }))
+    );
+
+    {
+        let mut guard = endpoint.inner.lock().unwrap();
+        guard.running.insert("a".to_owned(), false);
+        let tx_a = guard.journal_txs_by_conn[&(3, "a".to_owned())].clone();
+        tx_a.send(Ok(json!({
+            "type": "event",
+            "generation": "g",
+            "sessionId": "a",
+            "entry": {"event": {"type": "assistant/message", "seq": 1, "time": 2, "data": {"turn": 1, "step": 1, "sessionFinal": true, "message": {"id": "ma-1", "content": [{"type": "text", "text": "final answer"}]}}}}
+        })))
+        .unwrap();
+        tx_a.send(Ok(json!({
+            "type": "event",
+            "generation": "g",
+            "sessionId": "a",
+            "entry": {"event": {"type": "turn/end", "seq": 2, "time": 3, "data": {"turn": 1, "reason": "completed"}}}
+        })))
+        .unwrap();
+    }
+
+    rt.block_on(wait_store(&runtime, |s| !s.sessions["a"].run_open));
+    wait_until(
+        "RunWorkbenchBinding automatically receives final answer on A",
+        || {
+            let snap = binding.run_snapshot();
+            binding.current_scope().is_some_and(|s| s.session_id == "a")
+                && !snap.run.as_ref().is_some_and(|r| r.can_cancel)
+                && snap
+                    .transcript
+                    .items
+                    .iter()
+                    .any(|item| item.text.contains("final answer"))
+        },
+    );
+    assert!(
+        binding
+            .sidebar_rows()
+            .into_iter()
+            .find(|r| r.session_id == "a")
+            .is_some_and(|r| !r.archived)
+    );
 
     rt.block_on(runtime.stop()).unwrap();
 }
