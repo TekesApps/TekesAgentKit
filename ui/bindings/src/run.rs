@@ -132,7 +132,15 @@ struct SessionCancelTracking {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum SessionErrorKind {
     Cancel,
+    Archive,
     Other,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct UncertainArchive {
+    op_id: u64,
+    target: ArchiveTargetState,
+    start_epoch: u64,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -143,6 +151,7 @@ struct SessionErrorEntry {
     cancel_target: Option<CancelTurnTarget>,
     message: String,
     uncertain_cancel: Option<UncertainCancel>,
+    uncertain_archive: Option<UncertainArchive>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -226,6 +235,7 @@ struct RunUiState {
     local_pins: BTreeSet<String>,
     pending_renames: BTreeMap<String, PendingRename>,
     pending_archive_ops: BTreeMap<String, PendingArchiveOp>,
+    uncertain_archives: BTreeMap<String, UncertainArchive>,
     rename_op_tracking: BTreeMap<String, SessionSidebarOpTracking>,
     archive_op_tracking: BTreeMap<String, SessionSidebarOpTracking>,
     next_sidebar_op_id: u64,
@@ -629,6 +639,7 @@ impl RunWorkbenchBinding {
             local_pins: BTreeSet::new(),
             pending_renames: BTreeMap::new(),
             pending_archive_ops: BTreeMap::new(),
+            uncertain_archives: BTreeMap::new(),
             rename_op_tracking: BTreeMap::new(),
             archive_op_tracking: BTreeMap::new(),
             next_sidebar_op_id: 0,
@@ -662,6 +673,7 @@ impl RunWorkbenchBinding {
                             break;
                         }
                         if let Some(ui_strong) = ui_weak.upgrade() {
+                            reconcile_uncertain_archives(&runtime_w, &ui_strong);
                             try_spawn_history_acquire(
                                 &runtime_w,
                                 &controller_w,
@@ -1510,6 +1522,7 @@ impl RunWorkbenchBinding {
                 .get(session_id)
                 .map_or(0, |entry| entry.seq);
             begin_sidebar_op(&mut guard.archive_op_tracking, session_id, op_id);
+            guard.uncertain_archives.remove(session_id);
             if should_stage_optimistic {
                 guard.pending_archive_ops.insert(
                     session_id.to_owned(),
@@ -1550,6 +1563,7 @@ impl RunWorkbenchBinding {
                     });
                     let retired_lease = {
                         let mut guard = ui.lock().expect("run ui lock");
+                        guard.uncertain_archives.remove(&sid);
                         let is_latest =
                             finish_sidebar_op(&mut guard.archive_op_tracking, &sid, op_id);
                         if is_latest {
@@ -1596,25 +1610,87 @@ impl RunWorkbenchBinding {
                         ArchiveTargetState::Archived => "Archive failed",
                         ArchiveTargetState::Active => "Unarchive failed",
                     };
-                    let mut guard = ui.lock().expect("run ui lock");
-                    let is_latest = finish_sidebar_op(&mut guard.archive_op_tracking, &sid, op_id);
-                    let mut changed = false;
-                    if guard
-                        .pending_archive_ops
-                        .get(&sid)
-                        .is_some_and(|pending| pending.op_id == op_id)
-                    {
-                        guard.pending_archive_ops.remove(&sid);
-                        changed = true;
-                    }
-                    if is_latest {
-                        record_session_error_locked(
-                            &mut guard,
-                            &sid,
-                            Some(format!("{prefix}: {err}")),
-                        );
-                    } else if changed {
-                        guard.revision = guard.revision.saturating_add(1);
+                    let is_uncertain = matches!(
+                        &err,
+                        tekes_agent_contract::Error::Disconnected
+                            | tekes_agent_contract::Error::Transport(_)
+                            | tekes_agent_contract::Error::Timeout
+                    );
+                    let already_confirmed = is_uncertain
+                        && runtime.inspect(|store| {
+                            authoritative_archive_target_confirmed(store, &sid, target, start_epoch)
+                        });
+                    let retired_lease = {
+                        let mut guard = ui.lock().expect("run ui lock");
+                        let is_latest =
+                            finish_sidebar_op(&mut guard.archive_op_tracking, &sid, op_id);
+                        let mut changed = false;
+                        if guard
+                            .pending_archive_ops
+                            .get(&sid)
+                            .is_some_and(|pending| pending.op_id == op_id)
+                        {
+                            guard.pending_archive_ops.remove(&sid);
+                            changed = true;
+                        }
+                        if already_confirmed {
+                            guard.uncertain_archives.remove(&sid);
+                            if is_latest {
+                                clear_session_error_if_not_newer_locked(
+                                    &mut guard,
+                                    &sid,
+                                    start_error_seq,
+                                );
+                            }
+                            let lease = if target == ArchiveTargetState::Archived {
+                                retire_session_history_lease_locked(&mut guard, &sid)
+                            } else {
+                                None
+                            };
+                            guard.revision = guard.revision.saturating_add(1);
+                            lease
+                        } else if is_latest {
+                            if is_uncertain {
+                                let uncertain = UncertainArchive {
+                                    op_id,
+                                    target,
+                                    start_epoch,
+                                };
+                                guard.uncertain_archives.insert(sid.clone(), uncertain);
+                                guard.next_error_seq = guard.next_error_seq.saturating_add(1);
+                                let seq = guard.next_error_seq;
+                                guard.session_errors.insert(
+                                    sid.clone(),
+                                    SessionErrorEntry {
+                                        seq,
+                                        kind: SessionErrorKind::Archive,
+                                        cancel_op_id: None,
+                                        cancel_target: None,
+                                        message: format!("{prefix}: {err}"),
+                                        uncertain_cancel: None,
+                                        uncertain_archive: Some(uncertain),
+                                    },
+                                );
+                                guard.revision = guard.revision.saturating_add(1);
+                            } else {
+                                guard.uncertain_archives.remove(&sid);
+                                record_session_error_locked(
+                                    &mut guard,
+                                    &sid,
+                                    Some(format!("{prefix}: {err}")),
+                                );
+                            }
+                            None
+                        } else {
+                            if changed {
+                                guard.revision = guard.revision.saturating_add(1);
+                            }
+                            None
+                        }
+                    };
+                    drop(retired_lease);
+                    if is_uncertain && !already_confirmed {
+                        reconcile_uncertain_archives(&runtime, &ui);
                     }
                 }
             }
@@ -2470,6 +2546,7 @@ fn record_session_error_locked(guard: &mut RunUiState, session_id: &str, error: 
                     cancel_target: None,
                     message,
                     uncertain_cancel: None,
+                    uncertain_archive: None,
                 },
             );
         }
@@ -2552,6 +2629,7 @@ fn record_cancel_error_if_not_newer(
             cancel_target,
             message,
             uncertain_cancel,
+            uncertain_archive: None,
         },
     );
     guard.revision = guard.revision.saturating_add(1);
@@ -2702,6 +2780,110 @@ fn reconcile_uncertain_cancels(runtime: &SessionRuntime, ui: &Mutex<RunUiState>)
     if changed {
         guard.revision = guard.revision.saturating_add(1);
     }
+    changed
+}
+
+fn authoritative_archive_target_confirmed(
+    store: &MemoryProjectionStore,
+    session_id: &str,
+    target: ArchiveTargetState,
+    start_epoch: u64,
+) -> bool {
+    if store.connection != ConnectionState::Ready || !store.ready() {
+        return false;
+    }
+    let _ = start_epoch;
+    let (present, archived) = authoritative_archived_info(store, session_id);
+    match target {
+        ArchiveTargetState::Archived => archived || !present,
+        ArchiveTargetState::Active => present && !archived,
+    }
+}
+
+fn retire_session_history_lease_locked(
+    guard: &mut RunUiState,
+    session_id: &str,
+) -> Option<SessionHistoryLease> {
+    if guard.desired_history_session.as_deref() == Some(session_id) {
+        guard.desired_history_session = None;
+        guard.history_acquire_attempted = None;
+    }
+    if guard
+        .history_lease
+        .as_ref()
+        .is_some_and(|lease| lease.session_id() == session_id)
+    {
+        guard.history_acquire_attempted = None;
+        guard.history_lease.take()
+    } else {
+        None
+    }
+}
+
+fn reconcile_uncertain_archives(runtime: &SessionRuntime, ui: &Mutex<RunUiState>) -> bool {
+    let pending: Vec<(String, UncertainArchive)> = {
+        let guard = ui.lock().expect("run ui lock");
+        if guard.uncertain_archives.is_empty() {
+            return false;
+        }
+        guard
+            .uncertain_archives
+            .iter()
+            .map(|(sid, ua)| (sid.clone(), *ua))
+            .collect()
+    };
+    let (ready, current_epoch, outcomes) = runtime.inspect(|store| {
+        if store.connection != ConnectionState::Ready || !store.ready() {
+            return (false, store.connection_epoch, Vec::new());
+        }
+        let outcomes: Vec<(String, UncertainArchive, bool)> = pending
+            .into_iter()
+            .map(|(sid, ua)| {
+                let confirmed =
+                    authoritative_archive_target_confirmed(store, &sid, ua.target, ua.start_epoch);
+                (sid, ua, confirmed)
+            })
+            .collect();
+        (true, store.connection_epoch, outcomes)
+    });
+    if !ready {
+        return false;
+    }
+    let mut retired_leases = Vec::new();
+    let mut changed = false;
+    {
+        let mut guard = ui.lock().expect("run ui lock");
+        for (sid, ua, confirmed) in outcomes {
+            if guard.uncertain_archives.get(&sid) != Some(&ua) {
+                continue;
+            }
+            if confirmed {
+                guard.uncertain_archives.remove(&sid);
+                if guard.session_errors.get(&sid).is_some_and(|entry| {
+                    entry.kind == SessionErrorKind::Archive && entry.uncertain_archive == Some(ua)
+                }) {
+                    guard.session_errors.remove(&sid);
+                }
+                if ua.target == ArchiveTargetState::Archived
+                    && let Some(lease) = retire_session_history_lease_locked(&mut guard, &sid)
+                {
+                    retired_leases.push(lease);
+                }
+                changed = true;
+            } else if current_epoch > ua.start_epoch {
+                guard.uncertain_archives.remove(&sid);
+                if let Some(entry) = guard.session_errors.get_mut(&sid)
+                    && entry.uncertain_archive == Some(ua)
+                {
+                    entry.uncertain_archive = None;
+                }
+            }
+        }
+        if changed {
+            guard.revision = guard.revision.saturating_add(1);
+        }
+    }
+    drop(retired_leases);
     changed
 }
 

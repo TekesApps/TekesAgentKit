@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.12 — 2026-11-27
+
+- Key `SidebarSurface`'s open list-level context menu tracking by the menu component's open identity (`ContentRole::Menu` semantic part identity), reconcile/clear cached menu state whenever the menu closes or opens anew, validate context-request owner mounts, and resolve list-menu submissions strictly from the live list focus/selection so dismissing and refocusing a different row never reuses a prior menu open's target (#52).
+- Track disconnect-aborted `session.archive` / `session.discard` calls in `SessionRuntime` (`unconfirmed_archives`) until the next complete authoritative baseline confirms whether the session was archived/removed (retiring `wanted`, journal state, and recovery without reopening or misclassifying ordinary read errors) or remains active (restoring journal + recovery on reject), and add `UncertainArchive` reconciliation in `RunWorkbenchBinding` to retire `history_lease` / `desired_history_session` and clear transient `Archive failed` errors once the authoritative baseline confirms archival (#56).
+
 ## 0.6.11 — 2026-11-27
 
 - Pin the list-level sidebar context menu (`SIDEBAR_CONTEXT_MENU_ID`) target when the menu opens (`open_list_menu_target`) and retire/close stale list menus during `SidebarSurface::sync` whenever the resolved target session changes, disappears, or flips archived state, while preserving keyboard `Shift+F10` focused-row targeting and per-row pointer menus (#52).
