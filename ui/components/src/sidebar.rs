@@ -46,6 +46,7 @@ pub enum SidebarIntent {
     TogglePin(String),
     RenameSession { session_id: String, title: String },
     ArchiveSession(String),
+    UnarchiveSession(String),
     OpenSettings,
 }
 
@@ -54,8 +55,10 @@ pub struct SidebarSurface {
     next_key: u64,
     id_to_key: BTreeMap<String, ListItemKey>,
     key_to_id: BTreeMap<ListItemKey, String>,
+    row_archived: BTreeMap<String, bool>,
     last_sig: String,
     last_selected_session: Option<String>,
+    last_menu_archived: Option<bool>,
     last_mode: ResponsiveWidthMode,
     search_query: String,
     search_open: bool,
@@ -74,13 +77,27 @@ impl SidebarSurface {
             next_key: 1,
             id_to_key: BTreeMap::new(),
             key_to_id: BTreeMap::new(),
+            row_archived: BTreeMap::new(),
             last_sig: String::new(),
             last_selected_session: None,
+            last_menu_archived: None,
             last_mode: ResponsiveWidthMode::Expanded,
             search_query: String::new(),
             search_open: false,
             renaming_session_id: None,
         }
+    }
+
+    fn context_menu_entries(archived: bool) -> Vec<MenuEntry> {
+        vec![
+            MenuEntry::item("pin", "Pin / Unpin"),
+            MenuEntry::item("rename", "Rename"),
+            if archived {
+                MenuEntry::item("unarchive", "Unarchive")
+            } else {
+                MenuEntry::item("archive", "Archive")
+            },
+        ]
     }
 
     fn budget() -> ListBudget {
@@ -158,15 +175,8 @@ impl SidebarSurface {
 
         let context_menu = Content::new(
             SIDEBAR_CONTEXT_MENU_ID,
-            MenuContent::context_menu(
-                "Thread actions",
-                vec![
-                    MenuEntry::item("pin", "Pin / Unpin"),
-                    MenuEntry::item("rename", "Rename"),
-                    MenuEntry::item("archive", "Archive"),
-                ],
-            )
-            .expect("valid sidebar context menu entries"),
+            MenuContent::context_menu("Thread actions", Self::context_menu_entries(false))
+                .expect("valid sidebar context menu entries"),
         );
 
         StackContent::vertical(
@@ -271,7 +281,9 @@ impl SidebarSurface {
         let mut display_items = Vec::with_capacity(rows.len());
         let mut display_rows = Vec::with_capacity(rows.len());
 
+        self.row_archived.clear();
         for row in rows {
+            self.row_archived.insert(row.session_id.clone(), row.archived);
             let key = self.key_for(&row.session_id);
             let icon_name = if row.running {
                 "tekes-progress"
@@ -331,6 +343,20 @@ impl SidebarSurface {
             let _ = host.set_keyed_list_selection(SIDEBAR_LIST_ID, key);
             self.last_selected_session = sel_owned;
         }
+
+        let selected_archived = selected_session_id
+            .and_then(|sid| self.row_archived.get(sid).copied())
+            .unwrap_or(false);
+        if self.last_menu_archived != Some(selected_archived)
+            && let Some(menu) = host
+                .get_mut(SIDEBAR_CONTEXT_MENU_ID)
+                .and_then(|c| c.component_mut::<MenuContent>())
+            && menu
+                .set_entries(Self::context_menu_entries(selected_archived))
+                .is_ok()
+        {
+            self.last_menu_archived = Some(selected_archived);
+        }
     }
 
     pub fn handle_actions(
@@ -382,14 +408,36 @@ impl SidebarSurface {
                 && record.action.target == SIDEBAR_CONTEXT_MENU_ID
             {
                 if let Some(sid) = selected_session_id {
-                    match sel.index() {
-                        0 => out.push(SidebarIntent::TogglePin(sid.to_owned())),
-                        1 => {
+                    match sel.value_path() {
+                        Some([action]) if action == "pin" => {
+                            out.push(SidebarIntent::TogglePin(sid.to_owned()));
+                        }
+                        Some([action]) if action == "rename" => {
                             self.renaming_session_id = Some(sid.to_owned());
                             self.set_rename_visible(host, true, "");
                         }
-                        2 => out.push(SidebarIntent::ArchiveSession(sid.to_owned())),
-                        _ => {}
+                        Some([action]) if action == "archive" => {
+                            out.push(SidebarIntent::ArchiveSession(sid.to_owned()));
+                        }
+                        Some([action]) if action == "unarchive" => {
+                            out.push(SidebarIntent::UnarchiveSession(sid.to_owned()));
+                        }
+                        Some(_) => {}
+                        None => match sel.index() {
+                            0 => out.push(SidebarIntent::TogglePin(sid.to_owned())),
+                            1 => {
+                                self.renaming_session_id = Some(sid.to_owned());
+                                self.set_rename_visible(host, true, "");
+                            }
+                            2 => {
+                                if self.row_archived.get(sid).copied().unwrap_or(false) {
+                                    out.push(SidebarIntent::UnarchiveSession(sid.to_owned()));
+                                } else {
+                                    out.push(SidebarIntent::ArchiveSession(sid.to_owned()));
+                                }
+                            }
+                            _ => {}
+                        },
                     }
                 }
                 continue;

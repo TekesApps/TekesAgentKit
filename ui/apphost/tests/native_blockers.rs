@@ -5,12 +5,15 @@ use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tekes_agent_apphost::{
-    AgentRunContainer, AppHostWakeHub, SharedAgentWorkbench, TasksQueueContainer,
+    AgentRunContainer, AppHostWakeHub, SessionSidebarContainer, SharedAgentWorkbench,
+    TasksQueueContainer,
 };
 use tekes_agent_components_ui::{
     COMPOSER_SEND_BTN_ID, ComposerIntent, ComposerSurface, RUN_CONTAINER_STACK_ID,
-    ResponsiveWidthMode, TASKS_ERROR_ID, TRANSCRIPT_ERROR_PANEL_ID, TRANSCRIPT_ROOT_ID,
-    TRANSCRIPT_STATUS_ID, TasksQueueSurface, TasksQueueViewModel, TranscriptSurface,
+    ResponsiveWidthMode, SIDEBAR_CONTEXT_MENU_ID, SIDEBAR_LIST_ID, SidebarFilterSelection,
+    SidebarIntent, SidebarRowModel, SidebarSurface, TASKS_ERROR_ID, TRANSCRIPT_ERROR_PANEL_ID,
+    TRANSCRIPT_ROOT_ID, TRANSCRIPT_STATUS_ID, TasksQueueSurface, TasksQueueViewModel,
+    TranscriptSurface,
 };
 use tekes_agent_contract::{
     EndpointCapabilities, EndpointConnector, Error, FrameStream, HistoryPage, HistoryRequest,
@@ -21,9 +24,11 @@ use tekes_agent_session::{MemoryProjectionStore, SessionRuntime};
 use tekes_agent_ui_bindings::{
     DEFAULT_MAIN_SESSION_ID, FixtureSessionEndpoint, RunWorkbenchBinding, UiWakeNotifier,
 };
+use tekes_ui_app_host::{AppWindow, PresentationOptions};
 use tekes_ui_controls::composition::{
-    Content, ContentEvent, ContentHost, PointerButton, PointerEvent, PointerModifiers,
-    PointerPhase, StackContent, TextContent,
+    AccessibilityAction, Component, Content, ContentActionSource, ContentEvent, ContentHost,
+    ContentRole, KeyedSelectableListContent, MenuContent, PointerButton, PointerEvent,
+    PointerModifiers, PointerPhase, StackContent, TextContent,
 };
 use tekes_ui_scene::{Point, Rect, Scene};
 use tekes_ui_text::{
@@ -278,13 +283,18 @@ struct ErrorScopeEndpoint {
 }
 
 struct ErrorScopeState {
+    rpcs: Vec<(String, Value)>,
     journal_txs: BTreeMap<String, mpsc::UnboundedSender<tekes_agent_contract::Result<Value>>>,
     journal_entries_a: Vec<Value>,
     inventory_tx: Option<mpsc::UnboundedSender<tekes_agent_contract::Result<Value>>>,
+    custom_items: Option<Vec<Value>>,
+    archived_ids: Vec<String>,
     running_a: bool,
     reject_cancel_a: bool,
     transport_error_cancel_a: bool,
     reject_cancel_b: bool,
+    reject_archive: bool,
+    reject_unarchive: bool,
     gate_cancel_a: bool,
     gate_ok_a: bool,
     fail_create: bool,
@@ -294,15 +304,20 @@ impl ErrorScopeEndpoint {
     fn new() -> Self {
         Self {
             inner: Arc::new(Mutex::new(ErrorScopeState {
+                rpcs: Vec::new(),
                 journal_txs: BTreeMap::new(),
                 journal_entries_a: vec![
                     json!({"event": {"type": "user/message", "seq": 0, "time": 1, "data": {"text": "init"}}}),
                 ],
                 inventory_tx: None,
+                custom_items: None,
+                archived_ids: Vec::new(),
                 running_a: false,
                 reject_cancel_a: true,
                 transport_error_cancel_a: false,
                 reject_cancel_b: false,
+                reject_archive: false,
+                reject_unarchive: false,
                 gate_cancel_a: false,
                 gate_ok_a: false,
                 fail_create: false,
@@ -359,25 +374,35 @@ impl SessionEndpoint for ErrorScopeSessionEndpoint {
         &self.host
     }
     fn capabilities(&self) -> EndpointCapabilities {
-        EndpointCapabilities::methods(&["session.cancel", "session.create", "session.prompt"])
+        EndpointCapabilities::methods(&[
+            "session.cancel",
+            "session.create",
+            "session.prompt",
+            "session.rename",
+            "session.archive",
+            "session.unarchive",
+        ])
     }
     async fn follow(&self, target: StreamTarget) -> tekes_agent_contract::Result<FrameStream> {
         match target {
             StreamTarget::SessionInventory => {
                 let (tx, rx) = mpsc::unbounded_channel();
-                let running_a = {
+                let (running_a, custom_items) = {
                     let mut guard = self.source.inner.lock().unwrap();
                     guard.inventory_tx = Some(tx);
-                    guard.running_a
+                    (guard.running_a, guard.custom_items.clone())
                 };
+                let items = custom_items.unwrap_or_else(|| {
+                    vec![
+                        json!({"sessionId": "a", "running": running_a, "blank": false, "updatedAt": 10}),
+                        json!({"sessionId": "b", "running": false, "blank": false, "updatedAt": 20}),
+                    ]
+                });
                 let baseline = json!({
                     "type": "baseline",
                     "generation": "g",
                     "snapshot": {
-                        "items": [
-                            {"sessionId": "a", "running": running_a, "blank": false, "updatedAt": 10},
-                            {"sessionId": "b", "running": false, "blank": false, "updatedAt": 20}
-                        ]
+                        "items": items
                     }
                 });
                 let tail = stream::unfold(rx, |mut rx| async move {
@@ -450,6 +475,12 @@ impl SessionEndpoint for ErrorScopeSessionEndpoint {
         payload: Value,
         _rpc_id: &str,
     ) -> tekes_agent_contract::Result<Value> {
+        self.source
+            .inner
+            .lock()
+            .unwrap()
+            .rpcs
+            .push((method.to_owned(), payload.clone()));
         match method {
             "session.cancel" => {
                 let sid = payload["sessionId"].as_str().unwrap_or("");
@@ -489,6 +520,40 @@ impl SessionEndpoint for ErrorScopeSessionEndpoint {
                     return Err(Error::Remote("endpoint create rejected".into()));
                 }
                 Ok(json!({ "sessionId": "c" }))
+            }
+            "session.archive" => {
+                let sid = payload["sessionId"].as_str().unwrap_or("").to_owned();
+                let mut guard = self.source.inner.lock().unwrap();
+                if guard.reject_archive {
+                    return Err(Error::Remote("archive rejected".into()));
+                }
+                if let Some(items) = guard.custom_items.as_mut() {
+                    items.retain(|item| item["sessionId"] != sid);
+                }
+                if !guard.archived_ids.iter().any(|id| id == &sid) {
+                    guard.archived_ids.push(sid);
+                }
+                Ok(json!({ "archivedSessionIds": guard.archived_ids.clone() }))
+            }
+            "session.unarchive" => {
+                let sid = payload["sessionId"].as_str().unwrap_or("").to_owned();
+                let mut guard = self.source.inner.lock().unwrap();
+                if guard.reject_unarchive || !guard.archived_ids.iter().any(|id| id == &sid) {
+                    return Err(Error::Remote("session-not-found".into()));
+                }
+                guard.archived_ids.retain(|id| id != &sid);
+                if let Some(items) = guard.custom_items.as_mut()
+                    && !items.iter().any(|item| item["sessionId"] == sid)
+                {
+                    items.push(json!({
+                        "sessionId": sid,
+                        "running": false,
+                        "blank": false,
+                        "updatedAt": 25,
+                        "projections": {"asOfSeq": 10, "values": {"title": "Acceptance B"}}
+                    }));
+                }
+                Ok(json!({ "sessionId": sid }))
             }
             _ => Ok(json!({ "accepted": true })),
         }
@@ -1261,6 +1326,212 @@ fn overlapping_same_turn_stop_late_rejection_does_not_resurrect_error_in_transcr
     rt.block_on(wait_store(&runtime, |s| s.sessions["a"].journal_ready));
     let after_b_to_a = inspect_rendered_errors(&workbench, &mut surfaces);
     assert_eq!(after_b_to_a, ((false, None), Some(String::new())));
+
+    rt.block_on(runtime.stop()).unwrap();
+}
+
+#[test]
+fn session_sidebar_container_renders_confirmed_titles_matches_search_and_routes_explicit_archive_unarchive()
+ {
+    let endpoint = ErrorScopeEndpoint::new();
+    {
+        let mut guard = endpoint.inner.lock().unwrap();
+        guard.custom_items = Some(vec![
+            json!({"sessionId": "a", "running": false, "blank": false, "updatedAt": 10, "projections": {"asOfSeq": 1, "values": {"title": "Acceptance A"}}}),
+            json!({"sessionId": "b", "running": false, "blank": false, "updatedAt": 20, "projections": {"asOfSeq": 10, "values": {"title": "Acceptance B"}}}),
+            json!({"sessionId": "c", "running": false, "blank": false, "updatedAt": 5, "status": "archived", "projections": {"asOfSeq": 2, "values": {"title": "Archived C"}}}),
+        ]);
+        guard.archived_ids = vec!["c".to_owned()];
+    }
+
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    let runtime = rt.block_on(async {
+        let runtime = Arc::new(SessionRuntime::spawn(
+            "error-scope",
+            Arc::new(endpoint.clone()),
+        ));
+        runtime.wait_ready(Duration::from_secs(2)).await.unwrap();
+        runtime
+    });
+    let controller =
+        rt.block_on(async { Arc::new(RunController::new(Arc::clone(&runtime)).unwrap()) });
+    let workbench = SharedAgentWorkbench::new();
+    let binding = {
+        let _guard = rt.enter();
+        RunWorkbenchBinding::new(
+            "error-scope",
+            Arc::clone(&runtime),
+            controller,
+            rt.handle().clone(),
+            workbench.wake_hub(),
+        )
+    };
+    binding.open_initial_session("a").unwrap();
+    workbench.attach_run_binding(Arc::clone(&binding));
+
+    // Mount only public AppHost containers and wire AppWindow navigation.
+    let main = AgentRunContainer::build("run", workbench.clone()).unwrap();
+    let sidebar = SessionSidebarContainer::build("sidebar", workbench.clone()).unwrap();
+    let _app = AppWindow::from_containers(
+        vec![sidebar.into(), main.into()],
+        PresentationOptions::new("run").nav_bar("sidebar"),
+    )
+    .unwrap();
+
+    // Drive SidebarSurface on ContentHost to verify rendered row titles, search hit, and context menu actions.
+    let mut host = ContentHost::new(SidebarSurface::build_content()).unwrap();
+    host.set_window_active(true);
+    host.set_action_events(true);
+    let mut surface = SidebarSurface::new();
+    let mut text = TestTextBackend::new();
+
+    let sync_sidebar = |host: &mut ContentHost, surface: &mut SidebarSurface, text: &mut TestTextBackend| {
+        let rows: Vec<SidebarRowModel> = binding
+            .sidebar_rows()
+            .into_iter()
+            .map(|r| SidebarRowModel {
+                session_id: r.session_id,
+                title: r.title,
+                folder: r.folder,
+                activity: r.activity,
+                running: r.running,
+                pinned: r.pinned,
+                archived: r.archived,
+            })
+            .collect();
+        let selected = binding.current_scope().map(|s| s.session_id);
+        surface.sync(
+            host,
+            &rows,
+            selected.as_deref(),
+            SidebarFilterSelection::All,
+            ResponsiveWidthMode::Expanded,
+        );
+        let rect = Rect::new(0.0, 0.0, 320.0, 640.0);
+        host.render(&mut Scene::new(), text, rect, rect, Palette::from(Theme::LIGHT))
+            .unwrap();
+    };
+
+    sync_sidebar(&mut host, &mut surface, &mut text);
+    let menu_binding = host
+        .bind_context_menu(SIDEBAR_LIST_ID, SIDEBAR_CONTEXT_MENU_ID)
+        .unwrap();
+    let visible_names = |host: &ContentHost| -> Vec<String> {
+        host.get(SIDEBAR_LIST_ID)
+            .and_then(|c| c.component::<KeyedSelectableListContent>())
+            .unwrap()
+            .semantic_parts()
+            .into_iter()
+            .map(|p| p.semantics.name)
+            .collect()
+    };
+    let names = visible_names(&host);
+    assert!(names.iter().any(|n| n == "Acceptance B"), "names: {names:?}");
+
+    binding.select_session("b");
+    rt.block_on(wait_store(&runtime, |s| s.sessions["b"].journal_ready));
+    sync_sidebar(&mut host, &mut surface, &mut text);
+
+    let trigger_menu_item = |host: &mut ContentHost,
+                             surface: &mut SidebarSurface,
+                             text: &mut TestTextBackend,
+                             label: &str| {
+        host.request_context_menu(menu_binding, ContentActionSource::Accessibility)
+            .unwrap();
+        let rect = Rect::new(0.0, 0.0, 320.0, 640.0);
+        host.render(&mut Scene::new(), text, rect, rect, Palette::from(Theme::LIGHT))
+            .unwrap();
+        let part_id = host
+            .get(SIDEBAR_CONTEXT_MENU_ID)
+            .and_then(|c| c.component::<MenuContent>())
+            .unwrap()
+            .semantic_parts()
+            .into_iter()
+            .find(|p| p.semantics.role == ContentRole::MenuItem && p.semantics.name == label)
+            .unwrap_or_else(|| panic!("expected MenuItem `{label}`"))
+            .index;
+        let pick_resp = host.accessibility_action(
+            SIDEBAR_CONTEXT_MENU_ID,
+            Some(part_id),
+            AccessibilityAction::Press,
+        );
+        assert!(pick_resp.activated);
+        let records = host.drain_action_records();
+        let selected = binding.current_scope().map(|s| s.session_id);
+        for intent in surface.handle_actions(host, selected.as_deref(), &records) {
+            match intent {
+                SidebarIntent::ArchiveSession(sid) => binding.archive_session(&sid),
+                SidebarIntent::UnarchiveSession(sid) => binding.unarchive_session(&sid),
+                _ => {}
+            }
+        }
+    };
+
+    // Archive B, restore B externally, reconnect -> B reappears active -> menu "Archive" sends session.archive to B.
+    trigger_menu_item(&mut host, &mut surface, &mut text, "Archive");
+    for _ in 0..80 {
+        if endpoint
+            .inner
+            .lock()
+            .unwrap()
+            .rpcs
+            .iter()
+            .any(|(m, p)| m == "session.archive" && p["sessionId"] == "b")
+        {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    rt.block_on(runtime.reconnect()).unwrap();
+    rt.block_on(runtime.unarchive("b", "ext-restore")).unwrap();
+    rt.block_on(runtime.reconnect()).unwrap();
+    binding.select_session("b");
+    rt.block_on(wait_store(&runtime, |s| s.sessions["b"].journal_ready));
+    sync_sidebar(&mut host, &mut surface, &mut text);
+    assert!(visible_names(&host).iter().any(|n| n == "Acceptance B"));
+
+    let rpc_start = endpoint.inner.lock().unwrap().rpcs.len();
+    trigger_menu_item(&mut host, &mut surface, &mut text, "Archive");
+    for _ in 0..80 {
+        if endpoint.inner.lock().unwrap().rpcs[rpc_start..]
+            .iter()
+            .any(|(m, p)| m == "session.archive" && p["sessionId"] == "b")
+        {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    let after_rpcs = endpoint.inner.lock().unwrap().rpcs[rpc_start..].to_vec();
+    assert!(
+        after_rpcs
+            .iter()
+            .any(|(m, p)| m == "session.archive" && p["sessionId"] == "b")
+    );
+    assert!(!after_rpcs.iter().any(|(m, _)| m == "session.unarchive"));
+
+    // Selecting authoritatively archived row C flips context menu to "Unarchive" and routes to session.unarchive.
+    binding.select_session("c");
+    rt.block_on(wait_store(&runtime, |s| s.sessions["c"].journal_ready));
+    sync_sidebar(&mut host, &mut surface, &mut text);
+    assert!(visible_names(&host).iter().any(|n| n == "Archived C (Archived)"));
+    let c_rpc_start = endpoint.inner.lock().unwrap().rpcs.len();
+    trigger_menu_item(&mut host, &mut surface, &mut text, "Unarchive");
+    for _ in 0..80 {
+        if endpoint.inner.lock().unwrap().rpcs[c_rpc_start..]
+            .iter()
+            .any(|(m, p)| m == "session.unarchive" && p["sessionId"] == "c")
+        {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    let c_rpcs = endpoint.inner.lock().unwrap().rpcs[c_rpc_start..].to_vec();
+    assert!(
+        c_rpcs
+            .iter()
+            .any(|(m, p)| m == "session.unarchive" && p["sessionId"] == "c")
+    );
+    assert!(!c_rpcs.iter().any(|(m, _)| m == "session.archive"));
 
     rt.block_on(runtime.stop()).unwrap();
 }

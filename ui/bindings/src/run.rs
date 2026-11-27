@@ -10,9 +10,11 @@ use std::{
 use tekes_agent_contract::{ComposerAnnotation, PromptMode, Result, SessionAddress};
 use tekes_agent_presentation::{
     ActionablePrompt, ComposerArtifact, ComposerDestination, RunController, RunScope, RunSnapshot,
-    SummaryFacts, TranscriptDocument, thread_activity,
+    SummaryFacts, TranscriptDocument, canonical_session_title, thread_activity,
 };
-use tekes_agent_session::{ConnectionState, SessionHistoryLease, SessionRuntime};
+use tekes_agent_session::{
+    ConnectionState, MemoryProjectionStore, SessionHistoryLease, SessionProjection, SessionRuntime,
+};
 use tokio::runtime::Handle;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -150,6 +152,31 @@ enum TurnTerminal {
     ConfirmedOther,
 }
 
+#[derive(Clone, Debug)]
+struct PendingRename {
+    op_id: u64,
+    title: String,
+    start_epoch: u64,
+    baseline_seq: Option<i64>,
+    baseline_title: String,
+    confirmed_seq: Option<i64>,
+    in_flight: bool,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ArchiveTargetState {
+    Archived,
+    Active,
+}
+
+#[derive(Clone, Debug)]
+struct PendingArchiveOp {
+    op_id: u64,
+    target: ArchiveTargetState,
+    start_epoch: u64,
+    in_flight: bool,
+}
+
 struct RunUiState {
     endpoint_id: String,
     default_cwd: String,
@@ -166,8 +193,9 @@ struct RunUiState {
     history_acquire_attempted: Option<(u64, u64, String)>,
     dropped: bool,
     local_pins: BTreeSet<String>,
-    local_titles: BTreeMap<String, String>,
-    local_archived: BTreeSet<String>,
+    pending_renames: BTreeMap<String, PendingRename>,
+    pending_archive_ops: BTreeMap<String, PendingArchiveOp>,
+    next_sidebar_op_id: u64,
     host_summary_sections: Vec<(String, Vec<(String, String)>)>,
     last_error: Option<String>,
     session_errors: BTreeMap<String, SessionErrorEntry>,
@@ -566,8 +594,9 @@ impl RunWorkbenchBinding {
             history_acquire_attempted: None,
             dropped: false,
             local_pins: BTreeSet::new(),
-            local_titles: BTreeMap::new(),
-            local_archived: BTreeSet::new(),
+            pending_renames: BTreeMap::new(),
+            pending_archive_ops: BTreeMap::new(),
+            next_sidebar_op_id: 0,
             host_summary_sections: Vec::new(),
             last_error: None,
             session_errors: BTreeMap::new(),
@@ -606,6 +635,7 @@ impl RunWorkbenchBinding {
                                 &handle_w,
                             );
                             reconcile_uncertain_cancels(&runtime_w, &ui_strong);
+                            reconcile_sidebar_overrides(&runtime_w, &ui_strong);
                         } else {
                             break;
                         }
@@ -1311,50 +1341,196 @@ impl RunWorkbenchBinding {
     }
 
     pub fn rename_session(&self, session_id: &str, title: String) {
-        if title.trim().is_empty() {
+        let trimmed = title.trim();
+        if trimmed.is_empty() {
             return;
         }
-        {
+        let next_title = trimmed.to_owned();
+        let store = self.runtime.snapshot();
+        let start_epoch = store.connection_epoch;
+        let (baseline_title, baseline_seq) = store
+            .sessions
+            .get(session_id)
+            .and_then(authoritative_title_info)
+            .unwrap_or_else(|| ("New conversation".to_owned(), None));
+        let (op_id, start_error_seq) = {
             let mut guard = self.ui.lock().expect("run ui lock");
-            guard
-                .local_titles
-                .insert(session_id.to_owned(), title.clone());
+            guard.next_sidebar_op_id = guard.next_sidebar_op_id.saturating_add(1);
+            let op_id = guard.next_sidebar_op_id;
+            let start_error_seq = guard
+                .session_errors
+                .get(session_id)
+                .map_or(0, |entry| entry.seq);
+            guard.pending_renames.insert(
+                session_id.to_owned(),
+                PendingRename {
+                    op_id,
+                    title: next_title.clone(),
+                    start_epoch,
+                    baseline_seq,
+                    baseline_title,
+                    confirmed_seq: None,
+                    in_flight: true,
+                },
+            );
             guard.revision = guard.revision.saturating_add(1);
-        }
+            (op_id, start_error_seq)
+        };
         let runtime = Arc::clone(&self.runtime);
+        let ui = Arc::clone(&self.ui);
         let sid = session_id.to_owned();
         let wake = Arc::clone(&self.wake);
         self.handle.spawn(async move {
             let rpc = format!("rename-{}", uuid::Uuid::new_v4());
-            let _ = runtime.rename(&sid, &title, &rpc).await;
+            match runtime.rename(&sid, &next_title, &rpc).await {
+                Ok(value) => {
+                    let confirmed_seq = value.get("seq").and_then(Value::as_i64);
+                    let store = runtime.snapshot();
+                    let mut guard = ui.lock().expect("run ui lock");
+                    let should_retire = if let Some(pending) = guard.pending_renames.get_mut(&sid)
+                        && pending.op_id == op_id
+                    {
+                        pending.confirmed_seq = confirmed_seq;
+                        pending.in_flight = false;
+                        pending_rename_is_retired(pending, &store, &sid)
+                    } else {
+                        false
+                    };
+                    if should_retire {
+                        guard.pending_renames.remove(&sid);
+                    }
+                    guard.revision = guard.revision.saturating_add(1);
+                    drop(guard);
+                    clear_session_error_if_not_newer(&ui, &sid, start_error_seq);
+                }
+                Err(err) => {
+                    {
+                        let mut guard = ui.lock().expect("run ui lock");
+                        if guard
+                            .pending_renames
+                            .get(&sid)
+                            .is_some_and(|pending| pending.op_id == op_id)
+                        {
+                            guard.pending_renames.remove(&sid);
+                        }
+                    }
+                    record_session_error(&ui, &sid, Some(format!("Rename failed: {err}")));
+                }
+            }
             wake.wake();
         });
         self.wake.wake();
     }
 
     pub fn archive_session(&self, session_id: &str) {
-        {
+        self.submit_archive_transition(session_id, ArchiveTargetState::Archived);
+    }
+
+    pub fn unarchive_session(&self, session_id: &str) {
+        self.submit_archive_transition(session_id, ArchiveTargetState::Active);
+    }
+
+    fn submit_archive_transition(&self, session_id: &str, target: ArchiveTargetState) {
+        let store = self.runtime.snapshot();
+        let start_epoch = store.connection_epoch;
+        let (present, archived) = authoritative_archived_info(&store, session_id);
+        let should_stage_optimistic = match target {
+            ArchiveTargetState::Archived => present && !archived,
+            ArchiveTargetState::Active => archived,
+        };
+        let (op_id, start_error_seq) = {
             let mut guard = self.ui.lock().expect("run ui lock");
-            if !guard.local_archived.remove(session_id) {
-                guard.local_archived.insert(session_id.to_owned());
+            guard.next_sidebar_op_id = guard.next_sidebar_op_id.saturating_add(1);
+            let op_id = guard.next_sidebar_op_id;
+            let start_error_seq = guard
+                .session_errors
+                .get(session_id)
+                .map_or(0, |entry| entry.seq);
+            if should_stage_optimistic {
+                guard.pending_archive_ops.insert(
+                    session_id.to_owned(),
+                    PendingArchiveOp {
+                        op_id,
+                        target,
+                        start_epoch,
+                        in_flight: true,
+                    },
+                );
+            } else {
+                guard.pending_archive_ops.remove(session_id);
             }
             guard.revision = guard.revision.saturating_add(1);
-        }
+            (op_id, start_error_seq)
+        };
         let runtime = Arc::clone(&self.runtime);
+        let ui = Arc::clone(&self.ui);
         let sid = session_id.to_owned();
-        let archived = self
-            .ui
-            .lock()
-            .expect("run ui lock")
-            .local_archived
-            .contains(&sid);
         let wake = Arc::clone(&self.wake);
         self.handle.spawn(async move {
-            let rpc = format!("archive-{}", uuid::Uuid::new_v4());
-            if archived {
-                let _ = runtime.archive(&sid, &rpc).await;
-            } else {
-                let _ = runtime.unarchive(&sid, &rpc).await;
+            let result = match target {
+                ArchiveTargetState::Archived => {
+                    let rpc = format!("archive-{}", uuid::Uuid::new_v4());
+                    runtime.archive(&sid, &rpc).await
+                }
+                ArchiveTargetState::Active => {
+                    let rpc = format!("unarchive-{}", uuid::Uuid::new_v4());
+                    runtime.unarchive(&sid, &rpc).await
+                }
+            };
+            match result {
+                Ok(_) => {
+                    let store = runtime.snapshot();
+                    let retired_lease = {
+                        let mut guard = ui.lock().expect("run ui lock");
+                        let should_retire =
+                            if let Some(pending) = guard.pending_archive_ops.get_mut(&sid)
+                                && pending.op_id == op_id
+                            {
+                                pending.in_flight = false;
+                                pending_archive_is_retired(pending, &store, &sid)
+                            } else {
+                                false
+                            };
+                        if should_retire {
+                            guard.pending_archive_ops.remove(&sid);
+                        }
+                        let lease = if target == ArchiveTargetState::Archived
+                            && guard
+                                .history_lease
+                                .as_ref()
+                                .is_some_and(|lease| lease.session_id() == sid)
+                        {
+                            if guard.desired_history_session.as_deref() == Some(sid.as_str()) {
+                                guard.desired_history_session = None;
+                            }
+                            guard.history_acquire_attempted = None;
+                            guard.history_lease.take()
+                        } else {
+                            None
+                        };
+                        guard.revision = guard.revision.saturating_add(1);
+                        lease
+                    };
+                    drop(retired_lease);
+                    clear_session_error_if_not_newer(&ui, &sid, start_error_seq);
+                }
+                Err(err) => {
+                    {
+                        let mut guard = ui.lock().expect("run ui lock");
+                        if guard
+                            .pending_archive_ops
+                            .get(&sid)
+                            .is_some_and(|pending| pending.op_id == op_id)
+                        {
+                            guard.pending_archive_ops.remove(&sid);
+                        }
+                    }
+                    let prefix = match target {
+                        ArchiveTargetState::Archived => "Archive failed",
+                        ArchiveTargetState::Active => "Unarchive failed",
+                    };
+                    record_session_error(&ui, &sid, Some(format!("{prefix}: {err}")));
+                }
             }
             wake.wake();
         });
@@ -1671,20 +1847,27 @@ impl RunWorkbenchBinding {
             if is_child {
                 continue;
             }
+            let authoritative_title = authoritative_title_info(projection)
+                .map(|(title, _)| title)
+                .unwrap_or_else(|| "New conversation".to_owned());
             let title = ui
-                .local_titles
+                .pending_renames
                 .get(id)
-                .cloned()
-                .or_else(|| summary["title"].as_str().map(str::to_owned))
-                .unwrap_or_else(|| id.clone());
+                .filter(|pending| !pending_rename_is_retired(pending, &store, id))
+                .map_or(authoritative_title, |pending| pending.title.clone());
             let folder = summary["folder"]
                 .as_str()
                 .filter(|s| !s.is_empty())
                 .unwrap_or("默认")
                 .to_owned();
-            let archived = store.archived_session_ids.contains(id)
-                || ui.local_archived.contains(id)
-                || summary["status"].as_str() == Some("archived");
+            let authoritative_archived = authoritative_archived_info(&store, id).1;
+            let archived = ui
+                .pending_archive_ops
+                .get(id)
+                .filter(|pending| !pending_archive_is_retired(pending, &store, id))
+                .map_or(authoritative_archived, |pending| {
+                    pending.target == ArchiveTargetState::Archived
+                });
             let pinned = store.pinned_session_ids.contains(id) || ui.local_pins.contains(id);
             if matches!(ui.filter_mode, SidebarFilterMode::Pinned) && !pinned {
                 continue;
@@ -2020,6 +2203,87 @@ fn current_session_error_seq(ui: &Mutex<RunUiState>, session_id: &str) -> u64 {
         .session_errors
         .get(session_id)
         .map_or(0, |entry| entry.seq)
+}
+
+fn authoritative_title_info(projection: &SessionProjection) -> Option<(String, Option<i64>)> {
+    let summary = projection.summary.as_ref()?;
+    let projected = projection.projections.get("title");
+    let title = canonical_session_title(summary, projected.map(|v| &v.value));
+    let seq = projected.map(|v| v.sequence).or_else(|| {
+        summary["projections"]["values"]
+            .get("title")
+            .and_then(|_| summary["projections"]["asOfSeq"].as_i64())
+    });
+    Some((title, seq))
+}
+
+fn authoritative_archived_info(store: &MemoryProjectionStore, session_id: &str) -> (bool, bool) {
+    let summary = store
+        .sessions
+        .get(session_id)
+        .and_then(|projection| projection.summary.as_ref());
+    let present = summary.is_some();
+    let archived = store.archived_session_ids.iter().any(|id| id == session_id)
+        || summary.is_some_and(|s| s["status"].as_str() == Some("archived"));
+    (present, archived)
+}
+
+fn pending_rename_is_retired(
+    pending: &PendingRename,
+    store: &MemoryProjectionStore,
+    session_id: &str,
+) -> bool {
+    if store.connection_epoch > pending.start_epoch {
+        return true;
+    }
+    let Some(projection) = store.sessions.get(session_id) else {
+        return true;
+    };
+    let Some((current_title, current_seq)) = authoritative_title_info(projection) else {
+        return true;
+    };
+    if let Some(confirmed_seq) = pending.confirmed_seq
+        && current_seq.is_some_and(|seq| seq >= confirmed_seq)
+    {
+        return true;
+    }
+    if current_seq > pending.baseline_seq {
+        return true;
+    }
+    !pending.in_flight
+        && (current_title != pending.baseline_title
+            || (pending.confirmed_seq.is_none() && current_title == pending.title))
+}
+
+fn pending_archive_is_retired(
+    pending: &PendingArchiveOp,
+    store: &MemoryProjectionStore,
+    session_id: &str,
+) -> bool {
+    if store.connection_epoch > pending.start_epoch {
+        return true;
+    }
+    let (present, archived) = authoritative_archived_info(store, session_id);
+    match pending.target {
+        ArchiveTargetState::Archived => !present || archived,
+        ArchiveTargetState::Active => present && !archived,
+    }
+}
+
+fn reconcile_sidebar_overrides(runtime: &SessionRuntime, ui: &Mutex<RunUiState>) {
+    let store = runtime.snapshot();
+    let mut guard = ui.lock().expect("run ui lock");
+    let before = guard.pending_renames.len() + guard.pending_archive_ops.len();
+    guard
+        .pending_renames
+        .retain(|sid, pending| !pending_rename_is_retired(pending, &store, sid));
+    guard
+        .pending_archive_ops
+        .retain(|sid, pending| !pending_archive_is_retired(pending, &store, sid));
+    let after = guard.pending_renames.len() + guard.pending_archive_ops.len();
+    if after != before {
+        guard.revision = guard.revision.saturating_add(1);
+    }
 }
 
 fn record_session_error(ui: &Mutex<RunUiState>, session_id: &str, error: Option<String>) {

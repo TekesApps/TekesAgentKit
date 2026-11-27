@@ -521,6 +521,7 @@ impl AgentContainerAdapter for ShowcaseStageAdapter {
                                 run.rename_session(&session_id, title);
                             }
                             SidebarIntent::ArchiveSession(sid) => run.archive_session(&sid),
+                            SidebarIntent::UnarchiveSession(sid) => run.unarchive_session(&sid),
                             SidebarIntent::OpenSettings => {
                                 *self.selected.borrow_mut() = ShowcaseComponent::Settings;
                                 workbench.bump_revision();

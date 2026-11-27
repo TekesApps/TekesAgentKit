@@ -99,6 +99,9 @@ impl AgentContainerAdapter for SidebarAdapter {
                 SidebarIntent::ArchiveSession(session_id) => {
                     run.archive_session(&session_id);
                 }
+                SidebarIntent::UnarchiveSession(session_id) => {
+                    run.unarchive_session(&session_id);
+                }
                 SidebarIntent::OpenSettings => {
                     workbench.bump_revision();
                 }
