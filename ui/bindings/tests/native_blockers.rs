@@ -513,6 +513,19 @@ impl SessionEndpoint for TestSessionEndpoint {
                 Ok(json!({ "seq": seq, "title": title }))
             }
             "session.archive" => {
+                let sid = payload["sessionId"].as_str().unwrap_or("").to_owned();
+                let reject_archive = {
+                    let mut guard = self.source.inner.lock().unwrap();
+                    if !guard.reject_archive {
+                        if let Some(items) = guard.custom_items.as_mut() {
+                            items.retain(|item| item["sessionId"] != sid);
+                        }
+                        if !guard.archived_ids.iter().any(|id| id == &sid) {
+                            guard.archived_ids.push(sid);
+                        }
+                    }
+                    guard.reject_archive
+                };
                 if self.source.park_archive.swap(false, Ordering::AcqRel) {
                     let release = self.source.park_archive_release.notified();
                     tokio::pin!(release);
@@ -520,18 +533,11 @@ impl SessionEndpoint for TestSessionEndpoint {
                     self.source.park_archive_entered.notify_one();
                     release.await;
                 }
-                let sid = payload["sessionId"].as_str().unwrap_or("").to_owned();
-                let mut guard = self.source.inner.lock().unwrap();
-                if guard.reject_archive {
+                if reject_archive {
                     return Err(Error::Remote("archive rejected".into()));
                 }
-                if let Some(items) = guard.custom_items.as_mut() {
-                    items.retain(|item| item["sessionId"] != sid);
-                }
-                if !guard.archived_ids.iter().any(|id| id == &sid) {
-                    guard.archived_ids.push(sid);
-                }
-                Ok(json!({ "archivedSessionIds": guard.archived_ids.clone() }))
+                let archived_ids = self.source.inner.lock().unwrap().archived_ids.clone();
+                Ok(json!({ "archivedSessionIds": archived_ids }))
             }
             "sessions.recover" => Ok(json!({ "recoveredSessionIds": payload["sessionIds"] })),
             "session.unarchive" => {
@@ -3137,6 +3143,7 @@ fn archive_in_flight_reconnect_and_ws_drop_preserve_selected_running_subscriptio
     }));
 
     // 1. Explicit reconnect while archive_session("a") is in-flight preserves lease & recovery and does not replay archive.
+    let epoch_before_1 = runtime.inspect(|s| s.connection_epoch);
     endpoint.park_archive.store(true, Ordering::Release);
     let entered_1 = endpoint.park_archive_entered.notified();
     binding.archive_session("a");
@@ -3145,7 +3152,11 @@ fn archive_in_flight_reconnect_and_ws_drop_preserve_selected_running_subscriptio
     endpoint.park_archive_release.notify_one();
 
     rt.block_on(wait_store(&runtime, |s| {
-        s.connection_epoch >= 2 && s.sessions["a"].journal_ready && s.sessions["a"].run_open
+        s.connection == tekes_agent_session::ConnectionState::Ready
+            && s.connection_epoch > epoch_before_1
+            && endpoint.connect_count.load(Ordering::Acquire) >= 2
+            && s.sessions["a"].journal_ready
+            && s.sessions["a"].run_open
     }));
     let archive_rpcs_1 = endpoint
         .rpcs()
@@ -3163,17 +3174,22 @@ fn archive_in_flight_reconnect_and_ws_drop_preserve_selected_running_subscriptio
     );
 
     // 2. Transport / WS drop while archive_session("a") is in-flight also restores lease, recovery, and delivers final answer without B->A switch.
+    let epoch_before_2 = runtime.inspect(|s| s.connection_epoch);
     endpoint.park_archive.store(true, Ordering::Release);
     let entered_2 = endpoint.park_archive_entered.notified();
     binding.archive_session("a");
     rt.block_on(entered_2);
     endpoint.drop_connection();
     endpoint.unblock_reconnect();
-    endpoint.park_archive_release.notify_one();
 
     rt.block_on(wait_store(&runtime, |s| {
-        s.connection_epoch >= 3 && s.sessions["a"].journal_ready && s.sessions["a"].run_open
+        s.connection == tekes_agent_session::ConnectionState::Ready
+            && s.connection_epoch > epoch_before_2
+            && endpoint.connect_count.load(Ordering::Acquire) >= 3
+            && s.sessions["a"].journal_ready
+            && s.sessions["a"].run_open
     }));
+    endpoint.park_archive_release.notify_one();
     let archive_rpcs_2 = endpoint
         .rpcs()
         .iter()
@@ -3230,6 +3246,91 @@ fn archive_in_flight_reconnect_and_ws_drop_preserve_selected_running_subscriptio
             .find(|r| r.session_id == "a")
             .is_some_and(|r| !r.archived)
     );
+
+    rt.block_on(runtime.stop()).unwrap();
+}
+
+#[test]
+fn archive_success_receipt_lost_across_ws_drop_releases_lease_clears_error_and_never_reopens() {
+    let endpoint = BlockerTestEndpoint::new();
+    endpoint.supports_recovery.store(true, Ordering::Release);
+    {
+        let mut guard = endpoint.inner.lock().unwrap();
+        guard.use_workspace_stream = true;
+        guard.custom_items = Some(vec![
+            json!({"sessionId": "a", "running": false, "blank": false, "updatedAt": 10, "projections": {"asOfSeq": 1, "values": {"title": "Idle A"}}}),
+            json!({"sessionId": "b", "running": false, "blank": false, "updatedAt": 20, "projections": {"asOfSeq": 1, "values": {"title": "Idle B"}}}),
+        ]);
+    }
+    let (rt, runtime, binding) = setup_binding(&endpoint);
+    binding.open_initial_session("a").unwrap();
+    rt.block_on(wait_store(&runtime, |s| s.sessions["a"].journal_ready));
+
+    endpoint.park_archive.store(true, Ordering::Release);
+    let entered = endpoint.park_archive_entered.notified();
+    binding.archive_session("a");
+    rt.block_on(entered);
+    assert!(
+        endpoint
+            .inner
+            .lock()
+            .unwrap()
+            .archived_ids
+            .contains(&"a".to_owned())
+    );
+
+    let epoch_before = runtime.inspect(|s| s.connection_epoch);
+    endpoint.drop_connection();
+    endpoint.unblock_reconnect();
+
+    rt.block_on(wait_store(&runtime, |s| {
+        s.connection == tekes_agent_session::ConnectionState::Ready
+            && s.connection_epoch > epoch_before
+            && endpoint.connect_count.load(Ordering::Acquire) >= 2
+    }));
+    endpoint.park_archive_release.notify_one();
+
+    wait_until("uncertain archive error cleared and A removed", || {
+        binding.session_error("a").is_none()
+            && binding.error_for_session(Some("a")).is_none()
+            && !binding
+                .sidebar_rows()
+                .into_iter()
+                .any(|r| r.session_id == "a")
+    });
+
+    rt.block_on(runtime.reconnect()).unwrap();
+    rt.block_on(wait_store(&runtime, |s| {
+        s.connection == tekes_agent_session::ConnectionState::Ready && s.connection_epoch >= 3
+    }));
+
+    let late_opens: Vec<_> = endpoint
+        .journal_opens()
+        .into_iter()
+        .filter(|(c, _)| *c >= 2)
+        .collect();
+    assert!(
+        late_opens.is_empty(),
+        "unexpected late journal opens: {late_opens:?}"
+    );
+    let recover_rpcs: Vec<_> = endpoint
+        .rpcs()
+        .into_iter()
+        .filter(|(m, _)| m == "sessions.recover")
+        .collect();
+    assert!(
+        recover_rpcs.is_empty(),
+        "unexpected sessions.recover: {recover_rpcs:?}"
+    );
+    assert_eq!(
+        endpoint
+            .rpcs()
+            .iter()
+            .filter(|(m, p)| m == "session.archive" && p["sessionId"] == "a")
+            .count(),
+        1
+    );
+    assert_eq!(binding.session_error("a"), None);
 
     rt.block_on(runtime.stop()).unwrap();
 }

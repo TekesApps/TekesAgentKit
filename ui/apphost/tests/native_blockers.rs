@@ -25,10 +25,13 @@ use tekes_agent_ui_bindings::{
     DEFAULT_MAIN_SESSION_ID, FixtureSessionEndpoint, RunWorkbenchBinding, UiWakeNotifier,
 };
 use tekes_ui_app_host::{AppWindow, PresentationOptions};
-use tekes_ui_controls::composition::{
-    AccessibilityAction, Component, Content, ContentActionSource, ContentEvent, ContentHost,
-    ContentKeyEvent, ContentRole, InputModifiers, KeyedSelectableListContent, MenuContent,
-    PointerButton, PointerEvent, PointerModifiers, PointerPhase, StackContent, TextContent,
+use tekes_ui_controls::{
+    ControlKey,
+    composition::{
+        AccessibilityAction, Component, Content, ContentActionSource, ContentEvent, ContentHost,
+        ContentKeyEvent, ContentRole, InputModifiers, KeyedSelectableListContent, MenuContent,
+        PointerButton, PointerEvent, PointerModifiers, PointerPhase, StackContent, TextContent,
+    },
 };
 use tekes_ui_scene::{Point, Rect, Scene};
 use tekes_ui_text::{
@@ -2195,5 +2198,272 @@ fn list_context_menu_pins_or_retires_target_across_accessibility_keyboard_and_po
             .iter()
             .any(|(m, _)| m == "session.archive")
     );
+    rt.block_on(runtime.stop()).unwrap();
+}
+
+#[test]
+fn list_context_menu_dismiss_refocus_reopen_targets_new_focused_row_after_background_sync() {
+    let endpoint = ErrorScopeEndpoint::new();
+    {
+        let mut guard = endpoint.inner.lock().unwrap();
+        guard.custom_items = Some(vec![
+            json!({"sessionId": "a", "running": false, "blank": false, "updatedAt": 30, "projections": {"asOfSeq": 1, "values": {"title": "Acceptance A"}}}),
+            json!({"sessionId": "b", "running": false, "blank": false, "updatedAt": 20, "projections": {"asOfSeq": 1, "values": {"title": "Acceptance B"}}}),
+            json!({"sessionId": "c", "running": false, "blank": false, "updatedAt": 10, "projections": {"asOfSeq": 1, "values": {"title": "Acceptance C"}}}),
+        ]);
+    }
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    let runtime = rt.block_on(async {
+        let runtime = Arc::new(SessionRuntime::spawn(
+            "error-scope",
+            Arc::new(endpoint.clone()),
+        ));
+        runtime.wait_ready(Duration::from_secs(2)).await.unwrap();
+        runtime
+    });
+    let controller =
+        rt.block_on(async { Arc::new(RunController::new(Arc::clone(&runtime)).unwrap()) });
+    let workbench = SharedAgentWorkbench::new();
+    let binding = {
+        let _guard = rt.enter();
+        RunWorkbenchBinding::new(
+            "error-scope",
+            Arc::clone(&runtime),
+            controller,
+            rt.handle().clone(),
+            workbench.wake_hub(),
+        )
+    };
+    binding.open_initial_session("a").unwrap();
+    workbench.attach_run_binding(Arc::clone(&binding));
+
+    let main = AgentRunContainer::build("run", workbench.clone()).unwrap();
+    let sidebar = SessionSidebarContainer::build("sidebar", workbench.clone()).unwrap();
+    let _app = AppWindow::from_containers(
+        vec![sidebar.into(), main.into()],
+        PresentationOptions::new("run").nav_bar("sidebar"),
+    )
+    .unwrap();
+
+    let mut host = ContentHost::new(SidebarSurface::build_content()).unwrap();
+    host.set_window_active(true);
+    host.set_action_events(true);
+    let mut surface = SidebarSurface::new();
+    let mut text = TestTextBackend::new();
+    let rect = Rect::new(0.0, 0.0, 320.0, 640.0);
+
+    let sync_sidebar =
+        |host: &mut ContentHost, surface: &mut SidebarSurface, text: &mut TestTextBackend| {
+            let rows: Vec<SidebarRowModel> = binding
+                .sidebar_rows()
+                .into_iter()
+                .map(|r| SidebarRowModel {
+                    session_id: r.session_id,
+                    title: r.title,
+                    folder: r.folder,
+                    activity: r.activity,
+                    running: r.running,
+                    pinned: r.pinned,
+                    archived: r.archived,
+                })
+                .collect();
+            let selected = binding.current_scope().map(|s| s.session_id);
+            surface.sync(
+                host,
+                &rows,
+                selected.as_deref(),
+                SidebarFilterSelection::All,
+                ResponsiveWidthMode::Expanded,
+            );
+            host.render(
+                &mut Scene::new(),
+                text,
+                rect,
+                rect,
+                Palette::from(Theme::LIGHT),
+            )
+            .unwrap();
+        };
+
+    sync_sidebar(&mut host, &mut surface, &mut text);
+    SidebarSurface::bind_context_menu(&mut host);
+
+    // 1. Open list menu #1 on selected A (no focused row).
+    assert!(
+        host.accessibility_action(SIDEBAR_LIST_ID, None, AccessibilityAction::ShowMenu)
+            .consumed
+    );
+    host.render(
+        &mut Scene::new(),
+        &mut text,
+        rect,
+        rect,
+        Palette::from(Theme::LIGHT),
+    )
+    .unwrap();
+    assert_eq!(
+        surface.open_context_menu_id(&host),
+        Some(SIDEBAR_CONTEXT_MENU_ID)
+    );
+    let first_archive_idx = host
+        .get(SIDEBAR_CONTEXT_MENU_ID)
+        .and_then(|c| c.component::<MenuContent>())
+        .unwrap()
+        .semantic_parts()
+        .into_iter()
+        .find(|p| p.semantics.role == ContentRole::MenuItem && p.semantics.name == "Archive")
+        .unwrap()
+        .index;
+
+    // 2. Publish unrelated workbench background note -> advances revision -> sync with menu #1 open on A.
+    let prev_rev = workbench.sync_background_revision();
+    let sender = workbench.publish_background_note_sender();
+    sender.publish("Unrelated background note");
+    assert!(workbench.sync_background_revision() > prev_rev);
+    sync_sidebar(&mut host, &mut surface, &mut text);
+    assert_eq!(
+        surface.open_context_menu_id(&host),
+        Some(SIDEBAR_CONTEXT_MENU_ID)
+    );
+
+    // 3. Dismiss menu #1 via Escape WITHOUT syncing sidebar afterward.
+    let _ = host.drain_action_records();
+    let esc = ContentEvent::KeyInput(ContentKeyEvent {
+        key: Some(ControlKey::Escape),
+        down: true,
+        repeat: false,
+        modifiers: InputModifiers::default(),
+        native_code: 53,
+        characters: "\u{1b}".into(),
+        characters_ignoring_modifiers: "\u{1b}".into(),
+    });
+    assert!(host.event(&esc).consumed);
+    assert_eq!(surface.open_context_menu_id(&host), None);
+    let esc_records = host.drain_action_records();
+    assert!(
+        surface
+            .handle_actions(&mut host, Some("a"), &esc_records)
+            .is_empty()
+    );
+
+    // 4. Move AX focus ONLY to C while binding selection remains A (no sync in between).
+    let c_item_idx = host
+        .get(SIDEBAR_LIST_ID)
+        .and_then(|c| c.component::<KeyedSelectableListContent>())
+        .unwrap()
+        .semantic_parts()
+        .into_iter()
+        .find(|p| p.semantics.name == "Acceptance C")
+        .unwrap()
+        .index;
+    let _ = host.accessibility_action(
+        SIDEBAR_LIST_ID,
+        Some(c_item_idx),
+        AccessibilityAction::Focus,
+    );
+    let focus_records = host.drain_action_records();
+    assert!(
+        surface
+            .handle_actions(&mut host, Some("a"), &focus_records)
+            .is_empty()
+    );
+    assert_eq!(binding.current_scope().unwrap().session_id, "a");
+
+    // 5. Reopen list menu #2, verify fresh Archive token != first_archive_idx, also test sync while menu #2 is open!
+    assert!(
+        host.accessibility_action(SIDEBAR_LIST_ID, None, AccessibilityAction::ShowMenu)
+            .consumed
+    );
+    host.render(
+        &mut Scene::new(),
+        &mut text,
+        rect,
+        rect,
+        Palette::from(Theme::LIGHT),
+    )
+    .unwrap();
+    assert_eq!(
+        surface.open_context_menu_id(&host),
+        Some(SIDEBAR_CONTEXT_MENU_ID)
+    );
+    let next_archive_idx = host
+        .get(SIDEBAR_CONTEXT_MENU_ID)
+        .and_then(|c| c.component::<MenuContent>())
+        .unwrap()
+        .semantic_parts()
+        .into_iter()
+        .find(|p| p.semantics.role == ContentRole::MenuItem && p.semantics.name == "Archive")
+        .unwrap()
+        .index;
+    assert_ne!(first_archive_idx, next_archive_idx);
+
+    // Even if another background sync lands while menu #2 is open on focused C, menu #2 stays open and keeps C.
+    sender.publish("Second background note");
+    sync_sidebar(&mut host, &mut surface, &mut text);
+    assert_eq!(
+        surface.open_context_menu_id(&host),
+        Some(SIDEBAR_CONTEXT_MENU_ID)
+    );
+
+    // Stale first token must never activate anything.
+    let stale = host.accessibility_action(
+        SIDEBAR_CONTEXT_MENU_ID,
+        Some(first_archive_idx),
+        AccessibilityAction::Press,
+    );
+    assert!(!stale.activated);
+    let stale_records = host.drain_action_records();
+    assert!(
+        surface
+            .handle_actions(&mut host, Some("a"), &stale_records)
+            .is_empty()
+    );
+
+    // Fresh token activates Archive for C ONLY (NOT A!).
+    let press = host.accessibility_action(
+        SIDEBAR_CONTEXT_MENU_ID,
+        Some(next_archive_idx),
+        AccessibilityAction::Press,
+    );
+    assert!(press.activated);
+    let press_records = host.drain_action_records();
+    let intents = surface.handle_actions(&mut host, Some("a"), &press_records);
+    assert_eq!(intents, vec![SidebarIntent::ArchiveSession("c".to_owned())]);
+
+    // 6. Verify removing focused/selected target under filter retires open menu.
+    assert!(
+        host.accessibility_action(SIDEBAR_LIST_ID, None, AccessibilityAction::ShowMenu)
+            .consumed
+    );
+    host.render(
+        &mut Scene::new(),
+        &mut text,
+        rect,
+        rect,
+        Palette::from(Theme::LIGHT),
+    )
+    .unwrap();
+    assert_eq!(
+        surface.open_context_menu_id(&host),
+        Some(SIDEBAR_CONTEXT_MENU_ID)
+    );
+    let only_a = vec![SidebarRowModel {
+        session_id: "a".to_owned(),
+        title: "Acceptance A".to_owned(),
+        folder: "默认".to_owned(),
+        activity: "idle".to_owned(),
+        running: false,
+        pinned: false,
+        archived: false,
+    }];
+    surface.sync(
+        &mut host,
+        &only_a,
+        Some("a"),
+        SidebarFilterSelection::Pinned,
+        ResponsiveWidthMode::Expanded,
+    );
+    assert_eq!(surface.open_context_menu_id(&host), None);
+
     rt.block_on(runtime.stop()).unwrap();
 }
