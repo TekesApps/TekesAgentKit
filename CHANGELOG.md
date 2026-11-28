@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.14 — 2026-11-28
+
+- Keep unconfirmed archive/discard sessions in `SessionRuntime::unconfirmed_archives` (removing the duplicate `watch_archived_retirement` tracking) across reconnections even after an intermediate connection's baseline still shows the session active and reopens its journal, while refreshing active-run state, cleaning up finished detached closes, and keeping `Command::Close` pre-open semantics bounded to pre-open connections—so if a second disconnect happens before the delayed archive commits offline, the next connection defers `session-journal` open until its authoritative baseline confirms archival and retires the session with zero `stream-open-failed` or post-archive `sessions.recover` (#56).
+
 ## 0.6.13 — 2026-11-28
 
 - Preserve the captured target session and archive state on `SidebarSurface`'s open list-level context menu (`OpenListMenu`) across the same opening even when accessibility focus moves to another row without dismissing/reopening or calling `sync`, defer list-menu observation to the end of `handle_actions` so close-on-activation doesn't wipe the opening before processing `MenuSelection`, deduplicate consumed `ContextMenuRequest` anchors, and continue retiring open menus on `sync` when target/state becomes stale (#52).
