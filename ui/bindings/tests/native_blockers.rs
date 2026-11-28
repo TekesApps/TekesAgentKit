@@ -3712,3 +3712,125 @@ fn archive_committed_offline_after_reselecting_a_on_conn2_retires_before_conn3_o
 
     rt.block_on(runtime.stop()).unwrap();
 }
+
+#[test]
+fn archive_in_flight_reselection_before_first_disconnect_retires_before_conn2_open_and_clears_errors()
+ {
+    let endpoint = BlockerTestEndpoint::new();
+    endpoint.supports_recovery.store(true, Ordering::Release);
+    endpoint
+        .defer_archive_mutation
+        .store(true, Ordering::Release);
+    {
+        let mut guard = endpoint.inner.lock().unwrap();
+        guard.use_workspace_stream = true;
+        guard.custom_items = Some(vec![
+            json!({"sessionId": "a", "running": false, "blank": false, "updatedAt": 10, "projections": {"asOfSeq": 1, "values": {"title": "Idle A"}}}),
+            json!({"sessionId": "b", "running": false, "blank": false, "updatedAt": 20, "projections": {"asOfSeq": 1, "values": {"title": "Idle B"}}}),
+        ]);
+    }
+    let (rt, runtime, binding) = setup_binding(&endpoint);
+    binding.open_initial_session("a").unwrap();
+    rt.block_on(wait_store(&runtime, |s| s.sessions["a"].journal_ready));
+
+    endpoint.park_archive.store(true, Ordering::Release);
+    let entered = endpoint.park_archive_entered.notified();
+    binding.archive_session("a");
+    rt.block_on(entered);
+    assert!(endpoint.inner.lock().unwrap().archived_ids.is_empty());
+
+    // Still on conn 1: switch A -> B -> A while archive RPC remains in flight.
+    binding.select_session("b");
+    rt.block_on(wait_store(&runtime, |s| {
+        s.sessions.get("b").is_some_and(|p| p.journal_ready) && !s.sessions["a"].journal_ready
+    }));
+    binding.select_session("a");
+    rt.block_on(wait_store(&runtime, |s| {
+        s.sessions["a"].journal_ready && !s.sessions["b"].journal_ready
+    }));
+    let conn1_a_opens: Vec<_> = endpoint
+        .journal_opens()
+        .into_iter()
+        .filter(|(c, id)| *c == 1 && id == "a")
+        .collect();
+    assert_eq!(conn1_a_opens.len(), 2);
+
+    // Outage 1: drop conn 1, commit archive offline before conn 2 connects.
+    let epoch_before = runtime.inspect(|s| s.connection_epoch);
+    let rpcs_before_conn2 = endpoint.rpcs().len();
+    endpoint.drop_connection();
+    rt.block_on(wait_store(&runtime, |s| {
+        s.connection != tekes_agent_session::ConnectionState::Ready
+    }));
+    {
+        let mut guard = endpoint.inner.lock().unwrap();
+        if let Some(items) = guard.custom_items.as_mut() {
+            items.retain(|item| item["sessionId"] != "a");
+        }
+        guard.archived_ids.push("a".to_owned());
+    }
+    endpoint.park_archive_release.notify_one();
+    endpoint.unblock_reconnect();
+
+    // Conn 2 becomes Ready: A retires from conn 2 baseline with ZERO conn 2 open/recover.
+    rt.block_on(wait_store(&runtime, |s| {
+        s.connection == tekes_agent_session::ConnectionState::Ready
+            && s.connection_epoch > epoch_before
+            && endpoint.connect_count.load(Ordering::Acquire) >= 2
+    }));
+    wait_until(
+        "offline archive after conn1 reselection clears errors without conn2 open",
+        || {
+            binding.session_error("a").is_none()
+                && binding.error_for_session(Some("a")).is_none()
+                && !binding
+                    .sidebar_rows()
+                    .into_iter()
+                    .any(|r| r.session_id == "a")
+                && runtime.inspect(|s| {
+                    !s.sessions["a"].journal_ready && s.sessions["a"].journal_error.is_none()
+                })
+        },
+    );
+
+    // Conn 3 explicit reconnect also never opens/recovers A or retains journal_error.
+    let epoch_before_conn3 = runtime.inspect(|s| s.connection_epoch);
+    rt.block_on(runtime.reconnect()).unwrap();
+    rt.block_on(wait_store(&runtime, |s| {
+        s.connection == tekes_agent_session::ConnectionState::Ready
+            && s.connection_epoch > epoch_before_conn3
+            && endpoint.connect_count.load(Ordering::Acquire) >= 3
+    }));
+
+    let post_conn1_opens: Vec<_> = endpoint
+        .journal_opens()
+        .into_iter()
+        .filter(|(c, id)| *c >= 2 && id == "a")
+        .collect();
+    assert!(
+        post_conn1_opens.is_empty(),
+        "unexpected post-archive conn2/conn3 journal opens for A: {post_conn1_opens:?}"
+    );
+    let post_conn1_recover_rpcs: Vec<_> = endpoint
+        .rpcs()
+        .into_iter()
+        .skip(rpcs_before_conn2)
+        .filter(|(m, _)| m == "sessions.recover")
+        .collect();
+    assert!(
+        post_conn1_recover_rpcs.is_empty(),
+        "unexpected post-archive sessions.recover: {post_conn1_recover_rpcs:?}"
+    );
+    assert_eq!(
+        endpoint
+            .rpcs()
+            .iter()
+            .filter(|(m, p)| m == "session.archive" && p["sessionId"] == "a")
+            .count(),
+        1
+    );
+    assert_eq!(binding.session_error("a"), None);
+    assert!(runtime.inspect(|s| s.sessions["a"].journal_error.is_none()));
+
+    rt.block_on(runtime.stop()).unwrap();
+}

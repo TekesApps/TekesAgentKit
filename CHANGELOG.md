@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.16 — 2026-11-28
+
+- Preserve `SessionRuntime::suspended_journals` tracking for in-flight `session.archive` / `session.discard` calls even when the observer closes and re-selects the session (or archives an unopened session) before the first disconnect—recording `had_journal` and `reopened_while_suspended` so live journal reopening/closing works normally while an online completion immediately retires the reopened journal and a disconnect transfers the guard into `unconfirmed_archives`, preventing premature conn 2 `session-journal` opens (`stream-open-failed`) and stale `journal_error` (#56).
+
 ## 0.6.15 — 2026-11-28
 
 - Preserve `SessionRuntime`'s `unconfirmed_archives` baseline-check guard across idle `Command::Close`, `close_while_disconnected`, `deferred_closes` completion, `Command::Open`, and intermediate active baselines while still releasing unsubscribed idle journals immediately and opening/closing explicitly selected journals normally—terminating tracking only once authoritative archival/absence is confirmed, a subsequent archive/discard RPC for the session succeeds, or the runtime stops (#56).
