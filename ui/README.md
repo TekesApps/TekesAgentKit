@@ -1,6 +1,6 @@
 # TekesAgentKit Rust UI (`ui/`) · `TekesUI v0.4.12` `AppHost` 组件库
 
-复用 `TekesAgentKit v0.6.14` 的 headless 协议与表示层（`tekes-agent-contract`、`tekes-agent-session`、`tekes-agent-presentation`、`tekes-agent-endpoint-kernel`、`tekes-agent-web`），通过不可变公开 git revision（[tekesui-source.json](tekesui-source.json)，`TekesUI v0.4.12` / `427c0e5d9e6fcdb0d71d203c402decdc05761df9`）原生消费 `tekes-ui-app-host`、`tekes-ui-controls`、`tekes-ui-settings` 与 `tekes-ui-render`。
+复用 `TekesAgentKit v0.6.15` 的 headless 协议与表示层（`tekes-agent-contract`、`tekes-agent-session`、`tekes-agent-presentation`、`tekes-agent-endpoint-kernel`、`tekes-agent-web`），通过不可变公开 git revision（[tekesui-source.json](tekesui-source.json)，`TekesUI v0.4.12` / `427c0e5d9e6fcdb0d71d203c402decdc05761df9`）原生消费 `tekes-ui-app-host`、`tekes-ui-controls`、`tekes-ui-settings` 与 `tekes-ui-render`。
 
 - **五层 / 五 Crate 独立工作区**：`components`、`bindings`、`apphost`、`demo`（形态 A）、`consumer`（形态 B，仅消费公开 API），统一 `unsafe_code = "forbid"`，不包含 Swift 源码或 `--frame-pump` 轮询，所有异步增量由 `WindowWake` / `AppHostWakeHub` 按需驱动。
 - **架构与契约文档**：[AppHost 架构规范](../docs/tekesui-apphost-architecture.md)、[集成契约](../docs/tekesui-integration-contract.md)、[TekesUI 缺口追踪](../docs/tekesui-gaps.md)。

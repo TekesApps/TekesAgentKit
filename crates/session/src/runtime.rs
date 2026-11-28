@@ -819,6 +819,11 @@ struct ConnectionInterest {
     wanted: BTreeSet<String>,
     deferred_closes: BTreeSet<String>,
     suspended_journals: std::collections::BTreeMap<String, SuspendedJournal>,
+    /// Sessions whose disconnect-aborted `session.archive` / `session.discard` has not yet been
+    /// confirmed archived/absent or superseded by an `Ok` archive/discard completion.
+    /// Value is the pre-open `was_running` hint. Idle close and explicit re-selection release or
+    /// reopen `wanted` normally, but keep this entry until archival is confirmed (or retired on
+    /// stop) so every future reconnect still checks its complete baseline before opening.
     unconfirmed_archives: std::collections::BTreeMap<String, bool>,
 }
 
@@ -838,6 +843,10 @@ impl ConnectionInterest {
                 self.wanted.insert(id.clone());
                 self.deferred_closes.insert(id.clone());
                 self.unconfirmed_archives.insert(id, true);
+            } else {
+                self.deferred_closes.remove(&id);
+                self.wanted.remove(&id);
+                self.unconfirmed_archives.insert(id, false);
             }
         }
     }
@@ -1104,7 +1113,9 @@ fn close_while_disconnected(
     {
         deferred_closes.insert(id);
     } else {
-        unconfirmed_archives.remove(&id);
+        if let Some(was_running) = unconfirmed_archives.get_mut(&id) {
+            *was_running = false;
+        }
         deferred_closes.remove(&id);
         wanted.remove(&id);
         store.update(|s| s.reset_journal(&id));
@@ -1246,7 +1257,9 @@ async fn connected(
             .collect();
         for id in finished {
             deferred_closes.remove(&id);
-            unconfirmed_archives.remove(&id);
+            if let Some(was_running) = unconfirmed_archives.get_mut(&id) {
+                *was_running = false;
+            }
             wanted.remove(&id);
             journal_epochs.remove(&id);
             journals.remove(&id);
@@ -1484,7 +1497,9 @@ async fn connected(
                                         permanent_journal_errors.insert(id.to_owned());
                                         if deferred_closes.remove(id) {
                                             wanted.remove(id);
-                                            unconfirmed_archives.remove(id);
+                                            if let Some(was_running) = unconfirmed_archives.get_mut(id) {
+                                                *was_running = false;
+                                            }
                                         }
                                     } else {
                                         record_session_error(store, id, &error);
@@ -1499,7 +1514,9 @@ async fn connected(
                             permanent_journal_errors.insert(id.to_owned());
                             if deferred_closes.remove(id) {
                                 wanted.remove(id);
-                                unconfirmed_archives.remove(id);
+                                if let Some(was_running) = unconfirmed_archives.get_mut(id) {
+                                    *was_running = false;
+                                }
                             }
                         } else {
                             record_session_error(store, id, &error);
@@ -1551,11 +1568,7 @@ async fn connected(
                             );
                             continue;
                         }
-                        if !wanted.contains(&id) {
-                            unconfirmed_archives.remove(&id);
-                            continue;
-                        }
-                        if journal_epochs.contains_key(&id) {
+                        if !wanted.contains(&id) || journal_epochs.contains_key(&id) {
                             let running = store
                                 .read(|s| s.sessions.get(&id).is_some_and(session_has_active_run));
                             unconfirmed_archives.insert(id, running);
@@ -1584,7 +1597,9 @@ async fn connected(
                                     permanent_journal_errors.insert(id.clone());
                                     if deferred_closes.remove(&id) {
                                         wanted.remove(&id);
-                                        unconfirmed_archives.remove(&id);
+                                        if let Some(was_running) = unconfirmed_archives.get_mut(&id) {
+                                            *was_running = false;
+                                        }
                                     }
                                 } else {
                                     record_session_error(store, &id, &error);
@@ -1650,7 +1665,11 @@ async fn connected(
                             deferred_closes.remove(&id);
                             permanent_journal_errors.remove(&id);
                             suspended_journals.remove(&id);
-                            unconfirmed_archives.remove(&id);
+                            if let Some(was_running) = unconfirmed_archives.get_mut(&id) {
+                                *was_running = store.read(|s| {
+                                    s.sessions.get(&id).is_some_and(session_has_active_run)
+                                });
+                            }
                         }
                         let _ = reply.send(result);
                     }
@@ -1673,7 +1692,9 @@ async fn connected(
                             {
                                 deferred_closes.insert(id);
                             } else {
-                                unconfirmed_archives.remove(&id);
+                                if let Some(was_running) = unconfirmed_archives.get_mut(&id) {
+                                    *was_running = false;
+                                }
                                 deferred_closes.remove(&id);
                                 wanted.remove(&id);
                                 journal_epochs.remove(&id);
@@ -1691,7 +1712,9 @@ async fn connected(
                             let _ = reply.send(Ok(()));
                             continue;
                         }
-                        unconfirmed_archives.remove(&id);
+                        if let Some(was_running) = unconfirmed_archives.get_mut(&id) {
+                            *was_running = false;
+                        }
                         deferred_closes.remove(&id);
                         wanted.remove(&id);
                         journal_epochs.remove(&id);

@@ -2116,3 +2116,131 @@ async fn archive_committed_offline_after_second_outage_retires_before_conn3_jour
     drop(lease_b);
     r.stop().await.unwrap();
 }
+
+#[tokio::test]
+async fn archive_committed_offline_after_reselecting_session_on_conn2_retires_without_conn3_open() {
+    let source = ArchiveSwitchConnector::new(false, true);
+    source.defer_archive_mutation.store(true, Ordering::Release);
+    let r = Arc::new(SessionRuntime::spawn(
+        "archive-switch",
+        Arc::new(source.clone()),
+    ));
+    r.wait_ready(Duration::from_secs(2)).await.unwrap();
+
+    let lease_a = r.acquire_history("a").await.unwrap();
+    wait_store(&r, |s| s.sessions["a"].journal_ready).await;
+
+    let entered = source.archive_entered.notified();
+    let archive_task = tokio::spawn({
+        let r = r.clone();
+        async move { r.archive("a", "rpc-archive-a").await }
+    });
+    entered.await;
+    assert!(!source.archived_a.load(Ordering::Acquire));
+
+    // Outage 1: drop conn 1 before Kernel commits session.archive(a).
+    source.recover_calls.lock().unwrap().clear();
+    let ctrl_tx1 = source.control_txs.lock().unwrap()[&1].clone();
+    ctrl_tx1.send(Err(Error::Disconnected)).unwrap();
+    assert!(matches!(
+        archive_task.await.unwrap(),
+        Err(Error::Disconnected)
+    ));
+
+    // Conn 2 becomes Ready while A is still active on Kernel: A opens & recovers cleanly.
+    wait_store(&r, |s| {
+        s.connection == ConnectionState::Ready
+            && s.connection_epoch >= 2
+            && s.sessions["a"].journal_ready
+    })
+    .await;
+
+    // On conn 2, user temporarily switches to B (idle close releases A's history), then reselects A.
+    drop(lease_a);
+    wait_store(&r, |s| !s.sessions["a"].journal_ready).await;
+    let lease_b = r.acquire_history("b").await.unwrap();
+    wait_store(&r, |s| s.sessions["b"].journal_ready).await;
+    assert!(
+        source
+            .closed_journals
+            .lock()
+            .unwrap()
+            .contains(&(2, "a".to_owned()))
+    );
+
+    drop(lease_b);
+    let lease_a = r.acquire_history("a").await.unwrap();
+    wait_store(&r, |s| {
+        s.sessions["a"].journal_ready && !s.sessions["b"].journal_ready
+    })
+    .await;
+    let conn2_a_opens = source
+        .followed_journals
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|(c, sid)| *c == 2 && sid == "a")
+        .count();
+    assert_eq!(conn2_a_opens, 2);
+
+    // Outage 2: drop conn 2, then archive commits offline before conn 3 connects.
+    source.recover_calls.lock().unwrap().clear();
+    let ctrl_tx2 = source.control_txs.lock().unwrap()[&2].clone();
+    ctrl_tx2.send(Err(Error::Disconnected)).unwrap();
+    wait_store(&r, |s| s.connection != ConnectionState::Ready).await;
+    source.archived_a.store(true, Ordering::Release);
+    source.archive_release.notify_one();
+
+    // Conn 3 becomes Ready: A must be retired from conn 3's baseline with ZERO open/recover calls.
+    wait_store(&r, |s| {
+        s.connection == ConnectionState::Ready && s.connection_epoch >= 3
+    })
+    .await;
+    let conn3_a_opens: Vec<_> = source
+        .followed_journals
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|(c, sid)| *c == 3 && sid == "a")
+        .cloned()
+        .collect();
+    assert!(
+        conn3_a_opens.is_empty(),
+        "unexpected conn3 opens for A after reselection: {conn3_a_opens:?}"
+    );
+    assert!(source.recover_calls.lock().unwrap().is_empty());
+    assert!(r.inspect(|s| {
+        !s.sessions["a"].journal_ready
+            && s.sessions["a"].journal_error.is_none()
+            && s.sessions["a"].summary.is_none()
+    }));
+
+    // Conn 4 reconnect also never opens/recovers A or surfaces journal_error.
+    r.reconnect().await.unwrap();
+    wait_store(&r, |s| {
+        s.connection == ConnectionState::Ready && s.connection_epoch >= 4
+    })
+    .await;
+    let post_conn2_a_opens: Vec<_> = source
+        .followed_journals
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|(c, sid)| *c >= 3 && sid == "a")
+        .cloned()
+        .collect();
+    assert!(
+        post_conn2_a_opens.is_empty(),
+        "unexpected post-archive A opens: {post_conn2_a_opens:?}"
+    );
+    assert!(source.recover_calls.lock().unwrap().is_empty());
+    assert!(r.inspect(|s| {
+        !s.sessions["a"].journal_ready
+            && s.sessions["a"].journal_error.is_none()
+            && s.sessions["a"].summary.is_none()
+    }));
+    assert_eq!(source.archive_calls.load(Ordering::SeqCst), 1);
+
+    drop(lease_a);
+    r.stop().await.unwrap();
+}

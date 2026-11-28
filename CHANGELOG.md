@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.15 — 2026-11-28
+
+- Preserve `SessionRuntime`'s `unconfirmed_archives` baseline-check guard across idle `Command::Close`, `close_while_disconnected`, `deferred_closes` completion, `Command::Open`, and intermediate active baselines while still releasing unsubscribed idle journals immediately and opening/closing explicitly selected journals normally—terminating tracking only once authoritative archival/absence is confirmed, a subsequent archive/discard RPC for the session succeeds, or the runtime stops (#56).
+
 ## 0.6.14 — 2026-11-28
 
 - Keep unconfirmed archive/discard sessions in `SessionRuntime::unconfirmed_archives` (removing the duplicate `watch_archived_retirement` tracking) across reconnections even after an intermediate connection's baseline still shows the session active and reopens its journal, while refreshing active-run state, cleaning up finished detached closes, and keeping `Command::Close` pre-open semantics bounded to pre-open connections—so if a second disconnect happens before the delayed archive commits offline, the next connection defers `session-journal` open until its authoritative baseline confirms archival and retires the session with zero `stream-open-failed` or post-archive `sessions.recover` (#56).
