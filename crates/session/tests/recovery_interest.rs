@@ -2244,3 +2244,179 @@ async fn archive_committed_offline_after_reselecting_session_on_conn2_retires_wi
     drop(lease_a);
     r.stop().await.unwrap();
 }
+
+#[tokio::test]
+async fn archive_in_flight_reselection_before_first_disconnect_defers_conn2_and_clears_errors() {
+    let source = ArchiveSwitchConnector::new(false, true);
+    source.defer_archive_mutation.store(true, Ordering::Release);
+    let r = Arc::new(SessionRuntime::spawn(
+        "archive-switch",
+        Arc::new(source.clone()),
+    ));
+    r.wait_ready(Duration::from_secs(2)).await.unwrap();
+
+    let lease_a = r.acquire_history("a").await.unwrap();
+    wait_store(&r, |s| s.sessions["a"].journal_ready).await;
+
+    // Start in-flight archive on conn 1 while keeping conn 1 Ready.
+    let entered = source.archive_entered.notified();
+    let archive_task = tokio::spawn({
+        let r = r.clone();
+        async move { r.archive("a", "rpc-archive-a").await }
+    });
+    entered.await;
+    assert!(!source.archived_a.load(Ordering::Acquire));
+
+    // Still on conn 1: switch A -> B -> A without sending any second archive RPC.
+    drop(lease_a);
+    let lease_b = r.acquire_history("b").await.unwrap();
+    wait_store(&r, |s| {
+        s.sessions["b"].journal_ready && !s.sessions["a"].journal_ready
+    })
+    .await;
+    drop(lease_b);
+    let lease_a = r.acquire_history("a").await.unwrap();
+    wait_store(&r, |s| {
+        s.sessions["a"].journal_ready && !s.sessions["b"].journal_ready
+    })
+    .await;
+    assert_eq!(
+        source
+            .followed_journals
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|(c, sid)| *c == 1 && sid == "a")
+            .count(),
+        2
+    );
+
+    // Outage 1: drop conn 1 and commit archive offline before conn 2 connects.
+    source.recover_calls.lock().unwrap().clear();
+    let ctrl_tx1 = source.control_txs.lock().unwrap()[&1].clone();
+    ctrl_tx1.send(Err(Error::Disconnected)).unwrap();
+    assert!(matches!(
+        archive_task.await.unwrap(),
+        Err(Error::Disconnected)
+    ));
+    wait_store(&r, |s| s.connection != ConnectionState::Ready).await;
+    source.archived_a.store(true, Ordering::Release);
+    source.archive_release.notify_one();
+
+    // Conn 2 becomes Ready: A must be retired before any conn 2 open or recover.
+    wait_store(&r, |s| {
+        s.connection == ConnectionState::Ready && s.connection_epoch >= 2
+    })
+    .await;
+    let conn2_a_opens: Vec<_> = source
+        .followed_journals
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|(c, sid)| *c == 2 && sid == "a")
+        .cloned()
+        .collect();
+    assert!(
+        conn2_a_opens.is_empty(),
+        "unexpected conn2 opens for A: {conn2_a_opens:?}"
+    );
+    assert!(source.recover_calls.lock().unwrap().is_empty());
+    assert!(r.inspect(|s| {
+        !s.sessions["a"].journal_ready
+            && s.sessions["a"].journal_error.is_none()
+            && s.sessions["a"].summary.is_none()
+    }));
+
+    // Conn 3 explicit reconnect also never opens/recovers A or retains journal_error.
+    r.reconnect().await.unwrap();
+    wait_store(&r, |s| {
+        s.connection == ConnectionState::Ready && s.connection_epoch >= 3
+    })
+    .await;
+    let post_conn1_a_opens: Vec<_> = source
+        .followed_journals
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|(c, sid)| *c >= 2 && sid == "a")
+        .cloned()
+        .collect();
+    assert!(
+        post_conn1_a_opens.is_empty(),
+        "unexpected post-archive A opens: {post_conn1_a_opens:?}"
+    );
+    assert!(source.recover_calls.lock().unwrap().is_empty());
+    assert!(r.inspect(|s| {
+        !s.sessions["a"].journal_ready
+            && s.sessions["a"].journal_error.is_none()
+            && s.sessions["a"].summary.is_none()
+    }));
+    assert_eq!(source.archive_calls.load(Ordering::SeqCst), 1);
+
+    drop(lease_a);
+    r.stop().await.unwrap();
+}
+
+#[tokio::test]
+async fn archive_in_flight_reselection_online_commit_retires_reopened_journal() {
+    let source = ArchiveSwitchConnector::new(false, true);
+    source.defer_archive_mutation.store(true, Ordering::Release);
+    let r = Arc::new(SessionRuntime::spawn(
+        "archive-switch",
+        Arc::new(source.clone()),
+    ));
+    r.wait_ready(Duration::from_secs(2)).await.unwrap();
+
+    let lease_a = r.acquire_history("a").await.unwrap();
+    wait_store(&r, |s| s.sessions["a"].journal_ready).await;
+
+    let entered = source.archive_entered.notified();
+    let archive_task = tokio::spawn({
+        let r = r.clone();
+        async move { r.archive("a", "rpc-archive-a").await }
+    });
+    entered.await;
+
+    // Reselect B -> A while archive RPC is still in flight on conn 1.
+    drop(lease_a);
+    let lease_b = r.acquire_history("b").await.unwrap();
+    wait_store(&r, |s| {
+        s.sessions["b"].journal_ready && !s.sessions["a"].journal_ready
+    })
+    .await;
+    drop(lease_b);
+    let lease_a = r.acquire_history("a").await.unwrap();
+    wait_store(&r, |s| {
+        s.sessions["a"].journal_ready && !s.sessions["b"].journal_ready
+    })
+    .await;
+
+    // Archive commits online on conn 1 -> reopened journal retires immediately.
+    source.archived_a.store(true, Ordering::Release);
+    source.archive_release.notify_one();
+    archive_task.await.unwrap().unwrap();
+    wait_store(&r, |s| {
+        !s.sessions["a"].journal_ready && s.sessions["a"].journal_error.is_none()
+    })
+    .await;
+
+    // Explicit reconnect on conn 2 never reopens A.
+    r.reconnect().await.unwrap();
+    wait_store(&r, |s| {
+        s.connection == ConnectionState::Ready && s.connection_epoch >= 2
+    })
+    .await;
+    let conn2_a_opens: Vec<_> = source
+        .followed_journals
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|(c, sid)| *c >= 2 && sid == "a")
+        .cloned()
+        .collect();
+    assert!(conn2_a_opens.is_empty(), "{conn2_a_opens:?}");
+    assert_eq!(source.archive_calls.load(Ordering::SeqCst), 1);
+
+    drop(lease_a);
+    r.stop().await.unwrap();
+}

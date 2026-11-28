@@ -51,8 +51,10 @@ type OperationResult = Option<(
 #[derive(Clone, Copy, Debug)]
 struct SuspendedJournal {
     suspend_id: u64,
+    had_journal: bool,
     closed_while_suspended: bool,
     was_running: bool,
+    reopened_while_suspended: bool,
 }
 #[derive(Default)]
 struct RecoveryTracking {
@@ -835,7 +837,13 @@ impl ConnectionInterest {
         for (id, suspended) in std::mem::take(&mut self.suspended_journals) {
             let was_running = suspended.was_running
                 || store.read(|s| s.sessions.get(&id).is_some_and(session_has_active_run));
-            if !suspended.closed_while_suspended {
+            if suspended.reopened_while_suspended {
+                // Live observer intent already lives in `wanted` / `deferred_closes`; preserve it
+                // while guarding every subsequent reconnect via `unconfirmed_archives`.
+                self.unconfirmed_archives.insert(id, was_running);
+            } else if !suspended.had_journal {
+                self.unconfirmed_archives.insert(id, false);
+            } else if !suspended.closed_while_suspended {
                 self.deferred_closes.remove(&id);
                 self.wanted.insert(id.clone());
                 self.unconfirmed_archives.insert(id, was_running);
@@ -1377,20 +1385,36 @@ async fn connected(
                             None
                         };
                         if result.is_ok() {
-                            deferred_closes.remove(&id);
-                            unconfirmed_archives.remove(&id);
+                            if suspended.is_some() {
+                                retire_archived_session(
+                                    &id,
+                                    store,
+                                    wanted,
+                                    deferred_closes,
+                                    unconfirmed_archives,
+                                    &mut journal_epochs,
+                                    &mut journals,
+                                    &mut journal_retries,
+                                    &mut permanent_journal_errors,
+                                );
+                            } else {
+                                deferred_closes.remove(&id);
+                                unconfirmed_archives.remove(&id);
+                            }
                         } else if let Some(suspended) = suspended
                             && !journal_epochs.contains_key(&id)
                         {
-                            let should_restore = if !suspended.closed_while_suspended {
-                                true
-                            } else {
-                                !permanent_journal_errors.contains(&id)
-                                    && (suspended.was_running
-                                        || store.read(|s| {
-                                            s.sessions.get(&id).is_some_and(session_has_active_run)
-                                        }))
-                            };
+                            let should_restore = suspended.had_journal
+                                && !suspended.reopened_while_suspended
+                                && if !suspended.closed_while_suspended {
+                                    true
+                                } else {
+                                    !permanent_journal_errors.contains(&id)
+                                        && (suspended.was_running
+                                            || store.read(|s| {
+                                                s.sessions.get(&id).is_some_and(session_has_active_run)
+                                            }))
+                                };
                             if should_restore {
                                 next_journal_epoch += 1;
                                 match add_journal(
@@ -1664,7 +1688,14 @@ async fn connected(
                         if result.is_ok() {
                             deferred_closes.remove(&id);
                             permanent_journal_errors.remove(&id);
-                            suspended_journals.remove(&id);
+                            if let Some(suspended) = suspended_journals.get_mut(&id) {
+                                suspended.reopened_while_suspended = true;
+                                suspended.closed_while_suspended = false;
+                                suspended.had_journal = true;
+                                suspended.was_running = store.read(|s| {
+                                    s.sessions.get(&id).is_some_and(session_has_active_run)
+                                });
+                            }
                             if let Some(was_running) = unconfirmed_archives.get_mut(&id) {
                                 *was_running = store.read(|s| {
                                     s.sessions.get(&id).is_some_and(session_has_active_run)
@@ -1675,14 +1706,21 @@ async fn connected(
                     }
                     Command::Close(id, reply) => {
                         if let Some(suspended) = suspended_journals.get_mut(&id) {
-                            suspended.closed_while_suspended = true;
-                            if store.read(|s| {
-                                s.sessions.get(&id).is_some_and(session_has_active_run)
-                            }) {
-                                suspended.was_running = true;
+                            if !journal_epochs.contains_key(&id) {
+                                suspended.closed_while_suspended = true;
+                                if suspended.had_journal
+                                    && store.read(|s| {
+                                        s.sessions.get(&id).is_some_and(session_has_active_run)
+                                    })
+                                {
+                                    suspended.was_running = true;
+                                }
+                                let _ = reply.send(Ok(()));
+                                continue;
                             }
-                            let _ = reply.send(Ok(()));
-                            continue;
+                            suspended.reopened_while_suspended = false;
+                            suspended.closed_while_suspended = true;
+                            suspended.had_journal = true;
                         }
                         if !journal_epochs.contains_key(&id)
                             && let Some(was_running) = unconfirmed_archives.get(&id).copied()
@@ -1771,23 +1809,38 @@ async fn connected(
                             }
                         } else { None };
                         let endpoint = endpoint.clone();
-                        let removed=if matches!(method.as_str(),"session.discard"|"session.archive") {
-                            let id=payload["sessionId"].as_str().unwrap_or("").to_owned();
-                            if wanted.remove(&id) {
+                        let removed = if matches!(method.as_str(), "session.discard" | "session.archive") {
+                            let id = payload["sessionId"].as_str().unwrap_or("").to_owned();
+                            if !id.is_empty() {
+                                let was_wanted = wanted.remove(&id);
                                 let was_deferred = deferred_closes.remove(&id);
-                                let was_running = store.read(|s| s.sessions.get(&id).is_some_and(session_has_active_run));
-                                journal_epochs.remove(&id);
-                                journals.remove(&id);
-                                store.update(|s|s.reset_journal(&id));
+                                let was_running = was_wanted
+                                    && store.read(|s| {
+                                        s.sessions.get(&id).is_some_and(session_has_active_run)
+                                    });
+                                if was_wanted {
+                                    journal_epochs.remove(&id);
+                                    journals.remove(&id);
+                                    store.update(|s| s.reset_journal(&id));
+                                }
                                 next_suspend_id = next_suspend_id.saturating_add(1);
-                                suspended_journals.insert(id.clone(), SuspendedJournal {
-                                    suspend_id: next_suspend_id,
-                                    closed_while_suspended: was_deferred,
-                                    was_running,
-                                });
+                                suspended_journals.insert(
+                                    id.clone(),
+                                    SuspendedJournal {
+                                        suspend_id: next_suspend_id,
+                                        had_journal: was_wanted,
+                                        closed_while_suspended: !was_wanted || was_deferred,
+                                        was_running,
+                                        reopened_while_suspended: false,
+                                    },
+                                );
                                 Some((id, next_suspend_id))
-                            } else {None}
-                        } else {None};
+                            } else {
+                                None
+                            }
+                        } else {
+                            None
+                        };
                         let recovery_tracking = unresolved_recovery.clone();
                         let recovery_store = store.clone();
                         operations.spawn(async move {
