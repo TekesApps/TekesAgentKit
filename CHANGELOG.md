@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.13 — 2026-11-28
+
+- Preserve the captured target session and archive state on `SidebarSurface`'s open list-level context menu (`OpenListMenu`) across the same opening even when accessibility focus moves to another row without dismissing/reopening or calling `sync`, defer list-menu observation to the end of `handle_actions` so close-on-activation doesn't wipe the opening before processing `MenuSelection`, deduplicate consumed `ContextMenuRequest` anchors, and continue retiring open menus on `sync` when target/state becomes stale (#52).
+- Keep `watch_archived_retirement` in `SessionRuntime` and keep `UncertainArchive` active in `RunWorkbenchBinding` across reconnections when a disconnect-aborted `session.archive` is still uncommitted on initial `Ready`, so active journals/recovery survive until the delayed HTTP archive commits against Kernel—then live inventory/workspace archival confirmation immediately retires the journal, clears the transient `Archive failed` error, and releases `history_lease` without reopening or replaying `session.archive` (#56).
+
 ## 0.6.12 — 2026-11-27
 
 - Key `SidebarSurface`'s open list-level context menu tracking by the menu component's open identity (`ContentRole::Menu` semantic part identity), reconcile/clear cached menu state whenever the menu closes or opens anew, validate context-request owner mounts, and resolve list-menu submissions strictly from the live list focus/selection so dismissing and refocusing a different row never reuses a prior menu open's target (#52).

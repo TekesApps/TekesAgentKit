@@ -2832,9 +2832,9 @@ fn reconcile_uncertain_archives(runtime: &SessionRuntime, ui: &Mutex<RunUiState>
             .map(|(sid, ua)| (sid.clone(), *ua))
             .collect()
     };
-    let (ready, current_epoch, outcomes) = runtime.inspect(|store| {
+    let (ready, outcomes) = runtime.inspect(|store| {
         if store.connection != ConnectionState::Ready || !store.ready() {
-            return (false, store.connection_epoch, Vec::new());
+            return (false, Vec::new());
         }
         let outcomes: Vec<(String, UncertainArchive, bool)> = pending
             .into_iter()
@@ -2844,7 +2844,7 @@ fn reconcile_uncertain_archives(runtime: &SessionRuntime, ui: &Mutex<RunUiState>
                 (sid, ua, confirmed)
             })
             .collect();
-        (true, store.connection_epoch, outcomes)
+        (true, outcomes)
     });
     if !ready {
         return false;
@@ -2870,13 +2870,6 @@ fn reconcile_uncertain_archives(runtime: &SessionRuntime, ui: &Mutex<RunUiState>
                     retired_leases.push(lease);
                 }
                 changed = true;
-            } else if current_epoch > ua.start_epoch {
-                guard.uncertain_archives.remove(&sid);
-                if let Some(entry) = guard.session_errors.get_mut(&sid)
-                    && entry.uncertain_archive == Some(ua)
-                {
-                    entry.uncertain_archive = None;
-                }
             }
         }
         if changed {

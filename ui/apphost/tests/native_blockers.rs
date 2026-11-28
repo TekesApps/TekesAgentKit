@@ -2467,3 +2467,213 @@ fn list_context_menu_dismiss_refocus_reopen_targets_new_focused_row_after_backgr
 
     rt.block_on(runtime.stop()).unwrap();
 }
+
+#[test]
+fn list_context_menu_same_open_refocus_preserves_original_target_and_bridge_sync_retires() {
+    let endpoint = ErrorScopeEndpoint::new();
+    {
+        let mut guard = endpoint.inner.lock().unwrap();
+        guard.custom_items = Some(vec![
+            json!({"sessionId": "a", "running": false, "blank": false, "updatedAt": 30, "projections": {"asOfSeq": 1, "values": {"title": "Acceptance A"}}}),
+            json!({"sessionId": "b", "running": false, "blank": false, "updatedAt": 20, "projections": {"asOfSeq": 1, "values": {"title": "Acceptance B"}}}),
+            json!({"sessionId": "c", "running": false, "blank": false, "updatedAt": 10, "projections": {"asOfSeq": 1, "values": {"title": "Acceptance C"}}}),
+        ]);
+    }
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    let runtime = rt.block_on(async {
+        let runtime = Arc::new(SessionRuntime::spawn(
+            "error-scope",
+            Arc::new(endpoint.clone()),
+        ));
+        runtime.wait_ready(Duration::from_secs(2)).await.unwrap();
+        runtime
+    });
+    let controller =
+        rt.block_on(async { Arc::new(RunController::new(Arc::clone(&runtime)).unwrap()) });
+    let workbench = SharedAgentWorkbench::new();
+    let binding = {
+        let _guard = rt.enter();
+        RunWorkbenchBinding::new(
+            "error-scope",
+            Arc::clone(&runtime),
+            controller,
+            rt.handle().clone(),
+            workbench.wake_hub(),
+        )
+    };
+    binding.open_initial_session("a").unwrap();
+    workbench.attach_run_binding(Arc::clone(&binding));
+
+    let main = AgentRunContainer::build("run", workbench.clone()).unwrap();
+    let sidebar = SessionSidebarContainer::build("sidebar", workbench.clone()).unwrap();
+    let _app = AppWindow::from_containers(
+        vec![sidebar.into(), main.into()],
+        PresentationOptions::new("run").nav_bar("sidebar"),
+    )
+    .unwrap();
+
+    for with_background_sync in [false, true] {
+        let mut host = ContentHost::new(SidebarSurface::build_content()).unwrap();
+        host.set_window_active(true);
+        host.set_action_events(true);
+        let mut surface = SidebarSurface::new();
+        let mut text = TestTextBackend::new();
+        let rect = Rect::new(0.0, 0.0, 320.0, 640.0);
+
+        let sync_sidebar =
+            |host: &mut ContentHost, surface: &mut SidebarSurface, text: &mut TestTextBackend| {
+                let rows: Vec<SidebarRowModel> = binding
+                    .sidebar_rows()
+                    .into_iter()
+                    .map(|r| SidebarRowModel {
+                        session_id: r.session_id,
+                        title: r.title,
+                        folder: r.folder,
+                        activity: r.activity,
+                        running: r.running,
+                        pinned: r.pinned,
+                        archived: r.archived,
+                    })
+                    .collect();
+                let selected = binding.current_scope().map(|s| s.session_id);
+                surface.sync(
+                    host,
+                    &rows,
+                    selected.as_deref(),
+                    SidebarFilterSelection::All,
+                    ResponsiveWidthMode::Expanded,
+                );
+                host.render(
+                    &mut Scene::new(),
+                    text,
+                    rect,
+                    rect,
+                    Palette::from(Theme::LIGHT),
+                )
+                .unwrap();
+            };
+
+        sync_sidebar(&mut host, &mut surface, &mut text);
+        SidebarSurface::bind_context_menu(&mut host);
+
+        // Open menu for selected A, dispatch initial actions before first render too.
+        assert!(
+            host.accessibility_action(SIDEBAR_LIST_ID, None, AccessibilityAction::ShowMenu)
+                .consumed
+        );
+        let open_records = host.drain_action_records();
+        assert!(
+            surface
+                .handle_actions(&mut host, Some("a"), &open_records)
+                .is_empty()
+        );
+        host.render(
+            &mut Scene::new(),
+            &mut text,
+            rect,
+            rect,
+            Palette::from(Theme::LIGHT),
+        )
+        .unwrap();
+        assert_eq!(
+            surface.open_context_menu_id(&host),
+            Some(SIDEBAR_CONTEXT_MENU_ID)
+        );
+        let first_archive_idx = host
+            .get(SIDEBAR_CONTEXT_MENU_ID)
+            .and_then(|c| c.component::<MenuContent>())
+            .unwrap()
+            .semantic_parts()
+            .into_iter()
+            .find(|p| p.semantics.role == ContentRole::MenuItem && p.semantics.name == "Archive")
+            .unwrap()
+            .index;
+
+        if with_background_sync {
+            workbench
+                .publish_background_note_sender()
+                .publish("Background note during open A menu");
+            sync_sidebar(&mut host, &mut surface, &mut text);
+            assert_eq!(
+                surface.open_context_menu_id(&host),
+                Some(SIDEBAR_CONTEXT_MENU_ID)
+            );
+        }
+
+        // Move AX focus ONLY to C while the same menu remains open (no sync afterwards).
+        let c_item_idx = host
+            .get(SIDEBAR_LIST_ID)
+            .and_then(|c| c.component::<KeyedSelectableListContent>())
+            .unwrap()
+            .semantic_parts()
+            .into_iter()
+            .find(|p| p.semantics.name == "Acceptance C")
+            .unwrap()
+            .index;
+        let focus_resp = host.accessibility_action(
+            SIDEBAR_LIST_ID,
+            Some(c_item_idx),
+            AccessibilityAction::Focus,
+        );
+        assert!(focus_resp.consumed && focus_resp.changed);
+        let focus_records = host.drain_action_records();
+        assert!(
+            surface
+                .handle_actions(&mut host, Some("a"), &focus_records)
+                .is_empty()
+        );
+        host.render(
+            &mut Scene::new(),
+            &mut text,
+            rect,
+            rect,
+            Palette::from(Theme::LIGHT),
+        )
+        .unwrap();
+        assert_eq!(
+            surface.open_context_menu_id(&host),
+            Some(SIDEBAR_CONTEXT_MENU_ID)
+        );
+
+        // Activating the still-open menu's original Archive item MUST target A, NEVER C!
+        let press = host.accessibility_action(
+            SIDEBAR_CONTEXT_MENU_ID,
+            Some(first_archive_idx),
+            AccessibilityAction::Press,
+        );
+        assert!(press.activated);
+        let press_records = host.drain_action_records();
+        let intents = surface.handle_actions(&mut host, Some("a"), &press_records);
+        assert_eq!(intents, vec![SidebarIntent::ArchiveSession("a".to_owned())]);
+
+        // If sync runs after AX refocus to C while A's menu is open, the stale menu must retire.
+        assert!(
+            host.accessibility_action(SIDEBAR_LIST_ID, None, AccessibilityAction::ShowMenu)
+                .consumed
+        );
+        let reopen_records = host.drain_action_records();
+        assert!(
+            surface
+                .handle_actions(&mut host, Some("a"), &reopen_records)
+                .is_empty()
+        );
+        let b_item_idx = host
+            .get(SIDEBAR_LIST_ID)
+            .and_then(|c| c.component::<KeyedSelectableListContent>())
+            .unwrap()
+            .semantic_parts()
+            .into_iter()
+            .find(|p| p.semantics.name == "Acceptance B")
+            .unwrap()
+            .index;
+        let _ = host.accessibility_action(
+            SIDEBAR_LIST_ID,
+            Some(b_item_idx),
+            AccessibilityAction::Focus,
+        );
+        sync_sidebar(&mut host, &mut surface, &mut text);
+        assert_eq!(surface.open_context_menu_id(&host), None);
+    }
+
+    rt.block_on(runtime.stop()).unwrap();
+}

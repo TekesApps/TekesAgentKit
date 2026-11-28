@@ -43,6 +43,7 @@ struct BlockerTestEndpoint {
     park_archive: Arc<AtomicBool>,
     park_archive_entered: Arc<Notify>,
     park_archive_release: Arc<Notify>,
+    defer_archive_mutation: Arc<AtomicBool>,
     supports_recovery: Arc<AtomicBool>,
 }
 
@@ -142,6 +143,7 @@ impl BlockerTestEndpoint {
             park_archive: Arc::new(AtomicBool::new(false)),
             park_archive_entered: Arc::new(Notify::new()),
             park_archive_release: Arc::new(Notify::new()),
+            defer_archive_mutation: Arc::new(AtomicBool::new(false)),
             supports_recovery: Arc::new(AtomicBool::new(false)),
         }
     }
@@ -514,9 +516,10 @@ impl SessionEndpoint for TestSessionEndpoint {
             }
             "session.archive" => {
                 let sid = payload["sessionId"].as_str().unwrap_or("").to_owned();
+                let deferred = self.source.defer_archive_mutation.load(Ordering::Acquire);
                 let reject_archive = {
                     let mut guard = self.source.inner.lock().unwrap();
-                    if !guard.reject_archive {
+                    if !deferred && !guard.reject_archive {
                         if let Some(items) = guard.custom_items.as_mut() {
                             items.retain(|item| item["sessionId"] != sid);
                         }
@@ -3321,6 +3324,120 @@ fn archive_success_receipt_lost_across_ws_drop_releases_lease_clears_error_and_n
     assert!(
         recover_rpcs.is_empty(),
         "unexpected sessions.recover: {recover_rpcs:?}"
+    );
+    assert_eq!(
+        endpoint
+            .rpcs()
+            .iter()
+            .filter(|(m, p)| m == "session.archive" && p["sessionId"] == "a")
+            .count(),
+        1
+    );
+    assert_eq!(binding.session_error("a"), None);
+
+    rt.block_on(runtime.stop()).unwrap();
+}
+
+#[test]
+fn archive_committed_after_reconnect_ready_clears_error_releases_lease_and_never_reopens() {
+    let endpoint = BlockerTestEndpoint::new();
+    endpoint.supports_recovery.store(true, Ordering::Release);
+    endpoint
+        .defer_archive_mutation
+        .store(true, Ordering::Release);
+    {
+        let mut guard = endpoint.inner.lock().unwrap();
+        guard.use_workspace_stream = true;
+        guard.custom_items = Some(vec![
+            json!({"sessionId": "a", "running": false, "blank": false, "updatedAt": 10, "projections": {"asOfSeq": 1, "values": {"title": "Idle A"}}}),
+            json!({"sessionId": "b", "running": false, "blank": false, "updatedAt": 20, "projections": {"asOfSeq": 1, "values": {"title": "Idle B"}}}),
+        ]);
+    }
+    let (rt, runtime, binding) = setup_binding(&endpoint);
+    binding.open_initial_session("a").unwrap();
+    rt.block_on(wait_store(&runtime, |s| s.sessions["a"].journal_ready));
+
+    endpoint.park_archive.store(true, Ordering::Release);
+    let entered = endpoint.park_archive_entered.notified();
+    binding.archive_session("a");
+    rt.block_on(entered);
+    assert!(endpoint.inner.lock().unwrap().archived_ids.is_empty());
+
+    let epoch_before = runtime.inspect(|s| s.connection_epoch);
+    endpoint.drop_connection();
+    endpoint.unblock_reconnect();
+
+    // Conn 2 becomes Ready while Kernel still holds A active, so A legitimately opens and recovers on conn 2.
+    rt.block_on(wait_store(&runtime, |s| {
+        s.connection == tekes_agent_session::ConnectionState::Ready
+            && s.connection_epoch > epoch_before
+            && endpoint.connect_count.load(Ordering::Acquire) >= 2
+            && s.sessions["a"].journal_ready
+    }));
+    wait_until("transient archive error published on conn 2", || {
+        binding.session_error("a").is_some()
+    });
+
+    // Now the in-flight archive request commits and Kernel emits inventory remove(a) on conn 2.
+    {
+        let mut guard = endpoint.inner.lock().unwrap();
+        if let Some(items) = guard.custom_items.as_mut() {
+            items.retain(|item| item["sessionId"] != "a");
+        }
+        guard.archived_ids.push("a".to_owned());
+        guard
+            .inventory_tx
+            .as_ref()
+            .unwrap()
+            .send(Ok(json!({
+                "type": "remove",
+                "generation": "g",
+                "sessionId": "a"
+            })))
+            .unwrap();
+    }
+    endpoint.park_archive_release.notify_one();
+
+    wait_until(
+        "late archive confirmation clears error and retires journal without switch",
+        || {
+            binding.session_error("a").is_none()
+                && binding.error_for_session(Some("a")).is_none()
+                && !binding
+                    .sidebar_rows()
+                    .into_iter()
+                    .any(|r| r.session_id == "a")
+                && runtime.inspect(|s| {
+                    !s.sessions["a"].journal_ready && s.sessions["a"].journal_error.is_none()
+                })
+        },
+    );
+
+    // Next reconnect must NOT reopen A or produce stream-open-failed.
+    let conn2_rpcs_len = endpoint.rpcs().len();
+    rt.block_on(runtime.reconnect()).unwrap();
+    rt.block_on(wait_store(&runtime, |s| {
+        s.connection == tekes_agent_session::ConnectionState::Ready && s.connection_epoch >= 3
+    }));
+
+    let conn3_opens: Vec<_> = endpoint
+        .journal_opens()
+        .into_iter()
+        .filter(|(c, _)| *c >= 3)
+        .collect();
+    assert!(
+        conn3_opens.is_empty(),
+        "unexpected conn3 journal opens: {conn3_opens:?}"
+    );
+    let conn3_recover_rpcs: Vec<_> = endpoint
+        .rpcs()
+        .into_iter()
+        .skip(conn2_rpcs_len)
+        .filter(|(m, _)| m == "sessions.recover")
+        .collect();
+    assert!(
+        conn3_recover_rpcs.is_empty(),
+        "unexpected conn3 sessions.recover: {conn3_recover_rpcs:?}"
     );
     assert_eq!(
         endpoint

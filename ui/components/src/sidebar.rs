@@ -60,6 +60,13 @@ struct RowContextMenuState {
     archived: bool,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct OpenListMenu {
+    open_id: Option<usize>,
+    target_sid: String,
+    archived: bool,
+}
+
 #[derive(Debug)]
 pub struct SidebarSurface {
     next_key: u64,
@@ -71,7 +78,8 @@ pub struct SidebarSurface {
     last_sig: String,
     last_selected_session: Option<String>,
     last_menu_archived: Option<bool>,
-    open_list_menu: Option<(Option<usize>, String)>,
+    open_list_menu: Option<OpenListMenu>,
+    last_consumed_list_menu_anchor: Option<u64>,
     last_fallback_menu_target: Option<String>,
     last_mode: ResponsiveWidthMode,
     search_query: String,
@@ -98,6 +106,7 @@ impl SidebarSurface {
             last_selected_session: None,
             last_menu_archived: None,
             open_list_menu: None,
+            last_consumed_list_menu_anchor: None,
             last_fallback_menu_target: None,
             last_mode: ResponsiveWidthMode::Expanded,
             search_query: String::new(),
@@ -350,6 +359,40 @@ impl SidebarSurface {
             .map(|part| part.index)
     }
 
+    fn observe_open_list_menu(&mut self, host: &ContentHost, selected_session_id: Option<&str>) {
+        let is_open = host
+            .get(SIDEBAR_CONTEXT_MENU_ID)
+            .and_then(|c| c.component::<MenuContent>())
+            .is_some_and(MenuContent::is_open);
+        if !is_open {
+            self.open_list_menu = None;
+            return;
+        }
+        let current_open_id = Self::list_menu_open_identity(host);
+        match &mut self.open_list_menu {
+            Some(open) if open.open_id.is_some() && open.open_id == current_open_id => {}
+            Some(open) if open.open_id.is_none() => {
+                if current_open_id.is_some() {
+                    open.open_id = current_open_id;
+                }
+            }
+            _ => {
+                self.open_list_menu =
+                    self.resolve_list_context_target(host, selected_session_id)
+                        .or_else(|| self.last_fallback_menu_target.clone())
+                        .and_then(|target_sid| {
+                            self.row_archived.get(&target_sid).copied().map(|archived| {
+                                OpenListMenu {
+                                    open_id: current_open_id,
+                                    target_sid,
+                                    archived,
+                                }
+                            })
+                        });
+            }
+        }
+    }
+
     pub fn sync(
         &mut self,
         host: &mut ContentHost,
@@ -360,26 +403,8 @@ impl SidebarSurface {
     ) {
         self.last_mode = width_mode;
 
-        let list_menu_open_before = host
-            .get(SIDEBAR_CONTEXT_MENU_ID)
-            .and_then(|c| c.component::<MenuContent>())
-            .is_some_and(MenuContent::is_open);
-        if list_menu_open_before {
-            let open_id = Self::list_menu_open_identity(host);
-            let same_open = open_id.is_some()
-                && self
-                    .open_list_menu
-                    .as_ref()
-                    .is_some_and(|(cached_id, _)| *cached_id == open_id);
-            if !same_open {
-                self.open_list_menu = self
-                    .resolve_list_context_target(host, self.last_selected_session.as_deref())
-                    .or_else(|| self.last_fallback_menu_target.clone())
-                    .map(|sid| (open_id, sid));
-            }
-        } else {
-            self.open_list_menu = None;
-        }
+        let previous_selected = self.last_selected_session.clone();
+        self.observe_open_list_menu(host, previous_selected.as_deref());
 
         let show_search = self.search_open || !self.search_query.is_empty();
         self.set_search_visible(host, show_search);
@@ -545,18 +570,14 @@ impl SidebarSurface {
             .and_then(|c| c.component::<MenuContent>())
             .is_some_and(MenuContent::is_open);
         if list_menu_open_after {
-            let captured = self.open_list_menu.as_ref().map(|(_, sid)| sid);
-            let target_stale = captured != fallback_target.as_ref()
-                || captured.is_none_or(|sid| !self.row_archived.contains_key(sid))
+            let captured = self.open_list_menu.as_ref();
+            let target_stale = captured.map(|open| &open.target_sid) != fallback_target.as_ref()
+                || captured.is_none_or(|open| {
+                    self.row_archived.get(&open.target_sid).copied() != Some(open.archived)
+                })
                 || self.last_menu_archived != Some(fallback_archived);
             if target_stale {
                 Self::retire_list_context_menu(host);
-                self.open_list_menu = None;
-            } else if self
-                .open_list_menu
-                .as_ref()
-                .is_some_and(|(open_id, _)| open_id.is_none())
-            {
                 self.open_list_menu = None;
             }
         } else {
@@ -646,12 +667,6 @@ impl SidebarSurface {
         records: &[ContentActionRecord],
     ) -> Vec<SidebarIntent> {
         let mut out = Vec::new();
-        if let Some((cached_id, _)) = &self.open_list_menu {
-            let current_open_id = Self::list_menu_open_identity(host);
-            if current_open_id.is_none() || *cached_id != current_open_id {
-                self.open_list_menu = None;
-            }
-        }
         if let Some(search) = host
             .get(SIDEBAR_SEARCH_ID)
             .and_then(|c| c.component::<SearchFieldContent>())
@@ -715,32 +730,38 @@ impl SidebarSurface {
                             && host
                                 .get(SIDEBAR_LIST_ID)
                                 .is_some_and(|node| node.mount_identity() == req.owner_mount())
+                            && self.last_consumed_list_menu_anchor != Some(req.anchor_identity())
                     });
                     if !request_valid {
                         continue;
                     }
-                    self.open_list_menu = None;
-                    let _ = selected_session_id;
-                    let target_sid = host
-                        .get(SIDEBAR_LIST_ID)
-                        .and_then(|c| c.component::<KeyedSelectableListContent>())
-                        .and_then(|list| {
-                            if let Some(focused) = list.focused_key() {
-                                self.key_to_id
-                                    .get(&focused)
-                                    .filter(|sid| self.row_archived.contains_key(*sid))
-                                    .cloned()
-                            } else {
-                                list.selected_key()
-                                    .and_then(|selected| self.key_to_id.get(&selected))
-                                    .filter(|sid| {
-                                        self.row_archived.contains_key(*sid)
-                                            && self.last_fallback_menu_target.as_deref()
-                                                == Some(sid.as_str())
-                                    })
-                                    .cloned()
-                            }
-                        });
+                    if let Some(req) = sel.context_request() {
+                        self.last_consumed_list_menu_anchor = Some(req.anchor_identity());
+                    }
+                    let target_sid = if let Some(open) = self.open_list_menu.take() {
+                        (self.row_archived.get(&open.target_sid).copied() == Some(open.archived))
+                            .then_some(open.target_sid)
+                    } else {
+                        host.get(SIDEBAR_LIST_ID)
+                            .and_then(|c| c.component::<KeyedSelectableListContent>())
+                            .and_then(|list| {
+                                if let Some(focused) = list.focused_key() {
+                                    self.key_to_id
+                                        .get(&focused)
+                                        .filter(|sid| self.row_archived.contains_key(*sid))
+                                        .cloned()
+                                } else {
+                                    list.selected_key()
+                                        .and_then(|selected| self.key_to_id.get(&selected))
+                                        .filter(|sid| {
+                                            self.row_archived.contains_key(*sid)
+                                                && self.last_fallback_menu_target.as_deref()
+                                                    == Some(sid.as_str())
+                                        })
+                                        .cloned()
+                                }
+                            })
+                    };
                     if let Some(sid) = target_sid {
                         self.dispatch_menu_action(host, &sid, sel, &mut out);
                     }
@@ -777,6 +798,7 @@ impl SidebarSurface {
                 }
             }
         }
+        self.observe_open_list_menu(host, selected_session_id);
         out
     }
 

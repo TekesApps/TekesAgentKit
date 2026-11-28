@@ -1129,10 +1129,12 @@ struct ArchiveSwitchConnector {
     park_archive: Arc<std::sync::atomic::AtomicBool>,
     archive_entered: Arc<tokio::sync::Notify>,
     archive_release: Arc<tokio::sync::Notify>,
+    defer_archive_mutation: Arc<std::sync::atomic::AtomicBool>,
     archive_should_succeed: Arc<std::sync::atomic::AtomicBool>,
     archived_a: Arc<std::sync::atomic::AtomicBool>,
     fail_journal_a: Arc<std::sync::atomic::AtomicBool>,
     archive_calls: Arc<AtomicUsize>,
+    inventory_tx: Arc<Mutex<Option<tokio::sync::mpsc::UnboundedSender<Result<Value>>>>>,
     journal_txs: JournalSenderMap,
     control_txs: Arc<
         Mutex<std::collections::BTreeMap<usize, tokio::sync::mpsc::UnboundedSender<Result<Value>>>>,
@@ -1150,12 +1152,14 @@ impl ArchiveSwitchConnector {
             park_archive: Arc::new(std::sync::atomic::AtomicBool::new(true)),
             archive_entered: Arc::new(tokio::sync::Notify::new()),
             archive_release: Arc::new(tokio::sync::Notify::new()),
+            defer_archive_mutation: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             archive_should_succeed: Arc::new(std::sync::atomic::AtomicBool::new(
                 archive_should_succeed,
             )),
             archived_a: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             fail_journal_a: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             archive_calls: Arc::new(AtomicUsize::new(0)),
+            inventory_tx: Arc::new(Mutex::new(None)),
             journal_txs: Arc::new(Mutex::new(std::collections::BTreeMap::new())),
             control_txs: Arc::new(Mutex::new(std::collections::BTreeMap::new())),
         }
@@ -1206,6 +1210,8 @@ impl SessionEndpoint for ArchiveSwitchEndpoint {
     async fn follow(&self, target: StreamTarget) -> Result<FrameStream> {
         match target {
             StreamTarget::SessionInventory => {
+                let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
+                *self.source.inventory_tx.lock().unwrap() = Some(tx);
                 let running = self.source.running_a.load(Ordering::Acquire);
                 let mut items = Vec::new();
                 if !self.source.archived_a.load(Ordering::Acquire) {
@@ -1221,9 +1227,10 @@ impl SessionEndpoint for ArchiveSwitchEndpoint {
                         "items": items
                     }
                 });
-                Ok(Box::pin(
-                    stream::once(async { Ok(baseline) }).chain(stream::pending()),
-                ))
+                let tail = stream::unfold(rx, |mut rx| async move {
+                    rx.recv().await.map(|item| (item, rx))
+                });
+                Ok(Box::pin(stream::once(async { Ok(baseline) }).chain(tail)))
             }
             StreamTarget::SessionControl => {
                 let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
@@ -1321,7 +1328,8 @@ impl SessionEndpoint for ArchiveSwitchEndpoint {
             "session.archive" => {
                 self.source.archive_calls.fetch_add(1, Ordering::SeqCst);
                 let should_succeed = self.source.archive_should_succeed.load(Ordering::Acquire);
-                if should_succeed {
+                let deferred = self.source.defer_archive_mutation.load(Ordering::Acquire);
+                if should_succeed && !deferred {
                     self.source.archived_a.store(true, Ordering::Release);
                 }
                 if self.source.park_archive.swap(false, Ordering::AcqRel) {
@@ -1885,5 +1893,96 @@ async fn remote_journal_error_on_active_session_never_retires_wanted_without_arc
     );
 
     lease_a.release().await.unwrap();
+    r.stop().await.unwrap();
+}
+
+#[tokio::test]
+async fn archive_committed_after_reconnect_ready_retires_live_journal_and_never_reopens() {
+    let source = ArchiveSwitchConnector::new(false, true);
+    source.defer_archive_mutation.store(true, Ordering::Release);
+    let r = Arc::new(SessionRuntime::spawn(
+        "archive-switch",
+        Arc::new(source.clone()),
+    ));
+    r.wait_ready(Duration::from_secs(2)).await.unwrap();
+
+    let lease_a = r.acquire_history("a").await.unwrap();
+    wait_store(&r, |s| s.sessions["a"].journal_ready).await;
+
+    let entered = source.archive_entered.notified();
+    let archive_task = tokio::spawn({
+        let r = r.clone();
+        async move { r.archive("a", "rpc-archive-a").await }
+    });
+    entered.await;
+    assert!(!source.archived_a.load(Ordering::Acquire));
+
+    source.recover_calls.lock().unwrap().clear();
+    let ctrl_tx = source.control_txs.lock().unwrap()[&1].clone();
+    ctrl_tx.send(Err(Error::Disconnected)).unwrap();
+    assert!(matches!(
+        archive_task.await.unwrap(),
+        Err(Error::Disconnected)
+    ));
+
+    // Conn 2 reaches Ready before Kernel processes session.archive(a), so A legitimately opens & recovers on conn 2.
+    wait_store(&r, |s| {
+        s.connection == ConnectionState::Ready
+            && s.connection_epoch >= 2
+            && s.sessions["a"].journal_ready
+    })
+    .await;
+    assert_eq!(
+        source.recover_calls.lock().unwrap().as_slice(),
+        &[json!({ "sessionIds": ["a"] })]
+    );
+
+    // Now the in-flight HTTP archive commits against Kernel and emits inventory remove(a) on conn 2.
+    source.recover_calls.lock().unwrap().clear();
+    source.archived_a.store(true, Ordering::Release);
+    source
+        .inventory_tx
+        .lock()
+        .unwrap()
+        .as_ref()
+        .unwrap()
+        .send(Ok(json!({
+            "type": "remove",
+            "generation": "g",
+            "sessionId": "a"
+        })))
+        .unwrap();
+    source.archive_release.notify_one();
+
+    wait_store(&r, |s| {
+        !s.sessions["a"].journal_ready
+            && s.sessions["a"].journal_error.is_none()
+            && s.sessions["a"].summary.is_none()
+    })
+    .await;
+
+    // Subsequent reconnect must NOT open or recover A.
+    r.reconnect().await.unwrap();
+    wait_store(&r, |s| {
+        s.connection == ConnectionState::Ready && s.connection_epoch >= 3
+    })
+    .await;
+
+    let conn3_opens: Vec<_> = source
+        .followed_journals
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|(c, _)| *c >= 3)
+        .cloned()
+        .collect();
+    assert!(
+        conn3_opens.is_empty(),
+        "unexpected conn3 opens: {conn3_opens:?}"
+    );
+    assert!(source.recover_calls.lock().unwrap().is_empty());
+    assert_eq!(source.archive_calls.load(Ordering::SeqCst), 1);
+
+    drop(lease_a);
     r.stop().await.unwrap();
 }
