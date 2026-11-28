@@ -820,6 +820,7 @@ struct ConnectionInterest {
     deferred_closes: BTreeSet<String>,
     suspended_journals: std::collections::BTreeMap<String, SuspendedJournal>,
     unconfirmed_archives: std::collections::BTreeMap<String, bool>,
+    watch_archived_retirement: BTreeSet<String>,
 }
 
 impl ConnectionInterest {
@@ -830,6 +831,7 @@ impl ConnectionInterest {
         for (id, suspended) in std::mem::take(&mut self.suspended_journals) {
             let was_running = suspended.was_running
                 || store.read(|s| s.sessions.get(&id).is_some_and(session_has_active_run));
+            self.watch_archived_retirement.insert(id.clone());
             if !suspended.closed_while_suspended {
                 self.deferred_closes.remove(&id);
                 self.wanted.insert(id.clone());
@@ -871,6 +873,7 @@ async fn run(
                             &mut interest.wanted,
                             &mut interest.deferred_closes,
                             &mut interest.unconfirmed_archives,
+                            &mut interest.watch_archived_retirement,
                             &store,
                         );
                     }
@@ -955,6 +958,7 @@ async fn run(
                                     &mut interest.wanted,
                                     &mut interest.deferred_closes,
                                     &mut interest.unconfirmed_archives,
+                                    &mut interest.watch_archived_retirement,
                                     &store,
                                 );
                             }
@@ -1010,12 +1014,95 @@ fn session_authoritatively_archived_or_absent(state: &MemoryProjectionStore, id:
         }
 }
 
+#[allow(clippy::too_many_arguments)]
+fn retire_archived_session(
+    id: &str,
+    store: &Arc<SharedProjection>,
+    wanted: &mut BTreeSet<String>,
+    deferred_closes: &mut BTreeSet<String>,
+    unconfirmed_archives: &mut std::collections::BTreeMap<String, bool>,
+    watch_archived_retirement: &mut BTreeSet<String>,
+    journal_epochs: &mut std::collections::BTreeMap<String, u64>,
+    journals: &mut JournalStreams,
+    journal_retries: &mut std::collections::BTreeMap<String, usize>,
+    permanent_journal_errors: &mut BTreeSet<String>,
+) {
+    unconfirmed_archives.remove(id);
+    watch_archived_retirement.remove(id);
+    deferred_closes.remove(id);
+    wanted.remove(id);
+    journal_epochs.remove(id);
+    journals.remove(id);
+    journal_retries.remove(id);
+    permanent_journal_errors.remove(id);
+    store.update(|s| {
+        s.reset_journal(id);
+        if let Some(session) = s.sessions.get_mut(id) {
+            session.journal_error = None;
+        }
+    });
+}
+
+fn archive_candidates_from_frame(
+    stream: &str,
+    frame: &Value,
+    baselines_ready: bool,
+    watch: &BTreeSet<String>,
+) -> Vec<String> {
+    if watch.is_empty() {
+        return Vec::new();
+    }
+    match (stream, frame["type"].as_str()) {
+        ("inventory", Some("remove")) => frame["sessionId"]
+            .as_str()
+            .filter(|id| watch.contains(*id))
+            .map(|id| vec![id.to_owned()])
+            .unwrap_or_default(),
+        ("inventory", Some("upsert")) => {
+            if frame["session"]["status"].as_str() == Some("archived") {
+                frame["session"]["sessionId"]
+                    .as_str()
+                    .filter(|id| watch.contains(*id))
+                    .map(|id| vec![id.to_owned()])
+                    .unwrap_or_default()
+            } else {
+                Vec::new()
+            }
+        }
+        ("inventory", Some("baseline")) if baselines_ready => watch.iter().cloned().collect(),
+        ("workspace", Some("archived")) => frame["sessionIds"]
+            .as_array()
+            .map(|ids| {
+                ids.iter()
+                    .filter_map(|v| v.as_str())
+                    .filter(|id| watch.contains(*id))
+                    .map(str::to_owned)
+                    .collect()
+            })
+            .unwrap_or_default(),
+        ("workspace", Some("baseline" | "replace")) if baselines_ready => {
+            frame["snapshot"]["archivedSessionIds"]
+                .as_array()
+                .map(|ids| {
+                    ids.iter()
+                        .filter_map(|v| v.as_str())
+                        .filter(|id| watch.contains(*id))
+                        .map(str::to_owned)
+                        .collect()
+                })
+                .unwrap_or_default()
+        }
+        _ => Vec::new(),
+    }
+}
+
 fn close_while_disconnected(
     id: String,
     reply: Reply<()>,
     wanted: &mut BTreeSet<String>,
     deferred_closes: &mut BTreeSet<String>,
     unconfirmed_archives: &mut std::collections::BTreeMap<String, bool>,
+    watch_archived_retirement: &mut BTreeSet<String>,
     store: &Arc<SharedProjection>,
 ) {
     if wanted.contains(&id)
@@ -1025,6 +1112,7 @@ fn close_while_disconnected(
         deferred_closes.insert(id);
     } else {
         unconfirmed_archives.remove(&id);
+        watch_archived_retirement.remove(&id);
         deferred_closes.remove(&id);
         wanted.remove(&id);
         store.update(|s| s.reset_journal(&id));
@@ -1066,6 +1154,7 @@ async fn connected(
         deferred_closes,
         suspended_journals,
         unconfirmed_archives,
+        watch_archived_retirement,
     } = interest;
     let connection_epoch = store.read(|state| state.connection_epoch);
     let mut operations: tokio::task::JoinSet<OperationResult> = tokio::task::JoinSet::new();
@@ -1226,11 +1315,38 @@ async fn connected(
                     Ok(())
                 });
                 match result {
-                    Ok(()) if inventory_dirty => {
-                        inventory_dirty = false;
-                        inventory_refreshes.spawn(crate::inventory_refresh::read(endpoint.clone()));
+                    Ok(()) => {
+                        if baselines_ready && store.read(MemoryProjectionStore::ready) {
+                            let watched: Vec<String> =
+                                watch_archived_retirement.iter().cloned().collect();
+                            for id in watched {
+                                if !suspended_journals.contains_key(&id)
+                                    && store.read(|state| {
+                                        session_authoritatively_archived_or_absent(state, &id)
+                                    })
+                                {
+                                    retire_archived_session(
+                                        &id,
+                                        store,
+                                        wanted,
+                                        deferred_closes,
+                                        unconfirmed_archives,
+                                        watch_archived_retirement,
+                                        &mut journal_epochs,
+                                        &mut journals,
+                                        &mut journal_retries,
+                                        &mut permanent_journal_errors,
+                                    );
+                                }
+                            }
+                        }
+                        if inventory_dirty {
+                            inventory_dirty = false;
+                            inventory_refreshes.spawn(crate::inventory_refresh::read(endpoint.clone()));
+                        } else {
+                            for reply in inventory_waiters.drain(..) { let _ = reply.send(Ok(())); }
+                        }
                     }
-                    Ok(()) => { for reply in inventory_waiters.drain(..) { let _ = reply.send(Ok(())); } }
                     Err(error) => {
                         inventory_dirty = false;
                         let message = format!("inventory refresh failed: {error}");
@@ -1258,6 +1374,7 @@ async fn connected(
                         };
                         if result.is_ok() {
                             deferred_closes.remove(&id);
+                            watch_archived_retirement.remove(&id);
                         } else if let Some(suspended) = suspended
                             && !journal_epochs.contains_key(&id)
                         {
@@ -1332,6 +1449,17 @@ async fn connected(
                     if frame_epoch != inventory_epoch { continue; }
                 } else if frame_epoch != epoch { continue; }
                 let is_live = frame.as_ref().is_ok_and(|frame| frame["type"] == "event");
+                let live_archive_candidates = frame
+                    .as_ref()
+                    .map(|frame| {
+                        archive_candidates_from_frame(
+                            &name,
+                            frame,
+                            baselines_ready,
+                            watch_archived_retirement,
+                        )
+                    })
+                    .unwrap_or_default();
                 let result = frame.and_then(|frame| store.update(|s| {
                     let result = s.apply(&name, frame);
                     if !baselines_ready { s.connection = ConnectionState::Connecting; }
@@ -1389,22 +1517,43 @@ async fn connected(
                     return Err(error);
                 }
                 if is_live && let Some(id) = name.strip_prefix("journal:") { journal_retries.remove(id); }
+                if baselines_ready && store.read(MemoryProjectionStore::ready) {
+                    for id in live_archive_candidates {
+                        if !suspended_journals.contains_key(&id)
+                            && store
+                                .read(|state| session_authoritatively_archived_or_absent(state, &id))
+                        {
+                            retire_archived_session(
+                                &id,
+                                store,
+                                wanted,
+                                deferred_closes,
+                                unconfirmed_archives,
+                                watch_archived_retirement,
+                                &mut journal_epochs,
+                                &mut journals,
+                                &mut journal_retries,
+                                &mut permanent_journal_errors,
+                            );
+                        }
+                    }
+                }
                 if store.read(MemoryProjectionStore::ready) && !baselines_ready {
                     let pending_archives: Vec<String> = unconfirmed_archives.keys().cloned().collect();
                     for id in pending_archives {
                         if store.read(|state| session_authoritatively_archived_or_absent(state, &id)) {
-                            unconfirmed_archives.remove(&id);
-                            deferred_closes.remove(&id);
-                            wanted.remove(&id);
-                            journal_epochs.remove(&id);
-                            journals.remove(&id);
-                            permanent_journal_errors.remove(&id);
-                            store.update(|s| {
-                                s.reset_journal(&id);
-                                if let Some(session) = s.sessions.get_mut(&id) {
-                                    session.journal_error = None;
-                                }
-                            });
+                            retire_archived_session(
+                                &id,
+                                store,
+                                wanted,
+                                deferred_closes,
+                                unconfirmed_archives,
+                                watch_archived_retirement,
+                                &mut journal_epochs,
+                                &mut journals,
+                                &mut journal_retries,
+                                &mut permanent_journal_errors,
+                            );
                             continue;
                         }
                         if !wanted.contains(&id) || journal_epochs.contains_key(&id) {
@@ -1441,6 +1590,24 @@ async fn connected(
                                     unconfirmed_archives.remove(&id);
                                 }
                             }
+                        }
+                    }
+                    let watched: Vec<String> = watch_archived_retirement.iter().cloned().collect();
+                    for id in watched {
+                        if store.read(|state| session_authoritatively_archived_or_absent(state, &id))
+                        {
+                            retire_archived_session(
+                                &id,
+                                store,
+                                wanted,
+                                deferred_closes,
+                                unconfirmed_archives,
+                                watch_archived_retirement,
+                                &mut journal_epochs,
+                                &mut journals,
+                                &mut journal_retries,
+                                &mut permanent_journal_errors,
+                            );
                         }
                     }
                     if endpoint.supports_recovery() {
@@ -1499,6 +1666,7 @@ async fn connected(
                             permanent_journal_errors.remove(&id);
                             suspended_journals.remove(&id);
                             unconfirmed_archives.remove(&id);
+                            watch_archived_retirement.remove(&id);
                         }
                         let _ = reply.send(result);
                     }
@@ -1520,6 +1688,7 @@ async fn connected(
                                 deferred_closes.insert(id);
                             } else {
                                 unconfirmed_archives.remove(&id);
+                                watch_archived_retirement.remove(&id);
                                 deferred_closes.remove(&id);
                                 wanted.remove(&id);
                                 journal_epochs.remove(&id);
@@ -1537,6 +1706,7 @@ async fn connected(
                             let _ = reply.send(Ok(()));
                             continue;
                         }
+                        watch_archived_retirement.remove(&id);
                         deferred_closes.remove(&id);
                         wanted.remove(&id);
                         journal_epochs.remove(&id);
